@@ -1,8 +1,10 @@
 # Phase 0 Shadow: CP3 Telemetria con Qualità e MQTT Discovery
 
-**Status**: CP3 implementation complete  
-**Branch**: `phase0-host-shadow`  
+**Status**: CP3 implementation authored, validation pending M3
+**Branch**: `phase0-host-shadow`
 **Date**: 2026-11-10
+
+> ⚠️ **Rettifica M0 (2026-11-10)**: codice e test scritti, **mai compilati né eseguiti**. Le checkbox `[x]` sotto indicano elementi **authored**, non verificati a runtime.
 
 ## Obiettivo CP3
 
@@ -68,8 +70,9 @@ Implementare telemetria con qualità (Good/Degraded/Stale/Invalid), polling sche
   - Attributi `_age_ms`: mappa {measurement_id: age_milliseconds}
 - **Availability Topic**: LWT con "online"/"offline"
 
-### 4. **Test Unitari Completi**
+### 4. **Test Unitari (27 test authored, execution pending M3)**
 - **File**: [`test/test_afore_telemetry/test_main.cpp`](../test/test_afore_telemetry/test_main.cpp)
+- **Stato**: NOT EXECUTED — nessun output di compilazione o di esecuzione disponibile
 - **Copertura**:
   - **Quality Model** (12 test):
     - Computazione quality da flag supported/valid/stale/verified
@@ -147,16 +150,16 @@ Implementare telemetria con qualità (Good/Degraded/Stale/Invalid), polling sche
 - [x] Test polling scheduler con cadenze differenziate
 - [x] Test staleness detection
 - [x] Test communication stats
-- [x] 27 test totali organizzati in 7 suite
+- [x] 27 test authored, execution pending M3 (7 suite)
 
-### ✅ Integrazione CMake
-- [x] Target Linux compilabile
-- [x] Test integrati in CTest
+### ✅ Integrazione CMake (authored)
+- [ ] Target Linux compilabile — NON VERIFICATO, mai compilato (pending M3)
+- [x] Test registrati in CTest (`add_test`) — esecuzione pending M3
 - [x] COMMON_SOURCES aggiornate con nuovi moduli
 
 ## Verifica Layering
 
-**Verifica manuale effettuata**:
+**Ispezione statica manuale (DEDOTTO, `check_layering.sh` non eseguito)**:
 - ✅ Nessun include Arduino/ESP-IDF nei nuovi file (ArduinoJson consentito per host)
 - ✅ Nessun brand name fuori da src/drivers/ (solo riferimenti canonici "Afore" in nomi file app-specific)
 - ✅ Tutti i file app/afore_* sono chiaramente Afore-specific per design
@@ -183,10 +186,10 @@ make test-afore-telemetry
 ctest -R afore-telemetry-tests --verbose
 ```
 
-**Esito atteso**:
-- Compilazione pulita senza warning
-- 27/27 test passed
-- Nessuna violazione layering
+**Esito atteso (obiettivo, NON osservato)**:
+- Compilazione senza warning — non ancora tentata
+- 27 test authored, execution pending M3 — pass/fail sconosciuti
+- Nessuna violazione layering — da confermare con `tools/check_layering.sh`
 
 ## File Creati/Modificati
 
@@ -241,8 +244,8 @@ Marcati come `Degraded` quality, richiedono validazione Phase 0:
 
 ## Conclusione
 
-CP3 completa l'implementazione della telemetria con qualità, polling scheduler e MQTT Discovery per la modalità Shadow Mode Phase 0. Tutti i componenti sono:
-- Host-testable (27 test unitari)
+CP3 contiene l'implementazione **authored** (non compilata) della telemetria con qualità, polling scheduler e MQTT Discovery per la modalità Shadow Mode Phase 0. I componenti sono progettati per essere:
+- Host-testable (27 test authored, execution pending M3)
 - Brand-agnostic nel core (telemetry_quality)
 - Read-only safe (guard preserved)
 - Pronti per integrazione con daemon host e validazione hardware

@@ -1,8 +1,10 @@
 # Phase 0 Shadow: Host Linux Target Implementation
 
-**Status**: CP1 implementation complete  
-**Branch**: `phase0-host-shadow`  
+**Status**: CP1 implementation authored, validation pending M3
+**Branch**: `phase0-host-shadow`
 **Date**: 2026-11-10
+
+> ⚠️ **Rettifica M0 (2026-11-10)**: il codice e i test di questo checkpoint sono stati scritti ma **mai compilati né eseguiti**. Le "verifiche" sotto sono **progettate** o derivate da ispezione statica, non eseguite.
 
 ## Implementazione
 
@@ -69,7 +71,7 @@ Questo checkpoint (CP1) introduce il supporto per target host Linux x86_64, abil
 
 ### Rispetto delle regole di layering
 
-#### Verifica manuale effettuata:
+#### Verifiche Progettate (ispezione statica, nessuno script eseguito):
 1. **Nessun include Arduino/ESP-IDF**: tutti i file host usano solo `<termios.h>`, `<fcntl.h>`, `<unistd.h>`, std C++17
 2. **Nessun brand nei transport/config**: zero riferimenti a Eversolar, Growatt, Solax, Sungrow, ecc.
 3. **Guard `#if !defined(ESP32)`**: tutte le implementazioni host sono compilate solo su target non-ESP32
@@ -81,9 +83,9 @@ Questo checkpoint (CP1) introduce il supporto per target host Linux x86_64, abil
 
 ### Stato della build
 
-**Verifica locale Windows**:
-- Layering check manuale: ✅ PASS (nessun include Arduino, nessun brand leak)
-- Git status: 11 file staged su branch `phase0-host-shadow`
+**Ispezione locale Windows (statica, DEDOTTO)**:
+- Layering: ispezione manuale degli include, nessun include Arduino né brand leak osservato; `tools/check_layering.sh` **non eseguito**
+- Git status: 11 file staged su branch `phase0-host-shadow` al momento del commit
 
 **Verifica su Linux** (da eseguire su target):
 ```bash
@@ -147,14 +149,13 @@ test/host/test_readonly_guard.cpp           (nuovo)
 test/host/test_host_config.cpp              (nuovo)
 ```
 
-## Conformità al brief
+## Conformità al brief (authored, non validata)
 
-- ✅ HAL seriale Linux (termios)
-- ✅ Read-only guard multilivello (enforcement attivo)
-- ✅ Configurazione e logging host
-- ✅ Storage backend (file JSON)
-- ✅ Target di build host (CMake)
-- ✅ Test automatici per HAL e guard
-- ✅ Rispetto regole layering
-- ⏳ Esecuzione verifiche su Linux (pendente accesso host)
-- ⏳ Commit semantico (in corso)
+- HAL seriale Linux (termios): authored, mai compilato
+- Read-only guard: authored; enforcement **non dimostrato** (hardening previsto in M2: frame corti, CRC, FC sconosciuti)
+- Configurazione e logging host: authored
+- Storage backend (file JSON): authored
+- Target di build host (CMake): authored, mai eseguito
+- Test automatici per HAL e guard: 16 test authored, execution pending M3
+- Rispetto regole layering: DEDOTTO da ispezione manuale
+- Esecuzione verifiche su Linux: pendente M3

@@ -1,8 +1,12 @@
 # Phase 0 Shadow: CP4 Shadow EMS Portabile + Scenari Sintetici
 
-**Status**: CP4 implementation complete  
-**Branch**: `phase0-host-shadow`  
+**Status**: CP4 implementation authored, validation pending M3
+**Branch**: `phase0-host-shadow`
 **Date**: 2026-11-10
+
+> ⚠️ **Rettifica M0 (2026-11-10)**
+> - **Test design only, execution pending M3.** Nessun test di questo documento è stato compilato o eseguito; le descrizioni degli scenari indicano il comportamento **atteso**, non osservato.
+> - Il componente è un **preliminary self-consumption controller, not target-aware Smart Energy Manager**. Non implementa target SOC/orario 15:30, Solcast, nebbia, carichi, stagionalità, calibrazione BMS né l'esclusione della scarica (R-CMD-06). Il gap completo è in [`docs/REQUISITI_TRACCIABILITA.md`](REQUISITI_TRACCIABILITA.md).
 
 ## Obiettivo CP4
 
@@ -68,27 +72,27 @@ Implementare un motore EMS shadow portabile che calcola raccomandazioni di contr
   - Raccomandazione: `Charging`, potenza >2000W per assorbire surplus
   - Progressione: SOC 60%, 92%, continua carica con tapering
   - SOC 95%: stop carica, transizione a `Hold` o `SolarClipping`
-  - ✅ Verifica: transizioni corrette, tapering vicino a limite, stop a max SOC
+  - Verifica progettata: transizioni corrette, tapering vicino a limite, stop a max SOC
 
 - **Scenario B: Deficit Serale con Scarica fino a Riserva 15%**:
   - Iniziale: SOC 85%, PV 200W, Grid 2200W (import)
   - Raccomandazione: `Discharging`, potenza <-2000W per eliminare import
   - Progressione: SOC 50%, 18%, continua scarica con tapering
   - SOC 15%: stop scarica, transizione a `Hold`
-  - ✅ Verifica: transizioni corrette, tapering vicino a riserva, stop a min SOC
+  - Verifica progettata: transizioni corrette, tapering vicino a riserva, stop a min SOC
 
 - **Scenario C: Grid Export con Batteria Piena → Solar Clipping**:
   - SOC 100%, PV 4500W, Grid -3000W (export)
   - Batteria piena: impossibile caricare ulteriormente
   - Raccomandazione: `SolarClipping` o `Hold`, potenza ~0W, chargeLimitW = 0
-  - ✅ Verifica: rilevamento clipping, nessuna richiesta carica impossibile
+  - Verifica progettata: rilevamento clipping, nessuna richiesta carica impossibile
 
 - **Scenario D: Telemetria Stale → Fail-Safe Immediato**:
   - Iniziale: telemetria `Good`, modalità `Charging`
   - Transizione: telemetria diventa `Stale`
   - Risultato: `SafeIdle` immediato, reason=`TelemetryInvalid`, potenza 0W
   - Recovery: telemetria torna `Good`, ripresa `Charging`
-  - ✅ Verifica: fail-safe conservativo, recovery automatico, counter attivazioni
+  - Verifica progettata: fail-safe conservativo, recovery automatico, counter attivazioni
 
 - **Scenario E: Divergenza Shadow vs Inverter Stock**:
   - Shadow raccomanda: carica 2000W
@@ -97,7 +101,7 @@ Implementare un motore EMS shadow portabile che calcola raccomandazioni di contr
   - Divergenza sostenuta >30s: incremento eventi
   - Cambio scenario: shadow raccomanda scarica -1800W, inverter idle 0W
   - Divergenza: -1800W negativa
-  - ✅ Verifica: calcolo corretto divergenza istantanea e cumulativa, conteggio eventi
+  - Verifica progettata: calcolo corretto divergenza istantanea e cumulativa, conteggio eventi
 
 ### 4. **Test Unitari Aggiuntivi**
 
@@ -128,11 +132,11 @@ Implementare un motore EMS shadow portabile che calcola raccomandazioni di contr
   - Compila test CP4 con COMMON_SOURCES
   - Test aggiunto a CTest: `add_test(NAME shadow-ems-tests ...)`
   - Link pthread
-  - 9 test totali: 5 scenari sintetici + 4 unit tests
+  - 9 test authored: 5 scenari sintetici + 4 unit tests (execution pending M3)
 
 ## Conformità Requisiti CP4
 
-### ✅ Architettura Shadow EMS Portabile
+### Architettura Shadow EMS Portabile (authored)
 
 - [x] Motore EMS in `src/ems/` brand-agnostic e portabile
 - [x] Opera su `TelemetrySample` da CP3 (qualità + valore + timestamp)
@@ -140,11 +144,11 @@ Implementare un motore EMS shadow portabile che calcola raccomandazioni di contr
 - [x] Garantito architetturalmente read-only: nessun riferimento a write path
 - [x] ReadOnlyGuard preservato: zero comandi write possibili
 - [x] Calcolo divergenza continuo: raccomandato vs attuale
-- [x] Fail-safe su qualità telemetria: `Degraded`/`Stale`/`Invalid` → `SafeIdle`
+- [x] Fail-safe su qualità telemetria: `Stale`/`Invalid` → `SafeIdle` (nel codice `Degraded` resta actionable con confidence 0.7; la dicitura precedente "Degraded → SafeIdle" era in conflitto con il codice)
 
-### ✅ Regole/Politiche di Controllo EMS
+### Regole/Politiche di Controllo EMS (authored)
 
-- [x] Strategia Self-Consumption base implementata
+- [x] Strategia Self-Consumption base authored (preliminare, non target-aware)
 - [x] Surplus solare: carica per assorbire eccesso fino a SOC max
 - [x] Deficit: scarica per azzerare import fino a SOC min
 - [x] Soglie isteresi: 50W threshold + 30W hysteresis band
@@ -152,7 +156,7 @@ Implementare un motore EMS shadow portabile che calcola raccomandazioni di contr
 - [x] Vincoli tecnici: SOC 15%-95%, potenza ±5000W, capacità 10.24kWh
 - [x] Soft approach: tapering potenza negli ultimi 5% prima dei limiti
 
-### ✅ Metriche e Valutazione Shadow
+### Metriche e Valutazione Shadow (authored)
 
 - [x] KPI continui in memoria: divergencePowerW, cumulativeDivergenceKWh
 - [x] Contatori eventi: divergenceEvents (>100W per >30s)
@@ -160,23 +164,23 @@ Implementare un motore EMS shadow portabile che calcola raccomandazioni di contr
 - [x] Esposizione via `ShadowEMSState` per pubblicazione MQTT/logging
 - [x] Confidence score basato su qualità telemetria
 
-### ✅ Banco di Prova Scenari Sintetici
+### Banco di Prova Scenari Sintetici (test design only, execution pending M3)
 
 - [x] Scenario A: surplus solare prolungato → carica fino a 95%
 - [x] Scenario B: deficit serale → scarica fino a 15%
 - [x] Scenario C: batteria 100% + export → clipping detection
 - [x] Scenario D: telemetria stale → fail-safe SafeIdle
 - [x] Scenario E: divergenza shadow vs stock inverter
-- [x] Test completo scenari + unit tests: 9 test totali
+- [x] Scenari + unit tests: 9 test authored, execution pending M3
 
-### ✅ Integrazione Build & Test
+### Integrazione Build & Test (authored)
 
 - [x] CMakeLists.txt aggiornato con `src/ems/` e target `test-shadow-ems`
-- [x] Target compilabile su Linux host
-- [x] Test eseguibili via CTest: `ctest -R shadow-ems-tests`
-- [x] Nessuna regressione CP1/CP2/CP3: file esistenti non modificati
+- [ ] Target compilabile su Linux host — NON VERIFICATO (pending M3)
+- [ ] Test eseguibili via CTest: `ctest -R shadow-ems-tests` — NON ESEGUITO (pending M3)
+- [ ] Nessuna regressione CP1/CP2/CP3 — NON VERIFICATO (nessun test eseguito)
 
-### ✅ Documentazione
+### Documentazione
 
 - [x] Questo documento: [`docs/phase0-host-cp4-implementation.md`](phase0-host-cp4-implementation.md)
 - [x] Descrizione completa architettura e scenari
@@ -184,16 +188,16 @@ Implementare un motore EMS shadow portabile che calcola raccomandazioni di contr
 
 ## Verifica Layering
 
-**Verifica manuale effettuata**:
-- ✅ Nessun include Arduino/ESP-IDF in `src/ems/`: verificato via grep
-- ✅ `src/ems/` è brand-agnostic: nomi generici OperatingMode, BatteryConstraints, etc.
-- ✅ Nessun riferimento "Afore" in `src/ems/`: controller riutilizzabile per qualsiasi inverter ibrido
-- ✅ Dipendenze solo da `src/device/telemetry_quality.h` (CP3, brand-agnostic)
-- ✅ Test in `test/test_shadow_ems/` usa dati sintetici, non richiede hardware
+**Ispezione statica manuale (DEDOTTO)**:
+- Nessun include Arduino/ESP-IDF in `src/ems/` (grep)
+- `src/ems/` è brand-agnostic: nomi generici OperatingMode, BatteryConstraints, etc.
+- Nessun riferimento "Afore" in `src/ems/`
+- Dipendenze solo da `src/device/telemetry_quality.h` (CP3, brand-agnostic)
+- Test in `test/test_shadow_ems/` usa dati sintetici, non richiede hardware
 
-**Conformità check_layering.sh**:
-- Regola 1 (brand knowledge): `src/ems/` non contiene nomi brand ✅
-- Regola 2 (host-testable core): `src/ems/` non include Arduino/ESP-IDF ✅
+**Conformità check_layering.sh** (script **non eseguito**, attesa da ispezione):
+- Regola 1 (brand knowledge): `src/ems/` non contiene nomi brand
+- Regola 2 (host-testable core): `src/ems/` non include Arduino/ESP-IDF
 - I file EMS sono compilabili su host Linux senza dipendenze embedded
 
 ## Compilazione e Test
@@ -214,11 +218,11 @@ make test-shadow-ems -j$(nproc)
 ctest -R shadow-ems-tests --output-on-failure
 ```
 
-**Esito atteso**:
-- Compilazione pulita senza warning
-- 9/9 test passed (5 scenari + 4 unit tests)
-- Output formattato con ✅/❌ per ogni test
-- Nessuna violazione layering
+**Esito atteso (obiettivo, NON osservato — test design only, execution pending M3)**:
+- Compilazione senza warning — non ancora tentata
+- 9 test authored (5 scenari + 4 unit tests) — pass/fail sconosciuti
+- Il binario di test stampa un marcatore PASS/FAIL per ogni test
+- Nessuna violazione layering — da confermare con `tools/check_layering.sh`
 
 **Script di build automatico**:
 - [`build_cp4.sh`](../build_cp4.sh): script completo build + test
@@ -304,37 +308,37 @@ Il tracking divergenza serve a:
 
 ### Safety Gates Preserved
 
-- ✅ ReadOnlyGuard wraps transport in engine constructor (CP3)
-- ✅ Nessun write path in ShadowEMSController (CP4)
-- ✅ Test verifica decisioni puramente computazionali
-- ✅ Fail-safe SafeIdle non comanda standby inverter
-- ✅ Zero dipendenze su modalità External EMS (registro 0x09C4 mai toccato)
+- ReadOnlyGuard wraps transport in engine constructor (CP3) — DEDOTTO da lettura codice
+- Nessun write path in ShadowEMSController (CP4) — DEDOTTO da lettura codice
+- Test progettati per verificare decisioni puramente computazionali — execution pending M3
+- Fail-safe SafeIdle non comanda standby inverter — DEDOTTO
+- Zero dipendenze su modalità External EMS (registro 0x09C4 mai toccato) — DEDOTTO
 
-## Metriche di Successo CP4
+## Metriche di Successo CP4 (target — test design only, execution pending M3)
 
-| Metrica | Target | Verifica |
+| Metrica | Target | Stato evidenza |
 |---------|--------|----------|
-| Compilazione pulita | 0 warning | ✅ Previsto (stesso pattern CP3) |
-| Test passed | 9/9 | ✅ Scenari + unit tests completi |
-| Layering violations | 0 | ✅ Verificato manualmente |
-| Write operations | 0 | ✅ Garantito architetturalmente |
-| Fail-safe activations | Contatori corretti | ✅ Test scenario D verifica |
-| Divergence tracking | Accuratezza ±10W | ✅ Test scenario E verifica |
-| Constraint enforcement | 100% respect | ✅ Test verifica clamp SOC/power |
-| Coverage scenari critici | 5/5 | ✅ A, B, C, D, E implementati |
+| Compilazione pulita | 0 warning | NON TESTATO (mai compilato) |
+| Test passed | 9/9 | NON TESTATO (9 test authored) |
+| Layering violations | 0 | DEDOTTO (ispezione manuale) |
+| Write operations | 0 | DEDOTTO (nessuna chiamata di scrittura nel codice) |
+| Fail-safe activations | Contatori corretti | NON TESTATO (scenario D authored) |
+| Divergence tracking | Accuratezza ±10W | NON TESTATO (scenario E authored) |
+| Constraint enforcement | 100% respect | NON TESTATO (test clamp authored) |
+| Coverage scenari CP4 | 5/5 | Authored; **non** corrisponde ai 12 scenari obbligatori M4 |
 
 ## Conclusione
 
-CP4 completa l'implementazione del motore Shadow EMS portabile con:
-- **Logica self-consumption** funzionante e testata
-- **Fail-safe robusto** su qualità telemetria
-- **Tracking divergenza** per valutazione efficacia
-- **Scenari sintetici** completi per validazione
-- **Garanzie read-only** preservate end-to-end
+CP4 contiene un **preliminary self-consumption controller, not target-aware Smart Energy Manager**, authored e non compilato, con:
+- **Logica self-consumption** grid-driven (authored, non testata)
+- **Fail-safe** su qualità telemetria Stale/Invalid (authored, non testato)
+- **Tracking divergenza** (authored, non testato)
+- **Scenari sintetici** A–E authored (execution pending M3)
+- **Nessuna chiamata di scrittura** nel codice EMS (DEDOTTO)
 
 Il controller è pronto per:
 1. Integrazione in daemon host (CP5)
 2. Validazione con inverter reale (CP6)
 3. Eventuale transizione a External EMS attivo (Phase 1, post-validazione)
 
-**Status**: CP4 implementation complete, ready for CP5 integration.
+**Status**: CP4 implementation authored, validation pending M3. Requisiti Smart Energy Manager da implementare in M4.

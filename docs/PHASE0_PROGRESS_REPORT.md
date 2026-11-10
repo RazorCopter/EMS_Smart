@@ -1,9 +1,13 @@
 # Afore Autonomous EMS V4 - Phase 0 Progress Report
 
-**Data Report**: 2026-11-10  
-**Branch**: `phase0-host-shadow`  
-**Stato**: Checkpoint CP0-CP4 Completati  
+**Data Report**: 2026-11-10
+**Branch**: `phase0-host-shadow`
+**Stato**: CP0 completato; CP1-CP4 authored (codice e test scritti), non compilati né eseguiti
 **Modalità**: Strict Read-Only Shadow Mode
+
+> ⚠️ **DISCLAIMER (rettifica M0, 2026-11-10)** — **Design only, no runtime validation.**
+> Il codice C++ e i test descritti per CP1-CP4 sono stati **scritti (authored)** ma **mai compilati né eseguiti**. Nessun output di build o di CTest esiste. Nessuna porta seriale è stata aperta, nessun inverter è stato contattato.
+> Le uniche verifiche **eseguite** con exit code osservato sono i check Python su Windows registrati in CP0/CP2. Ogni altra voce "verificato" in questo documento va letta come **DEDOTTO** (ispezione statica) o **NON TESTATO**. Esecuzione test pendente in **M3** (vedi `docs/avanzamentoPiano.md`).
 
 ---
 
@@ -61,11 +65,17 @@ Il progetto si basa sul fork del firmware open-source [Heliograph](https://githu
    - Effort sostenibile, rischi mitigabili
    - Difesa in profondità a 4 livelli progettata
 
-#### Verifiche Eseguite
-- ✅ Check Python tools: `check_measurement_ids.py`, `gen_profiles.py --check`, `check_readback_rule.py`, `check_web_js.py` (exit code 0)
-- ✅ Layering verification manuale (include paths, brand isolation)
-- ⚠️ PlatformIO native tests: non eseguiti (toolchain assente su Windows)
-- ❌ SSH host `10.0.5.174`: autenticazione fallita (pubkey non configurata)
+#### Verifiche — Authored vs Executed
+**Executed** (comando eseguito, exit code osservato, Windows):
+- `check_measurement_ids.py`, `gen_profiles.py --check`, `check_readback_rule.py`, `check_web_js.py`: exit code 0
+- `ruff check tools/ && ruff format --check tools/`: exit code 0
+- SSH host `10.0.5.174`: tentato, exit code 255 (pubkey non configurata) → verifica host NON eseguita
+
+**Static inspection only** (DEDOTTO, nessuno script eseguito):
+- Layering verification manuale (include paths, brand isolation); `tools/check_layering.sh` non eseguito
+
+**Not executed**:
+- PlatformIO native tests (`pio test -e native`): toolchain assente su Windows
 
 #### Metriche
 - **File creati**: 1 (GAP_ASSESSMENT.md)
@@ -149,12 +159,17 @@ Specifica tecnica completa con:
 - Acceptance criteria formali
 - Future work (OTA, watchdog, remote diagnostics)
 
-#### Verifiche Eseguite
-- ✅ Layering verification manuale (zero include Arduino/ESP-IDF)
-- ✅ Brand isolation (nessun "afore" fuori da `src/app/`, `profiles/`, `test/`)
-- ✅ Compatibilità interfaccia `Transport` preservata
-- ⏳ Compilazione CMake su Linux: richiede ambiente target
-- ⏳ Test unitari esecuzione: richiede g++/clang++ + ArduinoJson
+#### Verifiche — Authored vs Executed
+**Executed**: nessuna.
+
+**Static inspection only** (DEDOTTO):
+- Layering manuale (zero include Arduino/ESP-IDF nei file host)
+- Brand isolation (nessun "afore" fuori da `src/app/`, `profiles/`, `test/`)
+- Firma interfaccia `Transport` invariata (lettura codice, non compilato)
+
+**Authored, not executed** (pending M3):
+- 16 test unitari host (`test/host/`)
+- Compilazione CMake su Linux
 
 #### Metriche CP1
 - **File creati**: 12
@@ -270,12 +285,19 @@ Aggiunto brand "afore" al pattern di isolamento (rule 1, line 48):
 eversolar|zeversolar|growatt|solax|deye|...|afore
 ```
 
-#### Verifiche Eseguite
-- ✅ Profilo TOML validato con [`gen_profiles.py --check`](../tools/gen_profiles.py) (exit code 0)
-- ✅ Layering verificato con grep brand pattern
-- ✅ Fixture JSON schema validato
-- ⏳ Test unitari compilazione: richiede CMake + CTest su Linux
-- ⏳ Sign conventions: da confermare con ciclo carica/scarica reale (CP4/CP5)
+#### Verifiche — Authored vs Executed
+**Executed**:
+- [`gen_profiles.py --check`](../tools/gen_profiles.py): exit code 0 riportato durante CP2 (output non allegato in questo documento; da ripetere con output allegato)
+
+**Static inspection only** (DEDOTTO):
+- Layering tramite grep del pattern brand
+- Fixture JSON: struttura ispezionata visivamente (nessuno schema validator eseguito)
+
+**Authored, not executed** (pending M3):
+- 9 test unitari `test/test_afore/`
+
+**Not verifiable before G1/M8**:
+- Sign conventions (`0x07D8`, `0x0212`): richiedono dati reali
 
 #### Metriche CP2
 - **File creati**: 6
@@ -460,12 +482,16 @@ Specifica tecnica con:
 - MQTT topic tree completo
 - Conformità requisiti CP3
 
-#### Verifiche Eseguite
-- ✅ Layering verification manuale
-- ✅ ArduinoJson consentito per host (header-only, portabile)
-- ✅ Nessun brand leak in `telemetry_quality` (brand-agnostic)
-- ⏳ Test unitari compilazione: richiede CMake + ArduinoJson
-- ⏳ MQTT Discovery test con broker reale: richiede mosquitto
+#### Verifiche — Authored vs Executed
+**Executed**: nessuna.
+
+**Static inspection only** (DEDOTTO):
+- Layering manuale; ArduinoJson ritenuto accettabile per host (header-only)
+- Nessun brand name in `telemetry_quality` (grep)
+
+**Authored, not executed** (pending M3):
+- 27 test unitari `test/test_afore_telemetry/`
+- Generazione payload MQTT Discovery (mai prodotta a runtime, nessun broker contattato)
 
 #### Metriche CP3
 - **File creati**: 8
@@ -678,13 +704,18 @@ Specifica tecnica con:
 - Divergence metrics definition
 - Scenari test case dettagliati
 
-#### Verifiche Eseguite
-- ✅ Layering verification: nessun brand name in `src/ems/` (portabile)
-- ✅ Zero write path: EMS puramente computazionale
-- ✅ ReadOnlyGuard preservation da CP1/CP2/CP3
-- ✅ Fail-safe robusto su telemetria degradata
-- ⏳ Test unitari compilazione: richiede CMake + g++
-- ⏳ Scenari sintetici esecuzione: richiede CTest
+#### Verifiche — Authored vs Executed
+**Executed**: nessuna.
+
+**Static inspection only** (DEDOTTO):
+- Nessun brand name in `src/ems/` (grep)
+- Nessuna chiamata di scrittura Modbus in `src/ems/` (lettura codice)
+- Logica fail-safe presente nel codice (comportamento non osservato a runtime)
+
+**Authored, not executed** (pending M3):
+- 9 test `test/test_shadow_ems/` (5 scenari + 4 unit)
+
+**Scope note**: il controller CP4 è un **preliminary self-consumption controller**, non il Smart Energy Manager target-aware richiesto dal piano (vedi `docs/REQUISITI_TRACCIABILITA.md`).
 
 #### Metriche CP4
 - **File creati**: 8
@@ -718,14 +749,17 @@ Total lines: ~6200 (code + docs + test)
 | **Tot** | **35** | **3100** | **1792** | **1812** | **61** | **5** |
 
 ### Test Coverage
+> Design only, no runtime validation. I conteggi sotto sono test **scritti**, non eseguiti.
+
 ```
-Unit tests totali: 61
+Unit tests authored: 61
 - CP1 (HAL/transport): 16
 - CP2 (register decoding): 9
 - CP3 (telemetry/MQTT): 27
 - CP4 (Shadow EMS): 9
 
-Pass rate: 100% (su design, esecuzione richiede Linux)
+Test authored, execution pending M3
+Executed: 0 / Passed: unknown / Failed: unknown
 ```
 
 ### Documentazione Prodotta
@@ -925,16 +959,17 @@ sudo systemctl start afore-shadow
 
 ## Conclusioni
 
-### Obiettivi Raggiunti
-✅ Dimostrata fattibilità tecnica porting Heliograph su Linux  
-✅ Implementata difesa multilivello read-only (100% safety)  
-✅ Creato profilo Afore AF5K-SL con tassonomia VERIFIED/UNVERIFIED  
-✅ Implementato Shadow EMS con self-consumption optimization  
-✅ Prodotta documentazione completa (1812 righe)  
-✅ Scritti 61 test unitari (design verificato)
+### Obiettivi Raggiunti (rettificati M0 — design only, no runtime validation)
+- Fattibilità del porting Heliograph su Linux: **analizzata** (CP0, analisi statica)
+- Difesa multilivello read-only: **progettata**, Level 3 (`ReadOnlyGuard`) **authored**, non compilato né testato
+- Profilo Afore AF5K-SL con tassonomia VERIFIED/UNVERIFIED: **authored**
+- Shadow EMS: **preliminary self-consumption controller authored**, non target-aware
+- Documentazione prodotta
+- 61 test unitari **authored, execution pending M3**
 
 ### Stato Progetto
-**Phase 0 - Checkpoint CP0-CP4**: ✅ Completati  
+**Phase 0 - Checkpoint CP0**: completato (analisi)
+**Phase 0 - Checkpoint CP1-CP4**: authored, non compilati né eseguiti
 **Phase 0 - Checkpoint CP5**: ⏳ Da Avviare  
 **Phase 0 - Servizio systemd**: ⏳ Da Implementare  
 **Phase 0 - Report Finale**: ⏳ Dipende da 7 giorni raccolta dati
@@ -943,7 +978,7 @@ sudo systemctl start afore-shadow
 ⚠️ **NON PRONTO**
 
 Prerequisiti:
-1. ✅ Read-only validation completa (CP0-CP4)
+1. ⏳ Read-only validation: guard authored, test pending M2/M3
 2. ⏳ 7 giorni dati Phase 0 senza incidenti
 3. ⏳ Sign conventions validate empiricamente
 4. ⏳ Divergenza analizzata e compresa

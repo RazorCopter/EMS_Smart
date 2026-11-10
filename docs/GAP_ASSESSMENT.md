@@ -108,7 +108,7 @@ Heliograph strictly enforces modular separation of concerns and clean layering b
 
 | Module Subsystem | File Paths | Classification | Porting / Adaptation Strategy for Host |
 |---|---|---|---|
-| **Modbus RTU Codec** | `src/protocols/modbus/modbus_rtu.{h,cpp}` | **Directly Portable** | 100% standard C++17. Zero hardware dependencies. Fully tested. |
+| **Modbus RTU Codec** | `src/protocols/modbus/modbus_rtu.{h,cpp}` | **Directly Portable** | 100% standard C++17. Zero hardware dependencies. Upstream test suite present (`test/test_modbus`); **not executed in this workspace** (see §6.1). |
 | **Modbus Client Engine** | `src/protocols/modbus/modbus_client.{h,cpp}` | **Directly Portable** | Pure C++17, depends only on `Transport` abstraction. |
 | **Profile Driver** | `src/drivers/modbus_profile/` | **Directly Portable** | TOML-driven parser, span optimizer, measurement decoder. Pure C++. |
 | **Byte Ordering & Math** | `src/protocols/byte_order.h` | **Directly Portable** | Header-only portable endian conversions. |
@@ -227,6 +227,7 @@ According to official Afore documentation (`Doc/外部Ems调度 - En_240312.docx
    - `0x0A09–0x0A0A`: Active Power Setpoint (signed 32-bit integer, Watts).
 2. **Function Code Requirement**: Afore requires **Modbus FC10 (Write Multiple Registers)** for writing `0x0A09–0x0A0A`. Since Heliograph's `ModbusClient` does not implement FC10, an accidental write to Afore setpoints is structurally impossible with the current codebase.
 3. **Critical EEPROM Register `0x0BC1`**: Register `0x0BC1` (`CurrMaxChg`, Max Charge Current) writes to non-volatile EEPROM. The legacy Solarman V3.3 automation wrote this register periodically, creating severe EEPROM degradation risks. In accordance with Phase 0 rules, **register `0x0BC1` is strictly forbidden from any dynamic write operations**.
+   - *Rettifica M0 (2026-11-10)*: the EEPROM persistence of every write to `0x0BC1` is taken from the Roadmap (§5.1) and has **not** been confirmed empirically or by the Afore register table; it is a documented hazard (DEDOTTO), not a verified fact. The prohibition stands regardless.
 
 ### 5.5 Multi-Level Read-Only Defense-in-Depth Architecture
 
@@ -275,7 +276,20 @@ Evaluated in the project workspace:
 | **Web Assets Integrity** | `python -X utf8 tools/check_web_js.py` | 0 | **PASSED** | Embedded JS security checks passed (inline handlers, version, auth, SSE, fleet, address collision). |
 | **Python Lint (ruff)** | `ruff check tools/ && ruff format --check tools/` | 0 | **PASSED** | All checks passed; 12 files already formatted. |
 | **Dashboard Layout** | `python -X utf8 tools/check_dashboard_layout.py` | 1 | **FAILED** | Requires headless Chromium/Chrome in Windows PATH. Non-blocking for host port. |
-| **PlatformIO Native Suite** | `pio test -e native` | — | **NOT RUN** | `platformio` CLI not installed on Windows dev host. 29 test suites (`test/test_*`) exist and target `env:native` (Unity framework, pure C++17). Must be verified on Linux host or after local PlatformIO installation. CI handles this gate. |
+| **PlatformIO Native Suite** | `pio test -e native` | — | **NOT RUN** | `platformio` CLI not installed on Windows dev host. 29 test suites (`test/test_*`) exist and target `env:native` (Unity framework, pure C++17). Must be verified on Linux host or after local PlatformIO installation. Upstream CI results do not cover this fork's changes. |
+
+#### 6.1.1 Rettifica M0 (2026-11-10) — Executed vs Not executed
+
+| Category | Checks | Where | Status |
+|---|---|---|---|
+| **Executed (Python, Windows)** | `check_measurement_ids.py`, `gen_profiles.py --check`, `check_readback_rule.py`, `check_web_js.py`, `ruff check/format --check` | Windows dev host | Exit code 0 observed |
+| **Executed, failed (Python, Windows)** | `check_dashboard_layout.py` | Windows dev host | Exit code 1 (missing headless Chromium) |
+| **Executed, inconclusive** | SSH audit `admin@10.0.5.174` | Windows dev host | Exit code 255, authentication failed: host toolchain unknown |
+| **Not executed** | `tools/check_layering.sh` (bash) | — | Layering assessed only by manual inspection (DEDOTTO) |
+| **Not executed** | PlatformIO native suite (`pio test -e native`, 29 upstream suites) | — | Toolchain absent |
+| **Not executed** | CMake host build (`cmake`, `make`, `ctest`) and all CP1-CP4 host tests | — | No Linux environment available; pending M3 |
+
+No C++ code in this workspace (upstream or fork) has been compiled or executed during CP0-CP4. Statements in this document about C++ test coverage refer to the **existence** of test sources, not to observed results.
 
 ### 6.2 Reference Oracles Ecosystem
 Independent validation oracles are available across three layers:

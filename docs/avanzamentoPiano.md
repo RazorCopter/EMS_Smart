@@ -7,8 +7,8 @@
 
 | Milestone | Stato | Data | Commit |
 |---|---|---|---|
-| M0 Riallineamento e governance | RAGGIUNTA | 2026-11-10 | `561552d`, `afd1bae`, `097164e` |
-| M1 Tracciabilità requisiti | DA INIZIARE | | |
+| M0 Riallineamento e governance | RAGGIUNTA | 2026-11-10 | `561552d`, `afd1bae`, `cc09922` |
+| M1 Tracciabilità requisiti | RAGGIUNTA | 2026-11-10 | commit `docs(m1): add complete Smart EMS requirements traceability` (hash verificabile nel log successivo) |
 | M2 Hardening read-only | DA INIZIARE | | |
 | M3 Build host e test | DA INIZIARE | | |
 | M4 Core EMS target-aware | DA INIZIARE | | |
@@ -330,7 +330,7 @@ Procedo con M1 dopo tua approvazione?
 
 **Data:** 2026-11-10
 **Stato:** RAGGIUNTA
-**Commit:** `561552d` (apertura M0), `afd1bae` (`docs(m0): apply documentation rectifications`), `097164e` (`docs(m0): complete governance realignment and evidence corrections`)
+**Commit:** `561552d` (apertura M0), `afd1bae` (`docs(m0): apply documentation rectifications`), `cc09922` (`docs(m0): complete governance realignment and evidence corrections`)
 
 > Questa sezione si aggiunge alla precedente senza modificarla. Le affermazioni della sezione "M0 – Riallineamento e governance" sopra che risultano superate sono rettificate qui.
 
@@ -401,9 +401,9 @@ git diff --name-only --diff-filter=A 4771a9c..a10c73a | count -> 34 file nuovi
 | Build/test C++ | — | Non eseguiti (vietati/impossibili prima di M3) | NON TESTATO |
 
 ### Verifiche di uscita M0 (piano §3)
-- [x] `avanzamentoPiano.md` creato con sezione M0 (`561552d`, chiuso con `097164e`)
+- [x] `avanzamentoPiano.md` creato con sezione M0 (`561552d`, chiuso con `cc09922`)
 - [x] Output Git allegato e coerente, CP4 incluso in HEAD
-- [x] Nessuna affermazione "verificato" senza evidenza nei documenti CP0–CP4 e nel report (`afd1bae`, `097164e`)
+- [x] Nessuna affermazione "verificato" senza evidenza nei documenti CP0–CP4 e nel report (`afd1bae`, `cc09922`)
 
 ### Punti aperti (non bloccanti per M0)
 - `docs/afore-af5k-sl-protocol.md` e `profiles/afore/af5k_sl.toml` usano "VERIFIED" per indicare una conferma da fonte documentale, non empirica. La riclassificazione con gli stati `VERIFIED_EMPIRICALLY` / `PROVISIONAL` è prevista in **M6**.
@@ -412,3 +412,58 @@ git diff --name-only --diff-filter=A 4771a9c..a10c73a | count -> 34 file nuovi
 
 ### Requisiti coperti
 Nessuno: M0 è solo governance.
+
+---
+
+## M1 – Matrice di tracciabilità completa
+
+**Data:** 2026-11-10
+**Stato:** RAGGIUNTA
+**Commit:** `docs(m1): add complete Smart EMS requirements traceability` (l'hash non può essere incluso nel commit stesso; è verificabile con `git log -1`)
+**Deliverable:** `docs/REQUISITI_TRACCIABILITA.md`
+
+### Obiettivo
+Censire tutti i requisiti funzionali del piano V4, collegarli solo a codice effettivamente ispezionato (non per inferenza dal nome file), esplicitare gap, dipendenze, milestone e test pianificati, e mappare ogni funzione CP4 ai requisiti parzialmente coperti.
+
+### Come è stato sviluppato
+- Trascritti **59 requisiti** dalla sezione 2 del piano nei 10 gruppi richiesti: R-TGT (7), R-NRG (10), R-PV (6), R-FOG (5), R-LOAD (4), R-SEA (5), R-CAL (3), R-CMD (7), R-DIA (6), R-SAF (6).
+- Per ogni requisito compilate le 13 colonne concettuali richieste: ID, Full requirement, Source, Existing file/function, Status, Gap, Target module, Planned unit test, Planned integration test, Dependency, Milestone, Notes (rappresentate verticalmente per leggibilità Markdown).
+- Stati ammessi limitati a `ABSENT`, `PARTIAL`, `IMPLEMENTED_NOT_TESTED`, `VERIFIED`; nessun requisito marcato VERIFIED prima di M3.
+- Ispezionato il controller CP4 (`src/ems/shadow_ems_controller.{h,cpp}`, `shadow_ems_types.{h,cpp}`), la qualità CP3 e il decoder telemetrico; mappate tutte le funzioni CP4 in una tabella inversa funzione→requisiti.
+- Documentati esplicitamente i gap noti: target SOC/time 15:30, buffer 20 min, recovery 60 min, feasibility, Solcast, correzione FV reale, nebbia, carichi weekend, stagionalità, calibrazione BMS, rampe A→W, no-discharge, reason codes, degraded without HA.
+- Gap summary organizzato nelle sei sezioni richieste: Implemented but not tested, Partially implemented, Entirely absent, Conflicting behavior, No longer needed, Blocked by missing data.
+
+### Come è stato verificato
+
+| Verifica | Evidenza | Esito | Classificazione |
+|---|---|---|---|
+| Completezza IDs | ricerca `^### R-[A-Z]+-[0-9]+` nel deliverable | **59** intestazioni univoche | VERIFICATO (controllo testuale) |
+| Gruppi | intestazioni sezioni 1–10 | tutti i 10 gruppi presenti | VERIFICATO (ispezione) |
+| Campi obbligatori | ogni scheda contiene 12 campi oltre all'intestazione ID | presenti | VERIFICATO (ispezione) |
+| Gap summary | sezioni 11.1–11.6 | tutte presenti | VERIFICATO (ispezione) |
+| Stato VERIFIED | ricerca campo Status=VERIFIED | **0** requisiti; coerente con vincolo M3+ | VERIFICATO (ricerca) |
+| Esecuzione test/build | nessuna | non pertinente per deliverable documentale; nessuna build o test eseguiti | NON TESTATO |
+
+### Evidenze principali
+- CP4 è classificato come **preliminary self-consumption controller**, non come Smart Energy Manager target-aware.
+- `checkTelemetryQuality()`, `computeRecommendation()`, `applySelfConsumptionStrategy()`, `applyPowerSmoothing()`, `updateDivergence()`, `transitionToFailSafe()` e helper sono mappati a requisiti specifici; nessuna copertura è dedotta dal solo nome del file.
+- Conflitto documentato: `Quality::Degraded` è actionable nel codice CP4, mentre la documentazione storica sosteneva `Degraded → SafeIdle`.
+- Conflitto documentato: CP4 può raccomandare scarica (`DischargeBattery`), mentre R-CMD-06 richiede default charge-only con `allow_discharge=false`.
+- Conflitto documentato: rampa CP4 500 W/s e isteresi 30 W non corrispondono rispettivamente alle rampe 5/8 A (256/410 W) e all'isteresi 100 W richieste.
+
+### Scostamenti
+Nessuno rispetto all'obiettivo M1. La matrice usa schede verticali anziché un'unica tabella orizzontale per evitare colonne illeggibili, conservando integralmente tutti i campi richiesti.
+
+### Punti aperti
+- I requisiti classificati ABSENT/PARTIAL verranno implementati a partire da M4, dopo hardening M2 e build/test M3.
+- Telemetria reale e segni potenza restano bloccati fino a M8; storico carichi fino a M5/M7; input Solcast/HA fino a M10.
+- La classificazione `No longer needed` non elimina requisiti: indica solo che alcuni write-path non servono in shadow; la proprietà richiesta resta tracciata.
+
+### Verifiche di uscita M1 (piano §3)
+- [x] Tutti i requisiti hanno ID e modulo target
+- [x] Ogni gap noto ha test pianificato
+- [x] Ogni funzione CP4 è mappata ai requisiti che implementa
+- [x] Nessun requisito è `VERIFIED` senza test passato
+
+### Requisiti coperti
+Tutti i 59 requisiti del piano sono **tracciati**, non implementati da M1. M1 è documentale e non modifica lo stato tecnico dei requisiti.

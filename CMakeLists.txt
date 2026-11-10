@@ -84,5 +84,21 @@ target_link_libraries(heliograph-tests pthread)
 
 add_test(NAME heliograph-unit-tests COMMAND heliograph-tests)
 
+# Afore AF5K-SL profile tests (Phase 0 CP2)
+add_executable(test-afore
+    test/test_afore/test_main.cpp
+    ${COMMON_SOURCES}
+)
+
+target_compile_definitions(test-afore PRIVATE
+    ENABLE_DRIVER_MODBUS_PROFILE=1
+    UNITY_INCLUDE_DOUBLE=1
+    UNITY_DOUBLE_PRECISION=1e-12
+)
+
+target_link_libraries(test-afore pthread)
+
+add_test(NAME afore-profile-tests COMMAND test-afore)
+
 # Install targets
 install(TARGETS heliograph-daemon DESTINATION bin)

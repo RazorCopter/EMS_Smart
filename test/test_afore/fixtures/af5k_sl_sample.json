@@ -1,0 +1,249 @@
+{
+    "description": "Afore AF5K-SL sample telemetry frame — synthetic test fixture for Phase 0 validation",
+    "timestamp": "2026-11-10T12:34:56Z",
+    "device": {
+        "manufacturer": "Afore",
+        "model": "AF5K-SL",
+        "serial_number": "AF5K230100123",
+        "firmware_version": "v1.2.3"
+    },
+    "modbus": {
+        "slave_id": 1,
+        "baud": 9600,
+        "parity": "none",
+        "stop_bits": 1,
+        "function_code": 3
+    },
+    "registers": {
+        "blocks": [
+            {
+                "comment": "Block 1: Inverter status, output power, grid power (0x0200-0x0212, 19 regs)",
+                "space": "holding",
+                "start_address": 512,
+                "count": 19,
+                "raw_hex": "0000 000A 00E6 0138 1388 0064 01F4 0000 0000 0000 0000 0000 0064 FF38 0000 0000 0000 0000 03E8",
+                "values": [
+                    0,
+                    10,
+                    230,
+                    312,
+                    5000,
+                    100,
+                    500,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    100,
+                    -200,
+                    0,
+                    0,
+                    0,
+                    0,
+                    1000
+                ]
+            },
+            {
+                "comment": "Block 2: PV1/PV2 voltage, current, power (0x0228-0x0230, 9 regs)",
+                "space": "holding",
+                "start_address": 552,
+                "count": 9,
+                "raw_hex": "0D8C 0019 04B0 0B54 000F 0320 0000 0000 0000",
+                "values": [
+                    3468,
+                    25,
+                    1200,
+                    2900,
+                    15,
+                    800,
+                    0,
+                    0,
+                    0
+                ]
+            },
+            {
+                "comment": "Block 3: Battery state, SOC, voltage, current, power (0x07D0-0x07D8, 9 regs)",
+                "space": "holding",
+                "start_address": 2000,
+                "count": 9,
+                "raw_hex": "0004 0000 0050 0208 FFC4 0000 0000 0000 FF38",
+                "values": [
+                    4,
+                    0,
+                    80,
+                    520,
+                    -60,
+                    0,
+                    0,
+                    0,
+                    -200
+                ]
+            }
+        ]
+    },
+    "decoded": {
+        "comment": "Expected decoded values after applying profile scaling and sign conventions",
+        "pv": {
+            "pv1_voltage_v": 346.8,
+            "pv1_current_a": 2.5,
+            "pv1_power_w": 1200,
+            "pv2_voltage_v": 290.0,
+            "pv2_current_a": 1.5,
+            "pv2_power_w": 800,
+            "total_power_w": 1000
+        },
+        "battery": {
+            "state": "charge",
+            "state_enum": 4,
+            "soc_pct": 80,
+            "voltage_v": 52.0,
+            "current_a": -0.60,
+            "power_w": 200,
+            "power_w_raw": -200,
+            "comment": "Battery power: raw=-200 (Afore convention: negative=charge), canonical=+200 (scale=-1 flip)"
+        },
+        "grid": {
+            "voltage_v": 231.2,
+            "frequency_hz": 50.00,
+            "power_w": -200,
+            "comment": "Grid power: -200W = exporting to grid (canonical convention: negative=export)"
+        },
+        "inverter": {
+            "output_power_w": 1000,
+            "temperature_c": 23.0,
+            "status_enum": 0
+        }
+    },
+    "validation_notes": {
+        "sign_conventions": {
+            "battery_power": "Afore reports NEGATIVE during charge. Profile scale=-1 flips to canonical POSITIVE=charging.",
+            "battery_current": "Sign convention UNVERIFIED in Phase 0. Assumed negative=discharge for this fixture.",
+            "grid_power": "Canonical: positive=import, negative=export. This fixture shows export (-200W)."
+        },
+        "unverified_registers": [
+            "0x0228 (PV1 voltage)",
+            "0x0229 (PV1 current)",
+            "0x022E (PV2 voltage)",
+            "0x022F (PV2 current)",
+            "0x0203 (grid voltage)",
+            "0x0205 (grid frequency)",
+            "0x0200 (inverter status)",
+            "0x020C (inverter temperature)"
+        ],
+        "power_balance": {
+            "check": "PV_total - Battery_charge - Inverter_output - Grid_export = 0",
+            "calculation": "1000 (PV) - 200 (batt charge) - 1000 (inv out) - (-200) (grid export) = 0",
+            "status": "BALANCED"
+        }
+    },
+    "modbus_frames": {
+        "comment": "Raw Modbus RTU frames (with CRC) for bus replay and decoder testing",
+        "request_block1": {
+            "hex": "01 03 02 00 00 13 44 0F",
+            "description": "Read holding regs: slave=1, FC=03, start=512 (0x0200), count=19 (0x0013)",
+            "breakdown": {
+                "slave_id": "01",
+                "function_code": "03",
+                "start_address_hi": "02",
+                "start_address_lo": "00",
+                "register_count_hi": "00",
+                "register_count_lo": "13",
+                "crc_lo": "44",
+                "crc_hi": "0F"
+            }
+        },
+        "response_block1": {
+            "hex": "01 03 26 0000 000A 00E6 0138 1388 0064 01F4 0000 0000 0000 0000 0000 0064 FF38 0000 0000 0000 0000 03E8 XX XX",
+            "description": "Response: slave=1, FC=03, byte_count=38 (0x26), 19 registers × 2 bytes, CRC placeholder",
+            "note": "CRC marked XX XX — compute via Modbus CRC-16 (poly 0xA001) before bus replay"
+        },
+        "request_block2": {
+            "hex": "01 03 02 28 00 09 85 E4",
+            "description": "Read holding regs: slave=1, FC=03, start=552 (0x0228), count=9 (0x0009)"
+        },
+        "response_block2": {
+            "hex": "01 03 12 0D8C 0019 04B0 0B54 000F 0320 0000 0000 0000 XX XX",
+            "description": "Response: slave=1, FC=03, byte_count=18 (0x12), 9 registers × 2 bytes, CRC placeholder"
+        },
+        "request_block3": {
+            "hex": "01 03 07 D0 00 09 04 3E",
+            "description": "Read holding regs: slave=1, FC=03, start=2000 (0x07D0), count=9 (0x0009)"
+        },
+        "response_block3": {
+            "hex": "01 03 12 0004 0000 0050 0208 FFC4 0000 0000 0000 FF38 XX XX",
+            "description": "Response: slave=1, FC=03, byte_count=18 (0x12), 9 registers × 2 bytes, CRC placeholder"
+        }
+    },
+    "test_scenarios": {
+        "normal_operation": {
+            "description": "Daytime operation: PV producing 1000W, battery charging 200W, exporting 200W to grid",
+            "expected_state": "valid",
+            "expected_measurements": 16
+        },
+        "night_zero_pv": {
+            "description": "Night: PV=0, battery discharging, importing from grid",
+            "modifications": {
+                "pv_total_power_w": 0,
+                "pv1_power_w": 0,
+                "pv2_power_w": 0,
+                "battery_power_w_raw": 500,
+                "battery_state_enum": 5,
+                "grid_power_w": 300
+            }
+        },
+        "battery_full_standby": {
+            "description": "Battery at 100% SOC, standby state, no charge/discharge",
+            "modifications": {
+                "battery_soc_pct": 100,
+                "battery_state_enum": 6,
+                "battery_power_w_raw": 0,
+                "battery_current_a": 0
+            }
+        },
+        "sign_convention_validation": {
+            "description": "Critical Phase 0 test: verify battery power sign flip (scale=-1) works correctly",
+            "test_cases": [
+                {
+                    "raw_battery_power": -200,
+                    "expected_canonical": 200,
+                    "state": "charging"
+                },
+                {
+                    "raw_battery_power": 300,
+                    "expected_canonical": -300,
+                    "state": "discharging"
+                },
+                {
+                    "raw_battery_power": 0,
+                    "expected_canonical": 0,
+                    "state": "standby"
+                }
+            ]
+        }
+    },
+    "oracle_cross_validation": {
+        "comment": "For CP4 cross-validation against Solarman Home Assistant sensors",
+        "solarman_sensors": {
+            "pv_power": "sensor.afore_pv_power",
+            "battery_soc": "sensor.afore_battery_soc",
+            "battery_power": "sensor.afore_battery_power",
+            "grid_power": "sensor.afore_grid_power",
+            "inverter_output": "sensor.afore_inverter_output"
+        },
+        "tolerance": {
+            "power_absolute_w": 5,
+            "power_relative_pct": 0.5,
+            "voltage_v": 0.5,
+            "current_a": 0.05,
+            "soc_pct": 1
+        }
+    },
+    "phase0_validation_gates": {
+        "gate1_register_addresses": "Confirm all VERIFIED register addresses decode to plausible values",
+        "gate2_sign_conventions": "Battery power and grid power signs match observed charge/discharge and import/export states",
+        "gate3_power_balance": "PV = Battery + Inverter Output + Grid (within 2% tolerance)",
+        "gate4_unverified_promotion": "All UNVERIFIED registers cross-checked against inverter display",
+        "gate5_endurance": "≥99.5% valid read rate over 24-72h, zero writes, no Solarman degradation"
+    }
+}

@@ -31,6 +31,7 @@ set(COMMON_SOURCES
     src/device/device_context.cpp
     src/device/device_state.cpp
     src/device/measurement.cpp
+    src/device/telemetry_quality.cpp
     src/transport/transport.cpp
     src/transport/posix_serial_transport.cpp
     src/transport/readonly_guard.cpp
@@ -44,6 +45,11 @@ set(COMMON_SOURCES
     src/config/configuration.cpp
     src/config/host_config_backend.cpp
     src/protocols/modbus/modbus_rtu.cpp
+    src/protocols/modbus/modbus_client.cpp
+    src/app/afore_telemetry_engine.cpp
+    src/app/afore_v4_mqtt.cpp
+    src/ems/shadow_ems_types.cpp
+    src/ems/shadow_ems_controller.cpp
     # Add more as needed from the native build filter
 )
 
@@ -99,6 +105,38 @@ target_compile_definitions(test-afore PRIVATE
 target_link_libraries(test-afore pthread)
 
 add_test(NAME afore-profile-tests COMMAND test-afore)
+
+# Afore CP3 Telemetry Engine tests
+add_executable(test-afore-telemetry
+    test/test_afore_telemetry/test_main.cpp
+    ${COMMON_SOURCES}
+)
+
+target_compile_definitions(test-afore-telemetry PRIVATE
+    ENABLE_DRIVER_MODBUS_PROFILE=1
+    UNITY_INCLUDE_DOUBLE=1
+    UNITY_DOUBLE_PRECISION=1e-12
+)
+
+target_link_libraries(test-afore-telemetry pthread)
+
+add_test(NAME afore-telemetry-tests COMMAND test-afore-telemetry)
+
+# Shadow EMS CP4 tests
+add_executable(test-shadow-ems
+    test/test_shadow_ems/test_main.cpp
+    ${COMMON_SOURCES}
+)
+
+target_compile_definitions(test-shadow-ems PRIVATE
+    ENABLE_DRIVER_MODBUS_PROFILE=1
+    UNITY_INCLUDE_DOUBLE=1
+    UNITY_DOUBLE_PRECISION=1e-12
+)
+
+target_link_libraries(test-shadow-ems pthread)
+
+add_test(NAME shadow-ems-tests COMMAND test-shadow-ems)
 
 # Install targets
 install(TARGETS heliograph-daemon DESTINATION bin)

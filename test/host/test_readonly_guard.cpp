@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 //
 // Unit tests for ReadOnlyGuard transport wrapper - M2 Complete Test Matrix A-Y
+// M2 CORRECTIONS APPLIED: mandatory slave ID, immutable under AFORE_SHADOW_BUILD, verified CRC
 //
 // TEST STATUS: All tests in this file are marked TEST_AUTHORED (M2 milestone).
 // They verify the frame-aware validation logic through static code analysis and
@@ -15,7 +16,7 @@
 #include <memory>
 #include <vector>
 
-#include "protocols/modbus/modbus_rtu.h"  // for crc16 function
+#include "protocols/modbus/modbus_rtu.h"  // M2 FIX-3: verified crc16 function
 #include "test/support/mock_transport.h"
 
 using namespace heliograph;
@@ -126,7 +127,7 @@ std::vector<uint8_t> buildFrameWithFC(uint8_t fc, uint8_t slave = 1) {
 static void test_A_FC03_valid_allowed() {
     auto fake = std::make_unique<FakeLowerTransport>();
     FakeLowerTransport* fakePtr = fake.get();
-    ReadOnlyGuard guard(std::move(fake));
+    ReadOnlyGuard guard(std::move(fake), 1);  // M2 FIX-2: mandatory slave ID
     
     auto frame = buildValidFC03();
     size_t written = guard.write(frame.data(), frame.size());
@@ -155,7 +156,7 @@ static void test_A_FC03_valid_allowed() {
 static void test_B_FC04_valid_allowed() {
     auto fake = std::make_unique<FakeLowerTransport>();
     FakeLowerTransport* fakePtr = fake.get();
-    ReadOnlyGuard guard(std::move(fake));
+    ReadOnlyGuard guard(std::move(fake), 1);  // M2 FIX-2: mandatory slave ID
     
     auto frame = buildValidFC04();
     size_t written = guard.write(frame.data(), frame.size());
@@ -175,7 +176,7 @@ static void test_B_FC04_valid_allowed() {
 static void test_C_FC01_blocked() {
     auto fake = std::make_unique<FakeLowerTransport>();
     FakeLowerTransport* fakePtr = fake.get();
-    ReadOnlyGuard guard(std::move(fake));
+    ReadOnlyGuard guard(std::move(fake), 1);  // M2 FIX-2: mandatory slave ID
     
     auto frame = buildFrameWithFC(0x01);
     size_t written = guard.write(frame.data(), frame.size());
@@ -203,7 +204,7 @@ static void test_C_FC01_blocked() {
 static void test_D_FC02_blocked() {
     auto fake = std::make_unique<FakeLowerTransport>();
     FakeLowerTransport* fakePtr = fake.get();
-    ReadOnlyGuard guard(std::move(fake));
+    ReadOnlyGuard guard(std::move(fake), 1);  // M2 FIX-2: mandatory slave ID
     
     auto frame = buildFrameWithFC(0x02);
     if (guard.write(frame.data(), frame.size()) != 0 || !fakePtr->wasNotCalled()) {
@@ -217,7 +218,7 @@ static void test_D_FC02_blocked() {
 static void test_E_FC05_blocked() {
     auto fake = std::make_unique<FakeLowerTransport>();
     FakeLowerTransport* fakePtr = fake.get();
-    ReadOnlyGuard guard(std::move(fake));
+    ReadOnlyGuard guard(std::move(fake), 1);  // M2 FIX-2: mandatory slave ID
     
     auto frame = buildFrameWithFC(0x05);
     if (guard.write(frame.data(), frame.size()) != 0 || !fakePtr->wasNotCalled()) {
@@ -231,7 +232,7 @@ static void test_E_FC05_blocked() {
 static void test_F_FC06_blocked() {
     auto fake = std::make_unique<FakeLowerTransport>();
     FakeLowerTransport* fakePtr = fake.get();
-    ReadOnlyGuard guard(std::move(fake));
+    ReadOnlyGuard guard(std::move(fake), 1);  // M2 FIX-2: mandatory slave ID
     
     auto frame = buildFrameWithFC(0x06);
     if (guard.write(frame.data(), frame.size()) != 0 || !fakePtr->wasNotCalled()) {
@@ -245,7 +246,7 @@ static void test_F_FC06_blocked() {
 static void test_G_FC0F_blocked() {
     auto fake = std::make_unique<FakeLowerTransport>();
     FakeLowerTransport* fakePtr = fake.get();
-    ReadOnlyGuard guard(std::move(fake));
+    ReadOnlyGuard guard(std::move(fake), 1);  // M2 FIX-2: mandatory slave ID
     
     auto frame = buildFrameWithFC(0x0F);
     if (guard.write(frame.data(), frame.size()) != 0 || !fakePtr->wasNotCalled()) {
@@ -259,7 +260,7 @@ static void test_G_FC0F_blocked() {
 static void test_H_FC10_blocked() {
     auto fake = std::make_unique<FakeLowerTransport>();
     FakeLowerTransport* fakePtr = fake.get();
-    ReadOnlyGuard guard(std::move(fake));
+    ReadOnlyGuard guard(std::move(fake), 1);  // M2 FIX-2: mandatory slave ID
     
     auto frame = buildFrameWithFC(0x10);
     if (guard.write(frame.data(), frame.size()) != 0 || !fakePtr->wasNotCalled()) {
@@ -273,7 +274,7 @@ static void test_H_FC10_blocked() {
 static void test_I_FC17_blocked() {
     auto fake = std::make_unique<FakeLowerTransport>();
     FakeLowerTransport* fakePtr = fake.get();
-    ReadOnlyGuard guard(std::move(fake));
+    ReadOnlyGuard guard(std::move(fake), 1);  // M2 FIX-2: mandatory slave ID
     
     auto frame = buildFrameWithFC(0x17);
     if (guard.write(frame.data(), frame.size()) != 0 || !fakePtr->wasNotCalled()) {
@@ -287,7 +288,7 @@ static void test_I_FC17_blocked() {
 static void test_J_unknown_FC_blocked() {
     auto fake = std::make_unique<FakeLowerTransport>();
     FakeLowerTransport* fakePtr = fake.get();
-    ReadOnlyGuard guard(std::move(fake));
+    ReadOnlyGuard guard(std::move(fake), 1);  // M2 FIX-2: mandatory slave ID
     
     auto frame = buildFrameWithFC(0x99);  // Unknown function code
     if (guard.write(frame.data(), frame.size()) != 0 || !fakePtr->wasNotCalled()) {
@@ -301,7 +302,7 @@ static void test_J_unknown_FC_blocked() {
 static void test_K_empty_frame_blocked() {
     auto fake = std::make_unique<FakeLowerTransport>();
     FakeLowerTransport* fakePtr = fake.get();
-    ReadOnlyGuard guard(std::move(fake));
+    ReadOnlyGuard guard(std::move(fake), 1);  // M2 FIX-2: mandatory slave ID
     
     uint8_t empty[] = {};
     if (guard.write(empty, 0) != 0 || !fakePtr->wasNotCalled()) {
@@ -319,7 +320,7 @@ static void test_K_empty_frame_blocked() {
 static void test_L_short_frame_blocked() {
     auto fake = std::make_unique<FakeLowerTransport>();
     FakeLowerTransport* fakePtr = fake.get();
-    ReadOnlyGuard guard(std::move(fake));
+    ReadOnlyGuard guard(std::move(fake), 1);  // M2 FIX-2: mandatory slave ID
     
     uint8_t short_frame[] = {0x01, 0x03, 0x02};  // Only 3 bytes
     if (guard.write(short_frame, 3) != 0 || !fakePtr->wasNotCalled()) {
@@ -337,7 +338,7 @@ static void test_L_short_frame_blocked() {
 static void test_M_invalid_CRC_blocked() {
     auto fake = std::make_unique<FakeLowerTransport>();
     FakeLowerTransport* fakePtr = fake.get();
-    ReadOnlyGuard guard(std::move(fake));
+    ReadOnlyGuard guard(std::move(fake), 1);  // M2 FIX-2: mandatory slave ID
     
     auto frame = buildValidFC03();
     frame[6] ^= 0xFF;  // Corrupt CRC low byte
@@ -357,7 +358,7 @@ static void test_M_invalid_CRC_blocked() {
 static void test_N_broadcast_blocked() {
     auto fake = std::make_unique<FakeLowerTransport>();
     FakeLowerTransport* fakePtr = fake.get();
-    ReadOnlyGuard guard(std::move(fake));
+    ReadOnlyGuard guard(std::move(fake), 1);  // M2 FIX-2: mandatory slave ID
     
     auto frame = buildValidFC03(0);  // slave = 0 (broadcast)
     if (guard.write(frame.data(), frame.size()) != 0 || !fakePtr->wasNotCalled()) {
@@ -375,10 +376,9 @@ static void test_N_broadcast_blocked() {
 static void test_O_wrong_slave_blocked() {
     auto fake = std::make_unique<FakeLowerTransport>();
     FakeLowerTransport* fakePtr = fake.get();
-    ReadOnlyGuard guard(std::move(fake));
+    ReadOnlyGuard guard(std::move(fake), 1);  // M2 FIX-2: configured for slave 1
     
-    guard.setConfiguredSlaveId(1);  // Configure for slave 1
-    auto frame = buildValidFC03(2);  // Send to slave 2
+    auto frame = buildValidFC03(2);  // Send to slave 2 (wrong slave)
     
     if (guard.write(frame.data(), frame.size()) != 0 || !fakePtr->wasNotCalled()) {
         printf("FAIL O: wrong slave not blocked\n");
@@ -395,7 +395,7 @@ static void test_O_wrong_slave_blocked() {
 static void test_P_quantity_zero_blocked() {
     auto fake = std::make_unique<FakeLowerTransport>();
     FakeLowerTransport* fakePtr = fake.get();
-    ReadOnlyGuard guard(std::move(fake));
+    ReadOnlyGuard guard(std::move(fake), 1);  // M2 FIX-2: mandatory slave ID
     
     auto frame = buildValidFC03(1, 0x0200, 0);  // qty = 0
     if (guard.write(frame.data(), frame.size()) != 0 || !fakePtr->wasNotCalled()) {
@@ -413,7 +413,7 @@ static void test_P_quantity_zero_blocked() {
 static void test_Q_quantity_overflow_blocked() {
     auto fake = std::make_unique<FakeLowerTransport>();
     FakeLowerTransport* fakePtr = fake.get();
-    ReadOnlyGuard guard(std::move(fake));
+    ReadOnlyGuard guard(std::move(fake), 1);  // M2 FIX-2: mandatory slave ID
     
     auto frame = buildValidFC03(1, 0x0200, 126);  // qty = 126 (> 125 limit)
     if (guard.write(frame.data(), frame.size()) != 0 || !fakePtr->wasNotCalled()) {
@@ -431,7 +431,7 @@ static void test_Q_quantity_overflow_blocked() {
 static void test_R_trailing_bytes_blocked() {
     auto fake = std::make_unique<FakeLowerTransport>();
     FakeLowerTransport* fakePtr = fake.get();
-    ReadOnlyGuard guard(std::move(fake));
+    ReadOnlyGuard guard(std::move(fake), 1);  // M2 FIX-2: mandatory slave ID
     
     auto frame = buildValidFC03();
     frame.push_back(0xAA);  // Add trailing byte (now 9 bytes)
@@ -451,7 +451,7 @@ static void test_R_trailing_bytes_blocked() {
 static void test_S_max_address_valid() {
     auto fake = std::make_unique<FakeLowerTransport>();
     FakeLowerTransport* fakePtr = fake.get();
-    ReadOnlyGuard guard(std::move(fake));
+    ReadOnlyGuard guard(std::move(fake), 1);  // M2 FIX-2: mandatory slave ID
     
     // addr = 0xFFFF, qty = 1 (total = 0x10000, exactly at limit, valid)
     auto frame = buildValidFC03(1, 0xFFFF, 1);
@@ -468,7 +468,7 @@ static void test_S_max_address_valid() {
 static void test_T_address_overflow_blocked() {
     auto fake = std::make_unique<FakeLowerTransport>();
     FakeLowerTransport* fakePtr = fake.get();
-    ReadOnlyGuard guard(std::move(fake));
+    ReadOnlyGuard guard(std::move(fake), 1);  // M2 FIX-2: mandatory slave ID
     
     // addr = 0xFFFF, qty = 2 (total = 0x10001, overflow)
     auto frame = buildValidFC03(1, 0xFFFF, 2);
@@ -487,7 +487,7 @@ static void test_T_address_overflow_blocked() {
 static void test_U_repeated_blocks() {
     auto fake = std::make_unique<FakeLowerTransport>();
     FakeLowerTransport* fakePtr = fake.get();
-    ReadOnlyGuard guard(std::move(fake));
+    ReadOnlyGuard guard(std::move(fake), 1);  // M2 FIX-2: mandatory slave ID
     
     auto frame = buildFrameWithFC(0x06);  // FC06 write
     
@@ -511,7 +511,7 @@ static void test_U_repeated_blocks() {
 static void test_V_valid_after_blocks() {
     auto fake = std::make_unique<FakeLowerTransport>();
     FakeLowerTransport* fakePtr = fake.get();
-    ReadOnlyGuard guard(std::move(fake));
+    ReadOnlyGuard guard(std::move(fake), 1);  // M2 FIX-2: mandatory slave ID
     
     // Block 3 attempts
     auto bad_frame = buildFrameWithFC(0x06);
@@ -538,7 +538,7 @@ static void test_V_valid_after_blocks() {
 static void test_W_two_valid_consecutive() {
     auto fake = std::make_unique<FakeLowerTransport>();
     FakeLowerTransport* fakePtr = fake.get();
-    ReadOnlyGuard guard(std::move(fake));
+    ReadOnlyGuard guard(std::move(fake), 1);  // M2 FIX-2: mandatory slave ID
     
     auto frame1 = buildValidFC03(1, 0x0200, 10);
     auto frame2 = buildValidFC04(1, 0x0300, 5);
@@ -565,7 +565,7 @@ static void test_W_two_valid_consecutive() {
 static void test_X_post_CRC_mutation_blocked() {
     auto fake = std::make_unique<FakeLowerTransport>();
     FakeLowerTransport* fakePtr = fake.get();
-    ReadOnlyGuard guard(std::move(fake));
+    ReadOnlyGuard guard(std::move(fake), 1);  // M2 FIX-2: mandatory slave ID
     
     auto frame = buildValidFC03();
     frame[2] ^= 0x01;  // Mutate address byte after CRC was computed
@@ -585,7 +585,7 @@ static void test_X_post_CRC_mutation_blocked() {
 static void test_Y_CRC_byte_order_wrong_blocked() {
     auto fake = std::make_unique<FakeLowerTransport>();
     FakeLowerTransport* fakePtr = fake.get();
-    ReadOnlyGuard guard(std::move(fake));
+    ReadOnlyGuard guard(std::move(fake), 1);  // M2 FIX-2: mandatory slave ID
     
     auto frame = buildValidFC03();
     // Swap CRC bytes (correct is little-endian, swap to big-endian)
@@ -604,13 +604,16 @@ static void test_Y_CRC_byte_order_wrong_blocked() {
     printf("OK [TEST_AUTHORED]\n");
 }
 
-// --- Compatibility test: guard disabled bypass ---
+// --- Compatibility test: guard disabled bypass (STANDARD BUILD ONLY) ---
+// M2 FIX-1: This test is ONLY valid for standard Heliograph build
+// Under AFORE_SHADOW_BUILD, setForceReadOnly() does not exist (compile error)
 static void test_bypass_when_disabled() {
+#if !defined(AFORE_SHADOW_BUILD)
     auto fake = std::make_unique<FakeLowerTransport>();
     FakeLowerTransport* fakePtr = fake.get();
-    ReadOnlyGuard guard(std::move(fake));
+    ReadOnlyGuard guard(std::move(fake), 1);  // M2 FIX-2: mandatory slave ID
     
-    guard.setForceReadOnly(false);  // Disable guard
+    guard.setForceReadOnly(false);  // Disable guard (standard build only)
     
     auto frame = buildFrameWithFC(0x06);  // FC06 write
     size_t written = guard.write(frame.data(), frame.size());
@@ -619,7 +622,92 @@ static void test_bypass_when_disabled() {
         printf("FAIL bypass: guard not disabled\n");
         exit(1);
     }
-    printf("OK\n");
+    printf("OK (standard build)\n");
+#else
+    printf("SKIPPED (AFORE_SHADOW_BUILD: setForceReadOnly() not available)\n");
+#endif
+}
+
+// --- M2 FIX-4: Additional slave mandatory tests ---
+
+// Test Z: Slave 1 FC03 valid -> ALLOWED (verify mandatory slave 1)
+static void test_Z_slave1_FC03_allowed() {
+    auto fake = std::make_unique<FakeLowerTransport>();
+    FakeLowerTransport* fakePtr = fake.get();
+    ReadOnlyGuard guard(std::move(fake), 1);  // Configured for slave 1
+    
+    auto frame = buildValidFC03(1);  // Slave 1 FC03
+    if (guard.write(frame.data(), frame.size()) != frame.size() || !fakePtr->wasCalledOnce()) {
+        printf("FAIL Z: slave 1 FC03 not allowed\n");
+        exit(1);
+    }
+    if (guard.lastBlockedEvent().reason != BlockReasonCode::ALLOWED) {
+        printf("FAIL Z: wrong reason\n");
+        exit(1);
+    }
+    printf("OK [TEST_AUTHORED]\n");
+}
+
+// Test AA: Slave 1 FC04 valid -> ALLOWED
+static void test_AA_slave1_FC04_allowed() {
+    auto fake = std::make_unique<FakeLowerTransport>();
+    FakeLowerTransport* fakePtr = fake.get();
+    ReadOnlyGuard guard(std::move(fake), 1);  // Configured for slave 1
+    
+    auto frame = buildValidFC04(1);  // Slave 1 FC04
+    if (guard.write(frame.data(), frame.size()) != frame.size() || !fakePtr->wasCalledOnce()) {
+        printf("FAIL AA: slave 1 FC04 not allowed\n");
+        exit(1);
+    }
+    printf("OK [TEST_AUTHORED]\n");
+}
+
+// Test AB: Slave 0 (broadcast) -> BLOCKED (always prohibited)
+static void test_AB_slave0_broadcast_blocked() {
+    auto fake = std::make_unique<FakeLowerTransport>();
+    FakeLowerTransport* fakePtr = fake.get();
+    ReadOnlyGuard guard(std::move(fake), 1);  // Configured for slave 1
+    
+    auto frame = buildValidFC03(0);  // Slave 0 (broadcast)
+    if (guard.write(frame.data(), frame.size()) != 0 || !fakePtr->wasNotCalled()) {
+        printf("FAIL AB: broadcast not blocked\n");
+        exit(1);
+    }
+    if (guard.lastBlockedEvent().reason != BlockReasonCode::BROADCAST_NOT_ALLOWED) {
+        printf("FAIL AB: wrong reason (expected BROADCAST_NOT_ALLOWED)\n");
+        exit(1);
+    }
+    printf("OK [TEST_AUTHORED]\n");
+}
+
+// Test AC: Slave 2 (wrong slave) -> BLOCKED
+static void test_AC_slave2_wrong_blocked() {
+    auto fake = std::make_unique<FakeLowerTransport>();
+    FakeLowerTransport* fakePtr = fake.get();
+    ReadOnlyGuard guard(std::move(fake), 1);  // Configured for slave 1
+    
+    auto frame = buildValidFC03(2);  // Slave 2 (not configured)
+    if (guard.write(frame.data(), frame.size()) != 0 || !fakePtr->wasNotCalled()) {
+        printf("FAIL AC: slave 2 not blocked\n");
+        exit(1);
+    }
+    if (guard.lastBlockedEvent().reason != BlockReasonCode::SLAVE_NOT_ALLOWED) {
+        printf("FAIL AC: wrong reason (expected SLAVE_NOT_ALLOWED)\n");
+        exit(1);
+    }
+    printf("OK [TEST_AUTHORED]\n");
+}
+
+// Test AD: configuredSlaveId() getter returns correct value
+static void test_AD_configured_slave_getter() {
+    auto fake = std::make_unique<FakeLowerTransport>();
+    ReadOnlyGuard guard(std::move(fake), 1);
+    
+    if (guard.configuredSlaveId() != 1) {
+        printf("FAIL AD: configuredSlaveId() != 1\n");
+        exit(1);
+    }
+    printf("OK [TEST_AUTHORED]\n");
 }
 
 // ============================================================================
@@ -706,11 +794,29 @@ int main() {
     printf("==> Y: CRC byte order wrong -> BLOCKED: ");
     test_Y_CRC_byte_order_wrong_blocked();
     
+    printf("\n--- M2 FIX-4: Slave Mandatory Tests ---\n");
+    printf("==> Z: Slave 1 FC03 -> ALLOWED: ");
+    test_Z_slave1_FC03_allowed();
+    
+    printf("==> AA: Slave 1 FC04 -> ALLOWED: ");
+    test_AA_slave1_FC04_allowed();
+    
+    printf("==> AB: Slave 0 (broadcast) -> BLOCKED: ");
+    test_AB_slave0_broadcast_blocked();
+    
+    printf("==> AC: Slave 2 (wrong) -> BLOCKED: ");
+    test_AC_slave2_wrong_blocked();
+    
+    printf("==> AD: configuredSlaveId() getter: ");
+    test_AD_configured_slave_getter();
+    
     printf("\n--- Compatibility Tests ---\n");
     printf("==> Bypass when disabled: ");
     test_bypass_when_disabled();
     
-    printf("\n✓ All M2 ReadOnlyGuard tests AUTHORED and compiled successfully.\n");
-    printf("  Runtime execution: M3 milestone\n\n");
+    printf("\n✓ All M2 ReadOnlyGuard tests (A-AD) AUTHORED and compiled successfully.\n");
+    printf("  Total tests: 30 (A-Y = 25, Z-AD = 5 slave mandatory)\n");
+    printf("  Runtime execution: M3 milestone\n");
+    printf("  M2 CORRECTIONS APPLIED: immutable, mandatory slave, verified CRC\n\n");
     return 0;
 }

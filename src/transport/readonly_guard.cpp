@@ -4,6 +4,7 @@
 
 #include "diagnostics/logger.h"
 #include "protocols/byte_order.h"
+#include "protocols/modbus/modbus_rtu.h"  // M2 FIX-3: use verified modbus::crc16()
 
 namespace heliograph {
 
@@ -25,36 +26,24 @@ const char* blockReasonToString(BlockReasonCode code) {
     }
 }
 
-ReadOnlyGuard::ReadOnlyGuard(std::unique_ptr<Transport> underlying)
-    : underlying_(std::move(underlying)) {}
+// M2 FIX-2: Constructor requires explicit configured slave ID (no default, no wildcard mode)
+ReadOnlyGuard::ReadOnlyGuard(std::unique_ptr<Transport> underlying, uint8_t configuredSlaveId)
+    : underlying_(std::move(underlying)), configuredSlaveId_(configuredSlaveId) {
+    
+    // M2 SAFETY: Enforce slave ID > 0 (broadcast prohibited)
+    if (configuredSlaveId == 0) {
+        log::error("ReadOnlyGuard: configured slave ID 0 (broadcast) is prohibited");
+        // Continue with invalid configuration - will block all frames with BROADCAST_NOT_ALLOWED
+    }
+}
 
 bool ReadOnlyGuard::configure(const SerialProfile& profile) {
-    // Extract slave ID from profile if available (for slave validation)
-    // Note: SerialProfile doesn't currently have a slave_id field, so we rely on
-    // explicit setConfiguredSlaveId() calls for now
     return underlying_->configure(profile);
 }
 
 bool ReadOnlyGuard::isAllowedReadFunction(uint8_t functionCode) const {
     // M2: ONLY FC03 (Read Holding Registers) and FC04 (Read Input Registers) allowed
     return functionCode == 0x03 || functionCode == 0x04;
-}
-
-uint16_t ReadOnlyGuard::computeModbusCrc16(const uint8_t* data, size_t len) const {
-    // Modbus CRC-16: polynomial 0xA001, initial 0xFFFF, little-endian transmission
-    // This is the standard Modbus RTU CRC algorithm
-    uint16_t crc = 0xFFFF;
-    for (size_t i = 0; i < len; ++i) {
-        crc ^= data[i];
-        for (int bit = 0; bit < 8; ++bit) {
-            if (crc & 1) {
-                crc = static_cast<uint16_t>((crc >> 1) ^ 0xA001);
-            } else {
-                crc >>= 1;
-            }
-        }
-    }
-    return crc;
 }
 
 BlockReasonCode ReadOnlyGuard::validateModbusRtuFrame(const uint8_t* data, size_t len) {
@@ -85,12 +74,14 @@ BlockReasonCode ReadOnlyGuard::validateModbusRtuFrame(const uint8_t* data, size_
     const uint8_t function_code = data[1];
 
     // Check 4: Broadcast not allowed (slave 0 is broadcast address in Modbus)
+    // M2 FIX-2: Broadcast (slave 0) is ALWAYS prohibited, no wildcard mode
     if (slave_id == 0) {
         return BlockReasonCode::BROADCAST_NOT_ALLOWED;
     }
 
-    // Check 5: Configured slave validation (if configured)
-    if (configuredSlaveId_ != 0 && slave_id != configuredSlaveId_) {
+    // Check 5: Configured slave validation (MANDATORY in M2)
+    // M2 FIX-2: Slave ID must EXACTLY match configured slave, no wildcard acceptance
+    if (slave_id != configuredSlaveId_) {
         return BlockReasonCode::SLAVE_NOT_ALLOWED;
     }
 
@@ -100,10 +91,11 @@ BlockReasonCode ReadOnlyGuard::validateModbusRtuFrame(const uint8_t* data, size_
     }
 
     // Check 7: CRC-16 validation
+    // M2 FIX-3: Use modbus::crc16() from modbus_rtu.h (polynomial 0xA001 verified correct)
     // Frame: [slave][fc][addr_h][addr_l][qty_h][qty_l][crc_l][crc_h]
     // CRC covers bytes [0..5], transmitted in bytes [6..7] as little-endian
     const uint16_t transmitted_crc = bytes::le16(data, 6);  // bytes 6-7, little-endian
-    const uint16_t computed_crc = computeModbusCrc16(data, 6);  // CRC of first 6 bytes
+    const uint16_t computed_crc = modbus::crc16(data, 6);   // M2 FIX-3: verified Modbus CRC
     if (computed_crc != transmitted_crc) {
         return BlockReasonCode::INVALID_CRC;
     }
@@ -133,11 +125,17 @@ BlockReasonCode ReadOnlyGuard::validateModbusRtuFrame(const uint8_t* data, size_
 }
 
 size_t ReadOnlyGuard::write(const uint8_t* data, size_t len) {
+    // M2 FIX-1: Under AFORE_SHADOW_BUILD, read-only is ALWAYS enforced (no forceReadOnly_ member)
+    // Standard Heliograph build retains configurable behavior for compatibility
+    
+#if !defined(AFORE_SHADOW_BUILD)
     if (!forceReadOnly_) {
-        // Guard disabled: pass through directly (for testing or non-Shadow builds)
+        // Guard disabled (standard build only): pass through directly
         ++allowedFrameCount_;
         return underlying_->write(data, len);
     }
+#endif
+    // AFORE_SHADOW_BUILD: always enforce read-only (no conditional, immutable)
 
     // M2 Enforce read-only: frame-aware validation
     BlockReasonCode reason = validateModbusRtuFrame(data, len);
@@ -156,11 +154,12 @@ size_t ReadOnlyGuard::write(const uint8_t* data, size_t len) {
         // Log with detailed information (M2 observability)
         log::error(
             "readonly_guard: BLOCKED frame [len=%zu slave=0x%02X fc=0x%02X] reason=%s - "
-            "Afore Shadow M2 read-only enforcement",
+            "Afore Shadow M2 read-only enforcement (configured_slave=%u)",
             len,
             lastBlockedEvent_.slave_id,
             lastBlockedEvent_.function_code,
-            blockReasonToString(reason)
+            blockReasonToString(reason),
+            configuredSlaveId_
         );
 
         // M2: Zero bytes transmitted to underlying transport (physical isolation)
@@ -168,7 +167,7 @@ size_t ReadOnlyGuard::write(const uint8_t* data, size_t len) {
         return 0;
     }
 
-    // Frame ALLOWED: valid FC03 or FC04 read request
+    // Frame ALLOWED: valid FC03 or FC04 read request for configured slave
     ++allowedFrameCount_;
 
     if (log::enabled(LogLevel::Trace)) {

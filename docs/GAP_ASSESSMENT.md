@@ -5,7 +5,7 @@
 **Target Inverter:** Afore AF5K-SL Hybrid Inverter (Single Phase 5kW, Storage)  
 **Target Environment:** Linux Host (x86_64 / arm64 / Raspberry Pi at 10.0.5.174) in Read-Only Shadow Mode  
 **Base Repository:** `Timdebruijn/heliograph` (Branch: `phase0-host-shadow`, Remote: `upstream`)  
-**Recommendation:** **GO (Strict Read-Only Shadow Mode)**  
+**Recommendation:** **PROCEDI / GO (Strict Read-Only Shadow Mode)**
 **Checkpoint:** CP0 (Phase 0 Scouting & Gap Assessment)
 
 ---
@@ -19,13 +19,18 @@ This gap assessment evaluates the architectural feasibility, host porting strate
 2. **Comprehensive Read-Only Safety**: The codebase possesses a 5-layer command gating architecture (`src/commands/command_dispatcher.cpp`). Furthermore, Heliograph currently implements single-register writes via Modbus FC06 only; it has **no** client implementation for FC10 (Write Multiple Registers). Because Afore External EMS requires 32-bit atomic writes via FC10 to `0x0A09–0x0A0A`, an unintended setpoint write is architecturally precluded even before adding our multi-level shadow guards.
 3. **Transport Porting Simplicity**: Replacing the ESP32 `HardwareSerial` transport (`src/transport/rs485_transport.cpp`) with a POSIX `<termios.h>` serial implementation (`PosixSerialTransport`) is straightforward and well-bounded. Standard USB-RS485 adapters (FTDI, CH340, CP2102) provide automatic hardware direction control.
 4. **Independent Oracle Availability**: Validated Python oracles and register scans already exist in `../Solarman/` (`scan_afore_registers.py`, `afore_AF5K-Sl.yaml`), in `Doc/` (`Afore_Autonomous_EMS_V4_Roadmap.md`, `外部Ems调度 - En_240312.docx`), and inside Heliograph (`tools/read_modbus.py`).
-5. **Verdict: GO**. Porting the telemetry read path of Heliograph to Linux for Phase 0 shadow operation is fully viable, safe, and strongly recommended.
+5. **Verdict: PROCEDI (GO)**. Porting the telemetry read path of Heliograph to Linux for Phase 0 shadow operation is fully viable, safe, and strongly recommended.
 
 ---
 
 ## 2. Current Architecture & Layering Analysis
 
-Heliograph follows strict separation of concerns, enforced by CI and linting scripts (`tools/check_layering.sh`, `AGENTS.md`).
+Heliograph strictly enforces modular separation of concerns and clean layering boundaries, codified in `AGENTS.md` and mechanically verified on every commit by `tools/check_layering.sh`:
+
+1. **Brand Isolation Principle (`AGENTS.md:13-16`)**: Device- and brand-specific knowledge (register addresses, protocol quirks, scaling) must live **only** in `src/drivers/<driver>/` and `profiles/`. Generic headers, transports, output adapters, and state containers are strictly prohibited from referencing brand names (enforced by `check_layering.sh` rule 1).
+2. **Canonical Data Integrity (`AGENTS.md:18-20`)**: *"Unknown is never zero."* Values not received from the device remain absent or `null`; replacing an unread field with 0 is treated as a fatal design fault.
+3. **Hardware-Decoupled Core (`tools/check_layering.sh:57-87`)**: Core protocol modules (`src/device/`, `src/protocols/byte_order.h`, `src/protocols/modbus/modbus_rtu.*`, `src/network/rtc_time.*`) are forbidden from including Arduino or ESP-IDF headers (`Arduino.h`, `WiFi.h`, `HardwareSerial.h`, `esp_*`, `freertos/*`), ensuring 100% host compilability and testability under `env:native`.
+4. **Verified Read-Back Gate (`tools/check_layering.sh:108-114`)**: Profiles with `verified = true` write definitions are rejected unless an explicit read-back address is defined (`tools/check_readback_rule.py`).
 
 ```text
  +--------------------------------------------------------------------------+
@@ -90,6 +95,8 @@ Heliograph follows strict separation of concerns, enforced by CI and linting scr
   - `src/outputs/modbus_tcp/`: Modbus TCP server exposing cache snapshot on port 502 (`modbus_tcp_server.cpp`, `register_map.cpp`).
 - **Testing Subsystem**:
   - 28 unit test suites in `test/` (e.g. `test_modbus`, `test_modbus_profile`, `test_measurements`, `test_rate_limiter`, `test_sha256`), written in portable C++ for the PlatformIO native test runner.
+  - `test/test_modbus/test_main.cpp`: Exercises the full Modbus stack via `run_modbus_rtu()` (wire codec, CRC-16, PDU encoding/decoding) and `run_modbus_client()` (transaction timeouts, exceptions, echo validation).
+  - `test/support/mock_transport.h`: In-memory byte-level bus simulator (`heliograph::test::MockTransport`) providing a programmable `Responder` callback and queue to simulate realistic inverter responses, frame drops, corrupted CRCs, and timeouts without physical hardware.
 
 ---
 
@@ -109,10 +116,10 @@ Heliograph follows strict separation of concerns, enforced by CI and linting scr
 | **REST Payloads** | `src/outputs/rest/rest_payloads.{h,cpp}` | **Directly Portable** | ArduinoJson / pure C++ JSON document generation. |
 | **Transport HAL** | `src/transport/transport.{h,cpp}` | **Directly Portable** | Abstract virtual base class. |
 | **RS485 Serial HAL** | `src/transport/rs485_transport.{h,cpp}` | **ESP32-Specific (Replace)** | Replace with `PosixSerialTransport` using standard POSIX `<termios.h>`. |
-| **Configuration Backend** | `src/config/nvs_backend.{h,cpp}` | **ESP32-Specific (Replace)** | Replace with `FileConfigurationBackend` (reading/writing a JSON file). |
-| **MQTT Client Transport** | `src/outputs/mqtt/mqtt_output.{h,cpp}` | **ESP32-Specific (Adapt)** | Current implementation uses `espMqttClient`. Adapt to `libmosquitto` or standalone POSIX MQTT client. |
-| **Web Server & UI** | `src/web/`, `src/outputs/rest/rest_api.{h,cpp}` | **ESP32-Specific (Exclude/Stub)** | Uses `ESPAsyncWebServer`. Exclude for host shadow runner or replace with micro-HTTP server (e.g. `httplib`). |
-| **WiFi & Provisioning** | `src/network/wifi_manager.{h,cpp}` | **ESP32-Specific (Exclude)** | Host OS (systemd-networkd / NetworkManager) manages network. |
+| **Configuration Backend** | `src/config/nvs_backend.{h,cpp}` | **ESP32-Specific (Replace)** | Core persistence uses abstract `heliograph::KeyValueBackend` (`src/config/configuration_store.h:33`). On ESP32 it uses `NvsBackend`; on host replace with `FileConfigurationBackend` (local JSON file). |
+| **MQTT Client Transport** | `src/outputs/mqtt/mqtt_output.{h,cpp}` | **ESP32-Specific (Adapt)** | Payload and HA discovery logic (`home_assistant_discovery.cpp`) is pure C++. Socket transport uses `espMqttClient`. Adapt to `libmosquitto` or disable in early shadow CLI. |
+| **Web Server & UI** | `src/web/`, `src/outputs/rest/rest_api.{h,cpp}` | **ESP32-Specific (Exclude/Stub)** | Uses `ESPAsyncWebServer`. Exclude for host shadow runner CLI. |
+| **WiFi & Provisioning** | `src/network/wifi_manager.{h,cpp}` | **ESP32-Specific (Exclude)** | Host OS (Linux systemd / NetworkManager) manages network interfaces. |
 | **Hardware Relays & DRM** | `src/relays/relay_controller.*`, `src/relays/drm.*` | **Exclude for Shadow** | Exclude from Phase 0 host build; no relay hardware exists on Linux host. |
 | **Command Dispatcher** | `src/commands/command_dispatcher.*` | **Exclude for Shadow** | Exclude or hard-lock in Phase 0; host operates in read-only shadow mode. |
 | **RTC & Time Sync** | `src/network/rtc_*`, `src/network/time_manager.*` | **Adaptable** | Replace I2C PCF85063 RTC with POSIX `clock_gettime(CLOCK_REALTIME)`. |
@@ -149,8 +156,9 @@ The ESP32 RS485 transport toggles GPIO pins for DE/RE direction switching. On Li
 - In Linux, route logs directly to `stdout` / `stderr` with ANSI color formatting and ISO-8601 timestamps, or to `syslog` / `systemd-journald`.
 
 ### 4.5 Storage & Data Persistence
-- Replace LittleFS with standard POSIX directory access (`std::filesystem`).
-- Telemetry datasets, frame captures (`bus_tap`), and shadow decision logs are saved directly to CSV / JSONL files on disk.
+- Heliograph uses non-volatile storage exclusively via `heliograph::KeyValueBackend` (`src/config/configuration_store.h:33`), backed on ESP32 by `NvsBackend` (`src/config/nvs_backend.h`) and in unit tests by `MemoryBackend` (LittleFS is **not** used; web assets are linked into Flash via `PROGMEM` as noted in `src/web/assets/index_html.h:7`).
+- On Linux host, implement `FileConfigurationBackend` implementing `KeyValueBackend`, persisting configuration as structured JSON.
+- Telemetry datasets, raw frame traces (`heliograph::diag::BusTap`), and shadow decision logs are recorded directly to disk via standard C++ POSIX file I/O (`std::filesystem`, CSV / JSONL).
 
 ### 4.6 Clocks, Timers & Arduino Compatibility
 Provide a lightweight compatibility header `compat/arduino_compat.h`:
@@ -267,18 +275,19 @@ Evaluated in the project workspace:
 ### 6.2 Reference Oracles Ecosystem
 Independent validation oracles are available across three layers:
 
-1. **Heliograph Internal Oracles**:
-   - `tools/read_modbus.py`: Validates the Heliograph Modbus TCP server output against `register_map.h` (schema version 1, validity bitmap at 610, canonical strings at 700).
-   - `tools/decode_eversolar.py`: Decodes raw RS485 frames for legacy PMU protocols.
+1. **Heliograph Internal Tooling & Oracles**:
+   - `tools/read_modbus.py`: Reference Python script reading the Heliograph Modbus TCP server output on port 502 against `src/outputs/modbus_tcp/register_map.h` (validates schema version 1, validity bitmap at 610, canonical floats, and strings at 700). Useful for validating external client output.
+   - `tools/decode_eversolar.py`: Decodes raw RS485 frames for packet inspection.
+   - **Current Afore Support Status**: **None**. Heliograph currently contains zero profiles or code paths for Afore in `profiles/` or `src/drivers/`.
 2. **Dedicated Solarman Afore Oracles (`../Solarman/`)**:
-   - `scan_afore_registers.py`: Collaudated Modbus RTU / Solarman V5 query tool tested on real Afore hardware.
-   - `scan_battery.py`: Targeted scanner for battery status, SOC, voltage, and current.
-   - `scan_full.py`: Complete holding/input register sweep tool.
-   - `afore_AF5K-Sl.yaml`: Collaudated sensor configuration schema containing register addresses, byte lengths, data types, and scaling rules.
+   - `scan_afore_registers.py`: Field-proven Modbus RTU / Solarman V5 query tool tested on the actual Afore AF5K-SL hardware.
+   - `scan_battery.py`: Targeted scanner for battery status (`0x07D0`), SOC (`0x07D2`), voltage (`0x07D4`), and current (`0x07D5`).
+   - `scan_full.py`: Full register scanner for empirical offset discovery.
+   - `afore_AF5K-Sl.yaml`: Collaudated Home Assistant Solarman integration configuration containing production-validated register definitions, data types, and multipliers.
 3. **Official Manufacturer Documentation (`Doc/`)**:
-   - `Doc/Afore_Autonomous_EMS_V4_Roadmap.md`: Architectural specification and phase criteria.
-   - `Doc/外部Ems调度 - En_240312.docx`: Afore External EMS official specification.
-   - `Doc/艾伏逆变器寄存器参数表（对外）v3.4_20251119_并网机和储能机分类(2).xlsx`: Official parameter table.
+   - `Doc/Afore_Autonomous_EMS_V4_Roadmap.md`: System specification, safety constraints, and phase criteria.
+   - `Doc/外部Ems调度 - En_240312.docx`: Official Afore External EMS Modbus protocol specification.
+   - `Doc/艾伏逆变器寄存器参数表（对外）v3.4_20251119_并网机和储能机分类(2).xlsx`: Complete register parameter table for grid-tied and hybrid storage inverters.
 
 ---
 
@@ -375,18 +384,32 @@ In accordance with `LICENSE-THIRD-PARTY.md:3-8`:
 
 ---
 
-## 11. Final Recommendation: GO
+## 11. Final Recommendation & Phase 0 Checkpoint Roadmap (CP1–CP5)
 
-**Final Verdict:** **GO for Phase 0 Host Shadow Mode**
+### 11.1 Feasibility Verdict: PROCEDI / GO
 
-### Detailed Justification:
-1. **Clean Architectural Boundaries**: Heliograph's core Modbus and profile subsystems are completely decoupled from microcontrollers, allowing 100% code reuse on Linux.
-2. **Guaranteed Write Immunity**: Multiple independent mechanisms (including the complete absence of FC10 client execution and transport-layer frame dropping) prevent any write from reaching the inverter.
-3. **Rich Oracle Availability**: Collaudated Python tools and real-world schemas exist to cross-verify every register reading.
-4. **Development Velocity**: Developing the shadow runner natively on Linux dramatically accelerates telemetry collection, dataset building, and EMS algorithm development prior to flashing the Waveshare ESP32-S3 hardware.
+**Final Verdict:** **PROCEDI (GO) for Phase 0 Host Shadow Mode**
 
-### Immediate Action Plan (Phase 0 Next Steps):
-1. Create `CMakeLists.txt` for host Linux build of `protocols/modbus`, `drivers/modbus_profile`, and `transport`.
-2. Implement `PosixSerialTransport` (`src/transport/posix_serial_transport.{h,cpp}`).
-3. Define the read-only TOML profile `profiles/afore_af5k_sl.toml` using verified registers.
-4. Build `afore_shadow_runner` CLI tool and execute passive validation against Solarman telemetry.
+#### Detailed Justification:
+1. **Clean Architectural Layering**: Heliograph's Modbus RTU codec, profile evaluation engine, and state pipeline are 100% decoupled from ESP32/Arduino hardware (`check_layering.sh`), allowing pure native compilation on Linux.
+2. **Guaranteed Write Immunity**: Multi-level defense-in-depth ensures zero possibility of writes reaching the inverter: absence of FC10 in `ModbusClient`, compile-time exclusion of command dispatchers, strict transport-layer drop of non-read function codes (`FC != 0x03 && FC != 0x04`), and omission of write blocks in the profile.
+3. **Rich Validation Ecosystem**: Field-proven Python oracles (`../Solarman/scan_afore_registers.py`, `afore_AF5K-Sl.yaml`) allow automated cross-verification of telemetry, scaling factors, and sign conventions before firmware flashing.
+4. **Maximum Safety for Hardware & Battery**: Operating strictly in read-only shadow mode eliminates any risk of EEPROM wear (`0x0BC1`) or battery disruption while establishing the telemetry baseline.
+
+#### Explicit STOP Criteria (Immediate Halt Triggers):
+- If any write frame is attempted or reaches Level 3 transport guard.
+- If RS485 communication introduces packet loss, CRC errors, or timeouts on the existing Solarman datalogger.
+- If inverter or BMS master/slave reports any communication or protocol error alarm.
+- If serial communication parameters (baud rate, parity, slave address) cannot be confirmed non-invasively.
+
+---
+
+### 11.2 Checkpoint Roadmap: CP1 through CP5
+
+| Checkpoint | Scope & Deliverables | Acceptance Gates | Key Risks & Mitigations |
+|---|---|---|---|
+| **CP1: POSIX Transport & Host Build Harness** | - Implement `PosixSerialTransport` (`src/transport/posix_serial_transport.{h,cpp}`) using POSIX `<termios.h>`.<br>- Embed Level 3 Read-Only Guard in `write()` (drop any `FC != 0x03 && FC != 0x04`).<br>- Create root `CMakeLists.txt` compiling core protocols, profile engine, and host unit tests on Linux (`x86_64` / `arm64`).<br>- Add `compat/arduino_compat.h` for `millis()` and `delay()`. | - `ctest` / host test binary passes 100% unit tests (`test_modbus` with `MockTransport`).<br>- Clean compilation under GCC/Clang with `-Wall -Wextra -Werror`.<br>- Simulated write attempt returns 0 bytes written and logs fatal security warning. | **Risk**: Termios buffer bloat or half-duplex RTS timing.<br>**Mitigation**: Non-blocking `poll()`/`select()` with explicit deadline timeouts, `VMIN=0, VTIME=1`, and hardware auto-direction USB-RS485 adapters. |
+| **CP2: Afore Read-Only TOML Profile** | - Author `profiles/afore_af5k_sl.toml` with verified telemetry registers only (`0x022A`, `0x022D`, `0x0230`, `0x07D2`, `0x07D4`, `0x07D5`, `0x07D8`, `0x0212`, `0x020B`, `0x07D0`).<br>- Omit all `[[write]]` blocks (driver exposes empty write capabilities).<br>- Group registers into tight contiguous read spans (max 125 regs).<br>- Regenerate profile tables via `python3 tools/gen_profiles.py`. | - `python3 tools/gen_profiles.py --check` passes cleanly.<br>- `tools/check_layering.sh` passes with zero violations.<br>- Unit tests in `test/test_modbus_profile` validate Afore profile parsing and measurement decoding. | **Risk**: Requesting unmapped/reserved registers causing Modbus Exception 0x02 (Illegal Data Address).<br>**Mitigation**: Span boundaries restricted strictly to addresses verified in Solarman production YAML. |
+| **CP3: Host Shadow Runner CLI & Telemetry Logging** | - Implement standalone CLI binary `afore_shadow_runner`.<br>- Non-blocking poll loop (conservative 5–10s cycle).<br>- Implement `FileConfigurationBackend` conforming to `heliograph::KeyValueBackend`.<br>- Implement CSV & JSONL local file telemetry logger recording UTC timestamp, raw registers, canonical values, and communication metrics. | - CLI executes cleanly on host with configurable serial device (`--port /dev/ttyUSB0 --baud 9600 --unit 1`).<br>- Zero packet corruption or unhandled exceptions.<br>- Bus tap sniffer captures raw frames for offline inspection. | **Risk**: Bus contention / collision if COM1 is shared with Solarman dongle.<br>**Mitigation**: Initial phase of passive bus sniffing (`BusTap`), zero retries during scouting, conservative polling interval (10s). |
+| **CP4: Reference Oracle Cross-Validation** | - Concurrent execution of `afore_shadow_runner` alongside Solarman HA sensor data and Python reference queries (`scan_afore_registers.py`).<br>- Automated comparison of PV power, grid power, battery SOC, voltage, and current.<br>- Formal resolution of sign conventions (`0x0212` grid power import vs export; `0x07D8` battery power charge vs discharge). | - Measurement delta between Heliograph canonical values and Solarman sensors < 0.5%.<br>- Zero discrepancy in sign conventions across full daylight charging cycle.<br>- Register classification table updated with all empirical confirmations. | **Risk**: Inverted power signs causing incorrect energy balance accounting.<br>**Mitigation**: Physical correlation against battery charge state (positive/negative verified during net PV generation surplus). |
+| **CP5: 24h–72h Endurance Run & Phase 0 Sign-Off** | - Continuous 24h–72h uninterrupted read-only telemetry run on Linux host.<br>- Accumulate communication statistics (total frames, valid reply rate, CRC errors, timeouts, P95 latency).<br>- Comprehensive Phase 0 validation report.<br>- Formal Phase 0 exit gate sign-off for transition to Phase 1 (Waveshare ESP32-S3 firmware build). | - Valid read rate >= 99.5% over consecutive 24 hours.<br>- Zero writes executed or attempted on RS485 bus.<br>- Zero disruption or packet loss observed on Solarman monitoring.<br>- Complete baseline dataset stored for Phase 3 shadow EMS algorithm development. | **Risk**: Transient USB disconnect or serial driver lockup on host.<br>**Mitigation**: Automatic serial reconnection watchdog with exponential backoff and persistent status logging. |

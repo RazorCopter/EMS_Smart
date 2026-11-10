@@ -121,10 +121,10 @@ Le funzioni del controller CP4 existente sono indicate come:
 | **Gap** | Controller CP4 non calcola potenza minima necessaria; usa massima disponibile |
 | **Target module** | `target_planner::computeMinimumPowerRequired()` (M4) |
 | **Planned unit test** | `test_target_planner::test_minimum_power_for_target` |
-| **Planned integration test** | Scenario M4 #1: surplus 3000W, deficit solo 500W → usa solo 500W fino all'anticipo |
+| **Planned integration test** | Scenario M4 #1: energy_deficit_kwh=2.5, remaining_effective_time_h=5, charge_efficiency=0.90 → required_average_charge_w=2.5/5/0.90*1000=556W; available_surplus_w=3000W → requested_charge_w=min(3000, 556, maximum_allowed_w)=556W |
 | **Dependency** | R-TGT-02, R-NRG-06 (potenza media richiesta) |
 | **Milestone** | **M4** |
-| **Notes** | Ottimizzazione: fuori dalla finestra critica, carica solo il minimo necessario; preserva batteria e riduce cicli |
+| **Notes** | Ottimizzazione: fuori dalla finestra critica, carica solo il minimo necessario; preserva batteria e riduce cicli. Esempio calcolo: deficit 2.5 kWh, tempo residuo 5h, efficienza 0.90 → potenza media richiesta 556W |
 
 ### R-TGT-06
 | Campo | Valore |
@@ -325,7 +325,7 @@ Le funzioni del controller CP4 existente sono indicate come:
 | **Source** | Piano V4 §2.2, osservazione preliminare Solarman |
 | **Existing file/function** | `afore_telemetry_engine.cpp::decodeBatteryBlock()`: scale=-1 sul registro `0x07D8` |
 | **Status** | **IMPLEMENTED_NOT_TESTED** |
-| **Compatibility** | **CONFLICTING** — CONFLICTING (critico): sign flip battery power pending validazione M8 |
+| **Compatibility** | **CONFLICTING** — CRITICAL_UNVERIFIED_SIGN_CONVENTION: sign flip battery power pending validazione M8 |
 | **Gap** | Convenzione implementata (flip segno) ma **mai confermata su bus reale** |
 | **Target module** | `afore_telemetry_engine` (CP3 authored) |
 | **Planned unit test** | `test_afore_telemetry::test_battery_power_sign_flip` (authored, pending M3) |
@@ -380,7 +380,7 @@ Le funzioni del controller CP4 existente sono indicate come:
 | **Source** | Piano V4 §2.3, Blueprint V3.3 HA |
 | **Existing file/function** | **ABSENT** |
 | **Status** | **ABSENT** |
-| **Compatibility** | **CONFLICTING** — CONFLICTING con R-LOAD-04 (surplus usa carico stimato non misurato) |
+| **Compatibility** | **ALIGNED** — estimated-load è limitazione accuracy, non conflitto con R-LOAD-04 |
 | **Gap** | Nessun calcolo surplus previsto; nessuna integrazione carico |
 | **Target module** | `pv_forecast::computeSurplus()` (M4) |
 | **Planned unit test** | `test_pv_forecast::test_surplus_computation` |
@@ -702,7 +702,7 @@ Le funzioni del controller CP4 existente sono indicate come:
 | **Source** | Piano V4 §2.7, Blueprint V3.3 HA |
 | **Existing file/function** | **ABSENT** |
 | **Status** | **ABSENT** |
-| **Compatibility** | **CONFLICTING** — CONFLICTING con R-CMD-03 (calibrazione 100% vs maxSOC 95%) |
+| **Compatibility** | **CONFLICTING** — CONF-03: calibrazione 100% vs CP4 maxSOC 95% |
 | **Gap** | Nessun tracking calibrazione; controller ignora stato calibrazione |
 | **Target module** | `calibration_tracker::detectCalibration()` (M4) |
 | **Planned unit test** | `test_calibration_tracker::test_calibration_detection` |
@@ -736,7 +736,7 @@ Le funzioni del controller CP4 existente sono indicate come:
 | **Source** | Piano V4 §2.7 |
 | **Existing file/function** | `shadow_ems_types.h::BatteryConstraints::maxSOC = 95.0` — conflitto potenziale |
 | **Status** | **PARTIAL** |
-| **Compatibility** | **ALIGNED** — Nessun conflitto noto |
+| **Compatibility** | **CONFLICTING** — CONF-03: calibrazione 100% override vs CP4 maxSOC 95% |
 | **Gap** | CP4 ha maxSOC 95% hard-coded; nessuna logica per override temporaneo calibrazione |
 | **Target module** | `calibration_tracker::overrideMaxSOC()` o config (M4) |
 | **Planned unit test** | `test_calibration_tracker::test_calibration_overrides_longevity` |
@@ -791,7 +791,7 @@ Le funzioni del controller CP4 existente sono indicate come:
 | **Source** | Piano V4 §2.8, Blueprint V3.3 HA |
 | **Existing file/function** | `shadow_ems_controller.cpp`: hysteresisW = 30W (usato per grid, non per setpoint) |
 | **Status** | **PARTIAL** |
-| **Compatibility** | **CONFLICTING** — CONFLICTING con R-CAL-01 (maxSOC 95% vs calibrazione 100%) |
+| **Compatibility** | **CONFLICTING** — CONF-02: CP4 hysteresis 30W grid-decision vs R-CMD-03 ~100W setpoint hysteresis approvato |
 | **Gap** | CP4 ha isteresi 30W per decisione grid-driven; requisito richiede isteresi 100W per variazione setpoint |
 | **Target module** | `setpoint_shaper::applyHysteresis()` (M4) |
 | **Planned unit test** | `test_setpoint_shaper::test_setpoint_hysteresis` |
@@ -872,18 +872,18 @@ Le funzioni del controller CP4 existente sono indicate come:
 | Campo | Valore |
 |---|---|
 | **ID** | R-CMD-08 |
-| **Full requirement** | Ritorno controllato a SelfUse in caso di perdita supervisione (design separato, fattibilità non documentata) |
-| **Source** | Piano V4 §2.8 |
+| **Full requirement** | Ritorno controllato a SelfUse dopo timeout >2min produce power/setpoint 0W (comportamento documentato); ritorno automatico SelfUse NON documentato in spec Afore |
+| **Source** | Piano V4 §2.8, doc Afore External EMS |
 | **Existing file/function** | **ABSENT** — solo progettazione, non implementare in Phase 0 |
 | **Status** | **ABSENT** |
 | **Compatibility** | **ALIGNED** — Nessun conflitto noto |
 | **Gap** | Nessun ritorno controllato (shadow mode); requisito design separato per fase attiva futura |
 | **Target module** | `afore_command_sender::returnToSelfUse()` (fase attiva post-G4) |
 | **Planned unit test** | `test_command_sender::test_return_to_selfuse` (fase attiva) |
-| **Planned integration test** | Fase attiva: perdita MQTT/HA → EMS invia setpoint 0W; verifica ritorno SelfUse |
+| **Planned integration test** | Fase attiva: perdita MQTT/HA → EMS invia setpoint 0W; M8 NON deve testare write EMS-mode attivo |
 | **Dependency** | R-CMD-07, fase attiva External EMS (post-G4) |
 | **Milestone** | **Fase attiva** (post-G4, non M4) |
-| **Notes** | **DESIGN REQUIREMENT**: transizione automatica a SelfUse = requisito design separato. **NOT DOCUMENTED**: fattibilità non menzionata in doc Afore (solo timeout → 0W). Strategia fail-safe fase attiva: EMS invia setpoint 0W → Afore timeout 2min → comportamento SelfUse atteso ma da validare empiricamente M8 |
+| **Notes** | **DOCUMENTED**: Doc Afore timeout >2min → power 0W. **NOT DOCUMENTED**: Ritorno automatico SelfUse non menzionato in doc Afore (conferma scritta necessaria). **DESIGN**: Inverter deve essere assunto rimanere in External EMS fino a cambio esplicito (salvo conferma scritta Afore diversa). **POST-G4**: Ritorno controllato SelfUse appartiene a piano active-control post-G4. **M8**: NON deve testare write EMS-mode attivo. |
 
 ---
 
@@ -1162,7 +1162,7 @@ La tabella deriva dalla lettura dei corpi funzione in `src/ems/shadow_ems_contro
 | `ShadowEMSController::applySelfConsumptionStrategy()` | Regola preliminare grid-driven di carica/scarica con SOC min/max | **R-TGT-01 (partial), R-NRG-01, R-CMD-06, R-SAF-05** | PARTIAL; non target-aware |
 | `ShadowEMSController::applyConstraints()` | Clamp SOC e potenza ai limiti nominali | **R-CMD-05, R-SAF-04, R-SAF-05** | PARTIAL |
 | `ShadowEMSController::applySmoothing()` | Rampa temporale generica 500 W/s | **R-CMD-02 (partial), R-CMD-04** | PARTIAL; valore in conflitto col requisito; manca bypass critico |
-| `ShadowEMSController::updateDivergence()` | Calcola divergenza istantanea, cumulativa ed eventi | **R-SAF-09 (divergence tracking)** | PARTIAL; non mappa R-DIA-04 (forecast invalid event) |
+| `ShadowEMSController::updateDivergence()` | Calcola divergenza istantanea, cumulativa ed eventi | **IMPLEMENTATION_EXTENSION** (M11 shadow-vs-Afore KPI; no approved requirement coverage) | PARTIAL; non mappa R-DIA-04 (forecast invalid event) |
 | `operatingModeToString()` | Serializza modalità CP4 | **R-DIA-05** (confidence/status reporting) | PARTIAL; non R-DIA-03 (calibration event) |
 | `decisionReasonToString()` | Serializza reason CP4, set incompleto | **R-DIA-05** (decision log structure) | PARTIAL |
 | `TelemetrySample::actionable()` | Accetta Good e Degraded; rifiuta Stale/Invalid | R-SAF-01, R-SAF-02, R-SAF-03 | PARTIAL; conflitto documentale su Degraded |
@@ -1196,10 +1196,10 @@ Questa sezione documenta i conflitti identificati tra requisiti, comportamenti a
 | ID Conflitto | Requisiti coinvolti | Descrizione | Risoluzione |
 |---|---|---|---|
 | **CONF-01** | R-SAF-02 (Degraded actionable) vs R-SAF-03 (fail-safe) | CP4 authored: Degraded (confidence 0.7) resta actionable. Doc CP4 precedente affermava "Degraded → SafeIdle" (conflitto documentale interno). | **RISOLTO**: Comportamento CP4 authored corretto; Degraded actionable, solo Stale/Invalid → SafeIdle. Documentazione corretta in M0. |
-| **CONF-02** | R-CMD-06 (isteresi 30W) vs R-CMD-03 (isteresi 100W) | CP4 usa isteresi 30W per decisione grid-driven. Requisito specifica 100W per variazione setpoint. | **RISOLUZIONE M4**: Separare isteresi decisione (30W) da isteresi comando (100W). Due soglie diverse per scopi diversi. |
-| **CONF-03** | R-CMD-03 (maxSOC 95%) vs R-CAL-01 (calibrazione 100%) | CP4 authored: maxSOC 95% hard-coded (longevità). Calibrazione BMS richiede 100% per 5 min. | **RISOLUZIONE M4**: Implementare override temporaneo `calibration_tracker::overrideMaxSOC()`. Calibrazione prioritaria su longevità. |
+| **CONF-02** | R-CMD-03 (isteresi 100W setpoint) vs CP4 hysteresis 30W grid-decision | CP4 authored usa isteresi 30W per decisione grid-driven. R-CMD-03 richiede isteresi ~100W approvato per variazione setpoint. | **RISOLUZIONE M4**: Separare isteresi grid-decision 30W (CP4) da isteresi setpoint 100W (R-CMD-03). Due soglie diverse per scopi diversi. NON riferire R-CMD-06 per hysteresis. |
+| **CONF-03** | R-CAL-01 e R-CAL-03 (calibrazione 100%) vs CP4 BatteryConstraints::maxSOC 95% | CP4 authored: `BatteryConstraints::maxSOC = 95%` (longevità). R-CAL-01 e R-CAL-03 richiedono calibrazione 100% per 5 min. | **RISOLUZIONE M4**: Implementare override temporaneo `calibration_tracker::overrideMaxSOC()`. Calibrazione prioritaria su longevità. NON riferire R-CMD-03 per maxSOC. |
 | **CONF-04** | R-CMD-06 (Phase 0 no discharge) vs CP4 `Discharging` mode | CP4 raccomanda mode `Discharging` con power negativo ma shadow mode non invia comandi (conforme de facto). Flag `allow_discharge` esplicito assente. | **RISOLUZIONE M4**: Aggiungere flag configurabile `setpoint_shaper::allowDischarge`. Phase 0: false. Fase attiva: configurabile. |
-| **CONF-05** | R-PV-03 (surplus = FV − carico) vs R-LOAD-04 (carico stimato) | Surplus calculation usa carico stimato 0.6/0.9 kW (R-LOAD-01/02). Carico reale misurato non disponibile fino a power balance validato (M8). | **LIMITATION**: Accuracy limitata. Post-M8: sostituire stima con misurato da bilancio (grid + pv − battery). |
+| **LIMIT-01** | R-PV-03 (surplus = FV − carico) estimated-load accuracy | Surplus calculation usa carico stimato 0.6/0.9 kW (R-LOAD-01/02). Carico reale misurato non disponibile fino a power balance validato (M8). | **LIMITATION**: Accuracy limitata fino a bilancio validato M8. Post-M8: sostituire stima con misurato da bilancio (grid + pv − battery). R-PV-03 ALIGNED (estimated-load = limitazione, non conflitto con R-LOAD-04). |
 | **CONF-06** | R-NRG-10 (sign flip battery power) vs convenzione Afore | CP4 authored: scale=-1 sul registro `0x07D8` (assume carica negativa). Convenzione Afore External EMS indica negativo=carica. Validazione empirica pendente M8. | **CRITICAL**: Se convenzione errata, decisioni EMS invertite. Validazione M8 obbligatoria prima fase attiva. |
 
 ### 14.2 Aggiunta colonna Compatibility ai requisiti
@@ -1211,9 +1211,9 @@ La colonna **Compatibility** è stata aggiunta dopo "Status" in tutte le 59 tabe
 - **NOT_APPLICABLE**: Requisito non applicabile in questo contesto
 
 **Requisiti marcati CONFLICTING**:
-- R-CMD-03 (maxSOC 95%) → CONF-03
-- R-CMD-06 (isteresi 30W / no discharge) → CONF-02, CONF-04
+- R-CMD-03 (isteresi setpoint 100W) → CONF-02
+- R-CMD-06 (Phase 0 no discharge) → CONF-04
 - R-CAL-01 (calibrazione 100%) → CONF-03
-- R-PV-03 (surplus con carico stimato) → CONF-05
+- R-CAL-03 (calibrazione override maxSOC) → CONF-03
 - R-SAF-02 (Degraded actionable) → CONF-01 (risolto)
 - R-NRG-10 (sign flip) → CONF-06 (critico, pending M8)

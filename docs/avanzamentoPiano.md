@@ -7,7 +7,7 @@
 
 | Milestone | Stato | Data | Commit |
 |---|---|---|---|
-| M0 Riallineamento e governance | IN CORSO | 2026-11-10 | |
+| M0 Riallineamento e governance | RAGGIUNTA | 2026-11-10 | `561552d`, `afd1bae`, `097164e` |
 | M1 Tracciabilità requisiti | DA INIZIARE | | |
 | M2 Hardening read-only | DA INIZIARE | | |
 | M3 Build host e test | DA INIZIARE | | |
@@ -323,3 +323,92 @@ Procedo con M1 dopo tua approvazione?
 ---
 
 **Fine sezione M0** (da completare con commit finale dopo risposte)
+
+---
+
+## M0 – Chiusura (rettifica e completamento)
+
+**Data:** 2026-11-10
+**Stato:** RAGGIUNTA
+**Commit:** `561552d` (apertura M0), `afd1bae` (`docs(m0): apply documentation rectifications`), `097164e` (`docs(m0): complete governance realignment and evidence corrections`)
+
+> Questa sezione si aggiunge alla precedente senza modificarla. Le affermazioni della sezione "M0 – Riallineamento e governance" sopra che risultano superate sono rettificate qui.
+
+### Obiettivo
+Applicare ai documenti esistenti le correzioni elencate in "Correzioni da apportare ai documenti esistenti" e chiudere M0 secondo le verifiche di uscita del piano.
+
+### Come è stato sviluppato
+Correzioni applicate nel commit `afd1bae` (5 file, 190 inserimenti, 133 cancellazioni):
+
+| File | Correzione |
+|---|---|
+| `docs/PHASE0_PROGRESS_REPORT.md` | Disclaimer "Design only, no runtime validation" in testa; "Pass rate: 100%" → "Test authored, execution pending M3" con `Executed: 0`; ogni sezione "Verifiche Eseguite" separata in Executed / Static inspection only / Authored, not executed; conclusioni e stato CP1–CP4 riclassificati come authored |
+| `docs/phase0-host-cp1-implementation.md` | Status → "Implementation authored, validation pending M3"; "Verifica manuale effettuata" → "Verifiche Progettate"; checklist di conformità senza ✅ |
+| `docs/phase0-host-cp3-implementation.md` | "27 test" → "27 test authored, execution pending M3"; target CMake marcato non verificato; esito atteso dichiarato non osservato |
+| `docs/phase0-host-cp4-implementation.md` | Rimossi tutti i ✅/❌; aggiunto "Test design only, execution pending M3"; dichiarato "preliminary self-consumption controller, not target-aware Smart Energy Manager"; corretto conflitto doc/codice su `Degraded` (nel codice resta actionable, non va in `SafeIdle`) |
+| `docs/GAP_ASSESSMENT.md` | Nuova §6.1.1 Executed vs Not executed (Python su Windows eseguiti; PlatformIO, CMake, `check_layering.sh` non eseguiti); "Fully tested" del codec Modbus riformulato; nota DEDOTTO sulla persistenza EEPROM di `0x0BC1` |
+
+Le sezioni storiche di `avanzamentoPiano.md` non sono state riscritte. Fa eccezione la riga M0 della tabella "Stato sintetico", che è un indice di stato.
+
+### Rettifica: "Milestone realmente raggiunta"
+La sezione precedente riporta: *"Milestone realmente raggiunta: **NESSUNA**"*. Rettifica:
+
+> **M0 reached after governance, M1-M6 remain not reached.**
+> Il lavoro CP1–CP4 resta codice authored, mai compilato né eseguito. Non soddisfa i criteri di nessuna milestone tecnica (M2–M6).
+
+### Rettifica: conteggi dei commit e dei file
+I documenti precedenti riportano conteggi diversi: PHASE0_PROGRESS_REPORT indica "Commits: 5"; la sezione M0 indica "6 commit relativi a CP0-CP4" e "36 file, ~6200 righe". La tabella seguente li riconcilia, con output Git eseguito il 2026-11-10:
+
+```text
+git rev-list --count 4771a9c..HEAD     -> 14 (incluso afd1bae)
+git log --oneline --reverse 4771a9c..HEAD
+e049fcc  CP0 (1/7)
+9b10231  CP0 (2/7)
+249c4aa  CP0 (3/7)
+6c458a1  CP0 (4/7)
+24aafdc  CP0 (5/7)
+3e68c1d  CP0 (6/7)
+4a952f0  CP0 (7/7)
+de214fc  CP1
+63045c6  CP2
+017e7ae  CP4   <- creato PRIMA di CP3
+e8c5d3b  CP3
+a10c73a  Report Phase 0
+561552d  M0 apertura
+afd1bae  M0 rettifiche
+git diff --shortstat 4771a9c..a10c73a  -> 36 files changed, 7290 insertions(+), 1 deletion(-)
+git diff --name-only --diff-filter=A 4771a9c..a10c73a | count -> 34 file nuovi
+```
+
+| Grandezza | Valore corretto | Note |
+|---|---|---|
+| Commit lavoro pre-piano (CP0–CP4 + report) | **12** | 7 CP0 + 1 CP1 + 1 CP2 + 1 CP3 + 1 CP4 + 1 report |
+| Il "5" del report | 1 commit per checkpoint CP0–CP4 | Conta i checkpoint, non i commit; esclude il report |
+| Il "6" della sezione M0 | 5 checkpoint + report | Conta un solo commit per CP0 |
+| Commit governance M0 | 3 | `561552d`, `afd1bae`, commit di chiusura |
+| File toccati pre-piano | **36** (34 aggiunti, 2 modificati) | Range `4771a9c..a10c73a` |
+| Righe inserite pre-piano | **7290** | Il valore "~6200" era una stima e va considerato superato |
+| Ordine cronologico | CP4 (`017e7ae`) precede CP3 (`e8c5d3b`) | Il codice CP4 dipende da `telemetry_quality.h`, aggiunto nel commit CP3: al commit `017e7ae` isolato il target CP4 non è compilabile (DEDOTTO, non verificato) |
+
+### Come è stato verificato
+
+| Verifica | Metodo | Esito | Classificazione |
+|---|---|---|---|
+| Storia Git coerente, CP4 in HEAD | `git log`, `git merge-base --is-ancestor 017e7ae HEAD` (sezione precedente) | exit 0 | VERIFICATO |
+| Commit rettifiche | `git commit` → `afd1bae`, 5 file | exit 0 | VERIFICATO |
+| Rimozione "pass rate 100%" | ricerca regex `pass rate` in `docs/` | Rimasta solo la citazione storica in `avanzamentoPiano.md` | VERIFICATO (ricerca) |
+| Rimozione ✅/❌ da CP4 doc | ricerca regex `✅\|❌` in `phase0-host-cp4-implementation.md` | 0 occorrenze dopo la correzione | VERIFICATO (ricerca) |
+| Build/test C++ | — | Non eseguiti (vietati/impossibili prima di M3) | NON TESTATO |
+
+### Verifiche di uscita M0 (piano §3)
+- [x] `avanzamentoPiano.md` creato con sezione M0 (`561552d`, chiuso con `097164e`)
+- [x] Output Git allegato e coerente, CP4 incluso in HEAD
+- [x] Nessuna affermazione "verificato" senza evidenza nei documenti CP0–CP4 e nel report (`afd1bae`, `097164e`)
+
+### Punti aperti (non bloccanti per M0)
+- `docs/afore-af5k-sl-protocol.md` e `profiles/afore/af5k_sl.toml` usano "VERIFIED" per indicare una conferma da fonte documentale, non empirica. La riclassificazione con gli stati `VERIFIED_EMPIRICALLY` / `PROVISIONAL` è prevista in **M6**.
+- Accesso Linux per M3 ancora assente (SSH exit 255).
+- Dati storici HA per M5 non ancora disponibili.
+
+### Requisiti coperti
+Nessuno: M0 è solo governance.

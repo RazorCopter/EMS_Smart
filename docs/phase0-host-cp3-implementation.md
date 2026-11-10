@@ -113,13 +113,13 @@ Implementare telemetria con qualità (Good/Degraded/Stale/Invalid), polling sche
 
 ## Conformità Requisiti CP3
 
-### ✅ Modello Dati e Qualità
+### Modello Dati e Qualità (authored)
 - [x] Enum Quality: Good, Degraded, Stale, Invalid
 - [x] TelemetrySample con value, quality, timestamp, age, verified, derived
 - [x] Calcolo automatico stale/degraded da timeout e errori
 - [x] Flag verified derivato da classificazione VERIFIED/UNVERIFIED profilo
 
-### ✅ Scheduler/Motore Polling
+### Scheduler/Motore Polling (authored)
 - [x] Loop polling non-blocking a cadenza differenziata
 - [x] Blocco rapido 1s: potenze/correnti/tensioni
 - [x] Blocco medio 5s: SOC, stato batteria
@@ -127,7 +127,7 @@ Implementare telemetria con qualità (Good/Degraded/Stale/Invalid), polling sche
 - [x] Utilizzo driver Afore profile + ReadOnlyGuard
 - [x] Isolamento read-only garantito (nessuna write path)
 
-### ✅ MQTT Discovery Home Assistant
+### MQTT Discovery Home Assistant (authored)
 - [x] Prefisso `homeassistant/sensor/afore_v4_*`
 - [x] Device definition: Manufacturer "Afore", Model "AF5K-SL (Shadow Mode)"
 - [x] Identifiers: `["afore_v4"]` configurabile
@@ -136,13 +136,13 @@ Implementare telemetria con qualità (Good/Degraded/Stale/Invalid), polling sche
 - [x] Entità shadow: mode, quality_summary, success_rate
 - [x] device_class, state_class, unit_of_measurement corretti
 
-### ✅ Pubblicazione MQTT
+### Pubblicazione MQTT (authored, mai pubblicato)
 - [x] Topic stato JSON con valori e attributi qualità
 - [x] Topic shadow con stato controller e statistiche
 - [x] Availability topic (LWT) con online/offline
 - [x] Attributi JSON per ogni misura: quality, age_ms, verified
 
-### ✅ Test Unitari
+### Test Unitari (authored, execution pending M3)
 - [x] Test validazione qualità (Good→Stale→Invalid)
 - [x] Test generazione MQTT Discovery payloads
 - [x] Test serializzazione telemetria con mock transport
@@ -152,7 +152,7 @@ Implementare telemetria con qualità (Good/Degraded/Stale/Invalid), polling sche
 - [x] Test communication stats
 - [x] 27 test authored, execution pending M3 (7 suite)
 
-### ✅ Integrazione CMake (authored)
+### Integrazione CMake (authored)
 - [ ] Target Linux compilabile — NON VERIFICATO, mai compilato (pending M3)
 - [x] Test registrati in CTest (`add_test`) — esecuzione pending M3
 - [x] COMMON_SOURCES aggiornate con nuovi moduli
@@ -160,11 +160,11 @@ Implementare telemetria con qualità (Good/Degraded/Stale/Invalid), polling sche
 ## Verifica Layering
 
 **Ispezione statica manuale (DEDOTTO, `check_layering.sh` non eseguito)**:
-- ✅ Nessun include Arduino/ESP-IDF nei nuovi file (ArduinoJson consentito per host)
-- ✅ Nessun brand name fuori da src/drivers/ (solo riferimenti canonici "Afore" in nomi file app-specific)
-- ✅ Tutti i file app/afore_* sono chiaramente Afore-specific per design
-- ✅ telemetry_quality.* è brand-agnostic, riutilizzabile
-- ✅ Guard ReadOnly preservato in tutta la pipeline
+- Nessun include Arduino/ESP-IDF nei nuovi file (ArduinoJson consentito per host)
+- Nessun brand name fuori da src/drivers/ (solo riferimenti canonici "Afore" in nomi file app-specific)
+- Tutti i file app/afore_* sono chiaramente Afore-specific per design
+- telemetry_quality.* è brand-agnostic, riutilizzabile
+- Guard ReadOnly istanziato nel costruttore dell'engine (lettura codice)
 
 **Note sul layering Afore-specific**:
 - `afore_telemetry_engine.*` e `afore_v4_mqtt.*` sono volutamente Afore-specific
@@ -237,10 +237,10 @@ Marcati come `Degraded` quality, richiedono validazione Phase 0:
 - Inverter Temperature (0x020C)
 
 ### Safety Gates Preserved
-- ✅ ReadOnlyGuard wraps transport in engine constructor
-- ✅ Nessun write path in AforeTelemetryEngine
-- ✅ Test verifica blockedWrites rimane 0
-- ✅ Profilo af5k_sl.toml: zero [[write]] blocks
+- ReadOnlyGuard wraps transport in engine constructor (DEDOTTO, lettura codice)
+- Nessun write path in AforeTelemetryEngine (DEDOTTO)
+- Test progettato per verificare che blockedWrites resti 0 (execution pending M3)
+- Profilo af5k_sl.toml: zero [[write]] blocks (ispezione)
 
 ## Conclusione
 

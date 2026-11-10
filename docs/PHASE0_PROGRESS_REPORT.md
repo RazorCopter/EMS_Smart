@@ -17,12 +17,12 @@ Completati con successo i primi 4 checkpoint della Fase 0 del progetto Afore Aut
 
 Il progetto si basa sul fork del firmware open-source [Heliograph](https://github.com/Timdebruijn/heliograph) (ESP32/PlatformIO), adattato per funzionare su host Linux (Raspberry Pi / Orange Pi) in modalità **strictly shadow**: acquisisce telemetria, calcola raccomandazioni EMS e traccia divergenze rispetto al comportamento dell'inverter, **senza mai inviare comandi di scrittura**.
 
-### Obiettivi Fase 0
-- ✅ Dimostrare fattibilità tecnica del porting host Linux
-- ✅ Garantire sicurezza assoluta (zero rischio di scrittura accidentale)
-- ✅ Validare mappa registri Afore AF5K-SL via protocollo Modbus
-- ✅ Implementare Shadow EMS per confronto con EMS Afore stock
-- ⏳ Raccogliere 7 giorni di dati per analisi (CP5, non ancora avviato)
+### Obiettivi Fase 0 (stato rettificato M0)
+- Fattibilità tecnica del porting host Linux: analizzata staticamente (CP0); non dimostrata da build
+- Sicurezza read-only (zero scritture accidentali): progettata; guard authored, non testato (M2/M3)
+- Mappa registri Afore AF5K-SL: documentata da fonti; **nessuna lettura Modbus effettuata** (M6/M7)
+- Shadow EMS per confronto con EMS Afore stock: controller preliminare authored, non eseguito
+- Raccolta 7 giorni di dati: non avviata
 
 ---
 
@@ -260,7 +260,7 @@ Scenario completo con power balance verification:
 - Battery: charging 200W (raw Afore=-200 → canonical=+200 con scale=-1)
 - Grid: exporting -50W
 - Inverter Output: 1050W
-- **Power Balance**: PV (1200) = Battery (200) + Inverter (1050) + Grid (-50) ✅
+- **Power Balance** (valori sintetici scelti a tavolino): PV (1200) = Battery (200) + Inverter (1050) + Grid (-50)
 
 Frame Modbus RTU raw con placeholder CRC per replay bus testing.
 
@@ -788,30 +788,30 @@ Executed: 0 / Passed: unknown / Failed: unknown
 - `control.inverter_writes_enabled = false` (cablato)
 - Non modificabile da CLI/config file in Phase 0
 
-**Level 3: Transport HAL** ✅ **IMPLEMENTATO CP1**
+**Level 3: Transport HAL**: authored in CP1, non testato; hardening previsto in M2
 - [`ReadOnlyGuard`](../src/transport/readonly_guard.h) ispeziona byte FC
 - Blocca FC 0x05, 0x06, 0x0F, 0x10, 0x16, 0x17
 - Passa solo FC 0x03, 0x04
 - Log dettagliato + contatori osservabili
 
-**Level 4: Profile TOML** ✅ **IMPLEMENTATO CP2**
+**Level 4: Profile TOML**: authored in CP2, nessun blocco `[[write]]` (ispezione)
 - [`profiles/afore/af5k_sl.toml`](../profiles/afore/af5k_sl.toml)
 - Zero blocchi `[[write]]`
 - Motore profile driver non espone write capabilities
 
-**Level 5: Architetturale** ✅ **VERIFICATO CP0**
+**Level 5: Architetturale**: DEDOTTO in CP0 da lettura del codice
 - [`ModbusClient`](../src/protocols/modbus/modbus_client.h) implementa solo FC06
 - FC10 (`writeMultipleRegisters`) assente
 - Impossibile scrivere setpoint 32-bit Afore (`0x0A09-0x0A0A`)
 
-### Shadow Mode Strictly Computational
-✅ **CP4**: Shadow EMS calcola raccomandazioni senza inviare comandi  
-✅ Divergence tracking per confronto shadow vs stock  
-✅ Fail-safe su telemetria degradata → SafeIdle conservativo
+### Shadow Mode Strictly Computational (DEDOTTO, non eseguito)
+- **CP4**: il codice Shadow EMS non contiene chiamate di scrittura (lettura codice)
+- Divergence tracking authored
+- Fail-safe su telemetria Stale/Invalid → SafeIdle (authored; `Degraded` resta actionable)
 
 ### EEPROM Protected
-✅ **CP2**: Registro `0x0BC1` (`CurrMaxChg`) documentato come **strictly forbidden**  
-✅ Nessun write path può accedervi (verificato audit CP0)
+- **CP2**: registro `0x0BC1` (`CurrMaxChg`) documentato come **strictly forbidden**
+- Nessun write path verso `0x0BC1` individuato nell'audit statico CP0 (DEDOTTO)
 
 ---
 

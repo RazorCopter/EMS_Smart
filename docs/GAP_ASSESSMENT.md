@@ -1,7 +1,7 @@
 # Heliograph Host Porting & Afore AF5K-SL Integration: Gap Assessment
 
 **Author:** Autonomous Engineering Agent  
-**Date:** November 2026  
+**Date:** 2026-11-10
 **Target Inverter:** Afore AF5K-SL Hybrid Inverter (Single Phase 5kW, Storage)  
 **Target Environment:** Linux Host (x86_64 / arm64 / Raspberry Pi at 10.0.5.174) in Read-Only Shadow Mode  
 **Base Repository:** `Timdebruijn/heliograph` (Branch: `phase0-host-shadow`, Remote: `upstream`)  
@@ -286,7 +286,8 @@ Independent validation oracles are available across three layers:
    - `tools/gen_profiles.py --check`: Validates syntax, spans, and registers of all TOML inverter profiles.
    - `tools/check_readback_rule.py`: Enforces read-back verification gates for every writable register.
    - **Current Afore Support Status**: **None**. Heliograph currently contains zero profiles or code paths for Afore in `profiles/` or `src/drivers/`. However, the data-driven architecture of `src/drivers/modbus_profile/` ensures that in CP2, adding full Afore AF5K-SL read-only telemetry only requires authoring `profiles/afore_af5k_sl.toml`, with zero custom C++ driver code required.
-2. **Dedicated Solarman Afore Oracles (`../Solarman/`)**:
+2. **Dedicated Solarman Afore Oracles** *(not currently in workspace)*:
+   - **NOTE**: The directory `../Solarman/` referenced in the prior version of this document does **not exist** in the current workspace (`c:/Users/gianv/Documents/Progetti/ESP`). The tools below (`scan_afore_registers.py`, `scan_battery.py`, `scan_full.py`, `afore_AF5K-Sl.yaml`) are expected to be available from a prior development phase but must be located or recreated before CP4 cross-validation. Their absence does not block CP0–CP2.
    - `scan_afore_registers.py`: Field-proven Modbus RTU / Solarman V5 query tool tested on the actual Afore AF5K-SL hardware.
    - `scan_battery.py`: Targeted scanner for battery status (`0x07D0`), SOC (`0x07D2`), voltage (`0x07D4`), and current (`0x07D5`).
    - `scan_full.py`: Full register scanner for empirical offset discovery.
@@ -340,15 +341,17 @@ In strict adherence to project safety rules, no register address or scale factor
 ## 8. Target Host Environment Audit (`10.0.5.174`)
 
 - **Host IP**: `10.0.5.174` (network reachable via local subnet).
-- **Inspection Command Executed**:
+- **Inspection Attempts** (2026-11-10):
   ```bash
-  ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 -o BatchMode=yes admin@10.0.5.174 "uname -a && which python3 g++ cmake git"
+  ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 -o BatchMode=yes admin@10.0.5.174 \
+      "uname -a && which python3 g++ cmake git && python3 --version && g++ --version | head -1 && cmake --version | head -1 && git --version && ls /dev/ttyUSB* 2>/dev/null || echo 'No ttyUSB devices found'"
   ```
 - **Exit Code**: `255`
 - **Output**: `admin@10.0.5.174: Permission denied (publickey,password).`
-- **Audit Finding**: **VERIFICA NON ESEGUITA** (Non-interactive batch execution could not authenticate because no SSH key pair is configured for user `admin`, and password input is disallowed in automated non-interactive sessions).
+- **Audit Finding**: **VERIFICA NON ESEGUITA** — non-interactive batch execution could not authenticate because no SSH key pair is configured for user `admin`, and `BatchMode=yes` disables password prompts. Multiple attempts on 2026-11-10 confirmed the same result.
+- **Toolchain Status**: **Unknown** — python3, g++, cmake, git versions and serial device presence (`/dev/ttyUSB*`) could not be inspected.
 - **Safety Compliance**: No files were created, modified, or executed on the remote host.
-- **Action Required for Phase 0 Bring-up**: Provide an SSH public key or run the non-interactive setup script when interactive credentials can be supplied.
+- **Action Required for CP1**: Configure SSH key-based authentication for `admin@10.0.5.174`, then re-run the inspection command above. Alternatively, connect interactively and record the output manually.
 
 ---
 
@@ -387,20 +390,45 @@ The project documents third-party dependencies and protocol provenance in detail
 ### 10.3 Protocol Knowledge & Clean-Room Provenance
 In accordance with `LICENSE-THIRD-PARTY.md:3-8`:
 - Protocol implementations reflect functional facts, public register maps, and observed bus behavior; no proprietary code is copied.
-- Afore AF5K-SL integration follows this exact clean-room convention: register maps are derived from official manufacturer protocol documents (`Doc/外部Ems调度 - En_240312.docx`, `Doc/艾伏逆变器寄存器参数表（对外）v3.4_20251119_并网机和储能机分类(2).xlsx`) and empirical Modbus verification in `../Solarman/` (`scan_afore_registers.py`, `afore_AF5K-Sl.yaml`).
+- Afore AF5K-SL integration follows this exact clean-room convention: register maps are derived from official manufacturer protocol documents (`Doc/外部Ems调度 - En_240312.docx`, `Doc/艾伏逆变器寄存器参数表（対外）v3.4_20251119_並網機和儲能機分類(2).xlsx`) and empirical Modbus verification via Solarman tools (currently not present in workspace — see §6.2 note).
 
 ---
 
-## 11. Final Recommendation & Phase 0 Checkpoint Roadmap (CP1–CP5)
+## 11. Per-Component Roadmap Gap Analysis
 
-### 11.1 Feasibility Verdict: PROCEDI / GO
+The following table maps each component required by `Doc/Afore_Autonomous_EMS_V4_Roadmap.md` to the current codebase state, reuse potential, new work needed, risks, and estimated effort.
+
+| Component | Roadmap Reference | Current Status | Reusable From Heliograph | New Work Required | Risks | Effort Estimate |
+|---|---|---|---|---|---|---|
+| **HAL termios** (PosixSerialTransport) | Phase 0 §3, CP1 | Not implemented. `rs485_transport.cpp` is ESP32-only (`HardwareSerial` + GPIO DE/RE). A non-functional `#ifndef ESP32` stub exists but is dead code. | `transport.h` (abstract base), `serial_profile.h` — 100% reusable as-is. | Write `posix_serial_transport.{h,cpp}`: POSIX `open()`, `termios`, `poll()`/`select()`, `read()`/`write()`. Embed Level 3 read-only guard (reject FC ≠ 0x03/0x04). ~250 LOC. | USB-RS485 dongle RTS timing; buffer bloat on slow baud rates. | **S** (1–2 days) |
+| **Configuration backend** | Phase 0 §3, CP1 | ESP32: `nvs_backend.cpp` (ESP-IDF NVS). Abstract `KeyValueBackend` interface exists in `configuration_store.h:33`. | `configuration.h`, `configuration_store.{h,cpp}`, `config_backup.{h,cpp}` — all pure C++. | Write `FileConfigurationBackend` implementing `KeyValueBackend`: JSON file with atomic rename. ~100 LOC. | Negligible. | **XS** (< 1 day) |
+| **MQTT output** | Phase 2 §7 | ESP32: `mqtt_output.cpp` uses `espMqttClient`. Payload builders (`mqtt_payloads.cpp`, `home_assistant_discovery.cpp`, `publish_policy.cpp`) are pure C++17. | Payload/discovery/policy modules — directly reusable. | Adapt socket transport to `libmosquitto` (Linux) or paho-mqtt-c. ~200 LOC adapter. Can be deferred: Phase 0 shadow CLI can log locally without MQTT. | Mosquitto packaging on Raspberry Pi OS. | **S** (1–2 days, deferrable to CP3) |
+| **Logging** | Phase 0 §3.4, Phase 1 §6.1 | ESP32: `diagnostics/logger.{h,cpp}` routes via settable output function. `log_timestamp.cpp` depends on `esp_timer.h` for boot-relative time. | Logger interface, log buffer, breadcrumbs — reusable with shim. | On Linux: route to `stdout`/`stderr` with ISO-8601 timestamps, optionally `syslog`/`journald`. Provide POSIX `log_timestamp` using `clock_gettime(CLOCK_MONOTONIC)`. ~50 LOC. | Negligible. | **XS** (< 1 day) |
+| **Storage (JSONL/SQLite)** | Phase 0 §3.4, Phase 4 §9 | Not implemented. Heliograph stores only config (NVS); telemetry is ephemeral in `DeviceState`. | Bus tap (`bus_tap.{h,cpp}`) captures raw frames to circular buffer — reusable for trace dump. | Write JSONL file logger for shadow decisions and telemetry (§8.4 format). SQLite optional for KPI queries. ~200 LOC for JSONL; ~300 LOC for SQLite wrapper. | Disk space on Raspberry Pi SD card; rotation policy needed. | **S** (1–2 days for JSONL; M for SQLite) |
+| **Guard read-only multilivello** | Phase 0 §3.2 | Heliograph has 5-gate dispatcher (`command_dispatcher.cpp`): `security.read_only_mode`, `control.inverter_writes_enabled`, `relays.enabled`, profile `verified` flag, `allow_unverified_writes`. FC10 absent from `ModbusClient`. | All dispatcher gate logic reusable. Transport-level guard pattern established. | Add Level 3 guard in `PosixSerialTransport::write()`: inspect FC byte, drop non-read frames. Add `#define HELIOGRAPH_READONLY_SHADOW 1` compile-time flag excluding write paths. Profile with no `[[write]]` blocks. ~30 LOC. | Extremely low — defense in depth with 4 independent barriers. | **XS** (< 1 day) |
+| **Profilo Afore AF5K-SL** (TOML) | Phase 0 §4, CP2 | **Not present**. `profiles/` contains 13 profiles for Growatt, Deye, GoodWe, Huawei, Sofar, Solis, Sungrow — zero Afore. | `modbus_profile_driver` (TOML-driven, data-only) — full reuse. `gen_profiles.py` toolchain. Template: `profiles/_template.toml`. | Author `profiles/afore/af5k_sl.toml` with verified read-only registers from §7.1. No `[[write]]` blocks. Match canonical measurement IDs. ~80 lines TOML. | Register addresses derived from documentation; must be validated against live bus in CP4. Span boundaries must avoid unmapped holes. | **S** (1–2 days) |
+| **Telemetria con qualità** | Phase 1 §6.1 (Telemetry Engine) | Partially present: `device_state.{h,cpp}` tracks `valid`/`stale`/`unavailable`; `measurement.{h,cpp}` defines canonical taxonomy with 57 IDs; `diagnostics.{h,cpp}` tracks poll counters, latency, error rates. | DeviceState quality model, measurement taxonomy, diagnostics counters — fully reusable. | Extend shadow runner to compute `data_age_s` per measurement, detect frozen values and range violations. Log quality metadata alongside telemetry. ~100 LOC. | Negligible — quality model already exists. | **XS** (< 1 day) |
+| **MQTT Discovery `afore_v4`** | Phase 2 §7 | `home_assistant_discovery.cpp` generates HA discovery payloads from `DeviceState`. Topic structure: `<prefix>/<component>/<unique_id>/config`. Pure C++. | Discovery generator — fully reusable. | Configure topic prefix `afore_v4` and map Afore-specific `sensor.*` entities per §7 list. Define `device_class`, `state_class`, `unit_of_measurement` for each sensor. ~50 lines config. | Must match HA sensor naming exactly to avoid duplicates with Solarman. | **XS** (< 1 day) |
+| **Shadow EMS** (controller) | Phase 3 §8 | **Not present**. No shadow controller logic exists in Heliograph (it is a monitoring bridge, not an EMS). | DeviceState snapshot read path, measurement quality flags, safety state — reusable as inputs. | Write shadow EMS engine: energy balance, SOC target planner, safety supervisor, decision logger. Output: shadow setpoint + reason (no actuation). §8.3 priority hierarchy. ~800–1200 LOC. | Algorithm complexity; tuning requires real data from CP5 endurance run. | **L** (1–2 weeks) |
+| **Logging JSONL/SQLite** | Phase 3 §8.4, Phase 4 §9 | Not present. See "Storage" row above. | Bus tap circular buffer reusable for raw trace. | JSONL writer for §8.4 JSON schema. SQLite for queryable KPI store. ~300–500 LOC. | SD card wear; SQLite WAL mode recommended. | **M** (2–3 days) |
+| **Replay / KPI** | Phase 4 §9 | Not present. No replay or analysis tooling exists. | JSONL dataset from CP3/CP5 run. | Python analysis scripts: load JSONL, compute KPIs (§9.1 table), generate comparison reports. ~500 LOC Python. | Requires ≥7 days of diverse weather data. | **M** (3–5 days) |
+| **systemd integration** | Phase 0 deployment | Not present. Heliograph runs as bare-metal firmware. | N/A. | Write `afore-shadow.service` unit file: `ExecStart`, `Restart=on-failure`, `WatchdogSec`, `StandardOutput=journal`. ~20 lines. | Negligible. | **XS** (< 1 day) |
+
+### Legend
+- **XS**: < 1 day — **S**: 1–2 days — **M**: 2–5 days — **L**: 1–2 weeks
+
+---
+
+## 12. Final Recommendation & Phase 0 Checkpoint Roadmap (CP1–CP5)
+
+### 12.1 Feasibility Verdict: PROCEDI / GO
 
 **Final Verdict:** **PROCEDI (GO) for Phase 0 Host Shadow Mode**
 
 #### Detailed Justification:
 1. **Clean Architectural Layering**: Heliograph's Modbus RTU codec, profile evaluation engine, and state pipeline are 100% decoupled from ESP32/Arduino hardware (`check_layering.sh`), allowing pure native compilation on Linux.
 2. **Guaranteed Write Immunity**: Multi-level defense-in-depth ensures zero possibility of writes reaching the inverter: absence of FC10 in `ModbusClient`, compile-time exclusion of command dispatchers, strict transport-layer drop of non-read function codes (`FC != 0x03 && FC != 0x04`), and omission of write blocks in the profile.
-3. **Rich Validation Ecosystem**: Field-proven Python oracles (`../Solarman/scan_afore_registers.py`, `afore_AF5K-Sl.yaml`) allow automated cross-verification of telemetry, scaling factors, and sign conventions before firmware flashing.
+3. **Rich Validation Ecosystem**: Official Afore documentation (`Doc/`) provides verified register maps. Solarman oracle tools are expected from a prior phase (currently not in workspace — must be located before CP4).
 4. **Maximum Safety for Hardware & Battery**: Operating strictly in read-only shadow mode eliminates any risk of EEPROM wear (`0x0BC1`) or battery disruption while establishing the telemetry baseline.
 
 #### Explicit STOP Criteria (Immediate Halt Triggers):
@@ -411,7 +439,7 @@ In accordance with `LICENSE-THIRD-PARTY.md:3-8`:
 
 ---
 
-### 11.2 Checkpoint Roadmap: CP1 through CP5
+### 12.2 Checkpoint Roadmap: CP1 through CP5
 
 | Checkpoint | Scope & Deliverables | Acceptance Gates | Key Risks & Mitigations |
 |---|---|---|---|
@@ -420,3 +448,21 @@ In accordance with `LICENSE-THIRD-PARTY.md:3-8`:
 | **CP3: Host Shadow Runner CLI & Telemetry Logging** | - Implement standalone CLI binary `afore_shadow_runner`.<br>- Non-blocking poll loop (conservative 5–10s cycle).<br>- Implement `FileConfigurationBackend` conforming to `heliograph::KeyValueBackend`.<br>- Implement CSV & JSONL local file telemetry logger recording UTC timestamp, raw registers, canonical values, and communication metrics. | - CLI executes cleanly on host with configurable serial device (`--port /dev/ttyUSB0 --baud 9600 --unit 1`).<br>- Zero packet corruption or unhandled exceptions.<br>- Bus tap sniffer captures raw frames for offline inspection. | **Risk**: Bus contention / collision if COM1 is shared with Solarman dongle.<br>**Mitigation**: Initial phase of passive bus sniffing (`BusTap`), zero retries during scouting, conservative polling interval (10s). |
 | **CP4: Reference Oracle Cross-Validation** | - Concurrent execution of `afore_shadow_runner` alongside Solarman HA sensor data and Python reference queries (`scan_afore_registers.py`).<br>- Automated comparison of PV power, grid power, battery SOC, voltage, and current.<br>- Formal resolution of sign conventions (`0x0212` grid power import vs export; `0x07D8` battery power charge vs discharge). | - Measurement delta between Heliograph canonical values and Solarman sensors < 0.5%.<br>- Zero discrepancy in sign conventions across full daylight charging cycle.<br>- Register classification table updated with all empirical confirmations. | **Risk**: Inverted power signs causing incorrect energy balance accounting.<br>**Mitigation**: Physical correlation against battery charge state (positive/negative verified during net PV generation surplus). |
 | **CP5: 24h–72h Endurance Run & Phase 0 Sign-Off** | - Continuous 24h–72h uninterrupted read-only telemetry run on Linux host.<br>- Accumulate communication statistics (total frames, valid reply rate, CRC errors, timeouts, P95 latency).<br>- Comprehensive Phase 0 validation report.<br>- Formal Phase 0 exit gate sign-off for transition to Phase 1 (Waveshare ESP32-S3 firmware build). | - Valid read rate >= 99.5% over consecutive 24 hours.<br>- Zero writes executed or attempted on RS485 bus.<br>- Zero disruption or packet loss observed on Solarman monitoring.<br>- Complete baseline dataset stored for Phase 3 shadow EMS algorithm development. | **Risk**: Transient USB disconnect or serial driver lockup on host.<br>**Mitigation**: Automatic serial reconnection watchdog with exponential backoff and persistent status logging. |
+
+---
+
+## 13. Open Questions Blocking or Gating Work
+
+The following questions must be resolved before or during the indicated checkpoint. None block CP0 or CP1.
+
+| # | Question | Blocking Checkpoint | Alignment with Roadmap §14 |
+|---|---|---|---|
+| 1 | **SSH access to host**: `admin@10.0.5.174` rejects non-interactive auth (`Permission denied (publickey,password)`). Key-based authentication must be configured before any on-host work. | CP1 (host build) | — |
+| 2 | **Solarman oracle tools location**: `../Solarman/` directory is not present in the workspace. The scripts (`scan_afore_registers.py`, `afore_AF5K-Sl.yaml`) must be located or recreated for cross-validation. | CP4 (oracle cross-validation) | §14.1 |
+| 3 | **COM1 multi-master coexistence**: Can the Raspberry Pi query the inverter on COM1 without disturbing the Solarman datalogger? Presume NO until confirmed. | CP3 (first bus query) | §14.1, §14.2 |
+| 4 | **Serial parameters**: 9600 8N1 slave ID 1 is expected; must be confirmed non-invasively via passive bus sniffing or inverter menu inspection. | CP3 | §14.3 |
+| 5 | **Grid power sign convention**: Does positive `0x0212` mean grid import or export? | CP4 | §14.4 |
+| 6 | **Battery power sign convention**: Negative `0x07D8` confirmed for charge; cross-validate with BMS during PV surplus. | CP4 | §14.4 |
+| 7 | **PlatformIO native test suite**: `pio test -e native` could not be executed (PlatformIO CLI not installed on Windows dev host). Must be verified on Linux or after local PlatformIO installation. | Non-blocking (CI handles it) | — |
+| 8 | **Max polling frequency**: What is the maximum sustainable poll rate without bus degradation? Start at 10s, reduce only with evidence. | CP5 (endurance run) | §14.8 |
+| 9 | **SunSpec vs Modbus direct**: Which interface offers better semantics and fallback for the AF5K-SL? | CP2 (profile authoring) | §14.9 |

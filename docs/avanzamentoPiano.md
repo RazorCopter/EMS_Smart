@@ -467,3 +467,29 @@ Nessuno rispetto all'obiettivo M1. La matrice usa schede verticali anziché un'u
 
 ### Requisiti coperti
 Tutti i 59 requisiti del piano sono **tracciati**, non implementati da M1. M1 è documentale e non modifica lo stato tecnico dei requisiti.
+
+---
+
+## Rettifica finale M1 – classificazione segni e fonti
+
+**Data:** 2026-11-10  
+**Stato:** DOCUMENTAZIONE CORRETTA, M1 PRONTA PER APPROVAZIONE  
+
+### Obiettivo
+Chiudere direttamente il debito documentale residuo senza un ulteriore ciclo dell’agente.
+
+### Modifiche effettuate
+- `R-NRG-10`: `IMPLEMENTED_NOT_TESTED`, `Compatibility = ALIGNED`, rischio `CRITICAL_UNVERIFIED_SIGN_CONVENTION`.
+- `CONF-06` rimosso e sostituito da `ASSUMPTION-01`.
+- M8 limitata alla verifica read-only del segno telemetrico `0x07D8`.
+- Verifica del segno dei comandi External EMS `0x0A09–0x0A0A` rinviata esplicitamente al post-G4.
+- Fonti normalizzate con `Source type` e `Source reference`.
+
+### Classificazione evidenze
+- **VERIFICATO:** modifiche documentali applicate al file corretto; nessun accesso hardware.
+- **DEDOTTO:** nessuno.
+- **NON TESTATO:** codice C++, build, seriale, inverter.
+- **CONFLITTO:** nessun conflitto documentale residuo noto per i punti corretti.
+
+### Vincoli mantenuti
+Nessuna modifica al codice, nessuna compilazione, nessuna apertura seriale, nessuna build di interrogazione e nessuna comunicazione con l’inverter.

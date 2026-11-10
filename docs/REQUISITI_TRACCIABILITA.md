@@ -19,7 +19,8 @@
 |---|---|
 | ID | Identificativo del requisito (dal piano) |
 | Full requirement | Testo completo del requisito |
-| Source | Origine: piano V4, blueprint V3.3 HA, decisione progetto, doc Afore |
+| Source type | Tassonomia controllata: APPROVED_PLAN, BLUEPRINT_V3_3, AFORE_DOCUMENTATION, EXPLICIT_PROJECT_DECISION, PROPOSED_NOT_APPROVED |
+| Source reference | Documento, sezione, file o decisione puntuale |
 | Existing file/function | File e/o funzione C++ che implementa (se presente) |
 | Status | Uno tra ABSENT, PARTIAL, IMPLEMENTED_NOT_TESTED, VERIFIED |
 | Compatibility | ALIGNED, CONFLICTING, NOT_APPLICABLE (conflitti con altri requisiti) |
@@ -30,6 +31,14 @@
 | Dependency | Altri requisiti o dati esterni necessari |
 | Milestone | M4 (core EMS) o M5 (replay) o successiva |
 | Notes | Osservazioni, ambiguità, decisioni |
+
+
+### Tassonomia delle fonti
+- **APPROVED_PLAN**: requisito contenuto nel piano approvato.
+- **BLUEPRINT_V3_3**: comportamento derivato dalla blueprint Home Assistant V3.3.
+- **AFORE_DOCUMENTATION**: comportamento documentato dal costruttore.
+- **EXPLICIT_PROJECT_DECISION**: decisione esplicita assunta nel progetto.
+- **PROPOSED_NOT_APPROVED**: proposta non ancora approvata, non vincolante.
 
 ### Notazione funzioni CP4
 Le funzioni del controller CP4 existente sono indicate come:
@@ -46,7 +55,8 @@ Le funzioni del controller CP4 existente sono indicate come:
 |---|---|
 | **ID** | R-TGT-01 |
 | **Full requirement** | SOC target configurabile (default 100%) |
-| **Source** | Piano V4 §2.1, Blueprint V3.3 HA |
+| **Source type** | APPROVED_PLAN, BLUEPRINT_V3_3 |
+| **Source reference** | Piano V4 §2.1, Blueprint V3.3 HA |
 | **Existing file/function** | **ABSENT** — `shadow_ems_controller` non ha campo target SOC |
 | **Status** | **ABSENT** |
 | **Compatibility** | **ALIGNED** — Nessun conflitto noto |
@@ -63,7 +73,8 @@ Le funzioni del controller CP4 existente sono indicate come:
 |---|---|
 | **ID** | R-TGT-02 |
 | **Full requirement** | Orario target configurabile (default 15:30) |
-| **Source** | Piano V4 §2.1, Blueprint V3.3 HA |
+| **Source type** | APPROVED_PLAN, BLUEPRINT_V3_3 |
+| **Source reference** | Piano V4 §2.1, Blueprint V3.3 HA |
 | **Existing file/function** | **ABSENT** |
 | **Status** | **ABSENT** |
 | **Compatibility** | **ALIGNED** — Nessun conflitto noto |
@@ -80,7 +91,8 @@ Le funzioni del controller CP4 existente sono indicate come:
 |---|---|
 | **ID** | R-TGT-03 |
 | **Full requirement** | Anticipo operativo sul target (20 min) |
-| **Source** | Piano V4 §2.1, Blueprint V3.3 HA |
+| **Source type** | APPROVED_PLAN, BLUEPRINT_V3_3 |
+| **Source reference** | Piano V4 §2.1, Blueprint V3.3 HA |
 | **Existing file/function** | **ABSENT** |
 | **Status** | **ABSENT** |
 | **Compatibility** | **ALIGNED** — Nessun conflitto noto |
@@ -97,7 +109,8 @@ Le funzioni del controller CP4 existente sono indicate come:
 |---|---|
 | **ID** | R-TGT-04 |
 | **Full requirement** | Finestra di recupero finale (priorità massima al target, 60 min) |
-| **Source** | Piano V4 §2.1 |
+| **Source type** | APPROVED_PLAN |
+| **Source reference** | Piano V4 §2.1 |
 | **Existing file/function** | **ABSENT** |
 | **Status** | **ABSENT** |
 | **Compatibility** | **ALIGNED** — Nessun conflitto noto |
@@ -114,7 +127,8 @@ Le funzioni del controller CP4 existente sono indicate come:
 |---|---|
 | **ID** | R-TGT-05 |
 | **Full requirement** | Usare la potenza minima compatibile con il raggiungimento del target |
-| **Source** | Piano V4 §2.1, Blueprint V3.3 HA |
+| **Source type** | APPROVED_PLAN, BLUEPRINT_V3_3 |
+| **Source reference** | Piano V4 §2.1, Blueprint V3.3 HA |
 | **Existing file/function** | **ABSENT** — CP4 usa tutta la potenza disponibile (export o power limits) |
 | **Status** | **ABSENT** |
 | **Compatibility** | **ALIGNED** — Nessun conflitto noto |
@@ -131,7 +145,8 @@ Le funzioni del controller CP4 existente sono indicate come:
 |---|---|
 | **ID** | R-TGT-06 |
 | **Full requirement** | Se il SOC scende sotto target prima dell'orario (es. lavastoviglie dopo il 100%), riprendere la ricarica |
-| **Source** | Piano V4 §2.1, comportamento osservato 8/11 e accettato |
+| **Source type** | APPROVED_PLAN, EXPLICIT_PROJECT_DECISION |
+| **Source reference** | Piano V4 §2.1, comportamento osservato 8/11 e accettato |
 | **Existing file/function** | **ABSENT** — CP4 non confronta SOC con target; carica solo su export |
 | **Status** | **ABSENT** |
 | **Compatibility** | **ALIGNED** — Nessun conflitto noto |
@@ -148,7 +163,8 @@ Le funzioni del controller CP4 existente sono indicate come:
 |---|---|
 | **ID** | R-TGT-07 |
 | **Full requirement** | Dichiarare esplicitamente target non raggiungibile quando energia/limiti non bastano (stato `NOT_FEASIBLE`) |
-| **Source** | Piano V4 §2.1 |
+| **Source type** | APPROVED_PLAN |
+| **Source reference** | Piano V4 §2.1 |
 | **Existing file/function** | **ABSENT** — CP4 non ha stati/reason `NOT_FEASIBLE` |
 | **Status** | **ABSENT** |
 | **Compatibility** | **ALIGNED** — Nessun conflitto noto |
@@ -169,7 +185,8 @@ Le funzioni del controller CP4 existente sono indicate come:
 |---|---|
 | **ID** | R-NRG-01 |
 | **Full requirement** | Capacità batteria = 10,24 kWh |
-| **Source** | Piano V4 §2.2, impianto reale |
+| **Source type** | APPROVED_PLAN |
+| **Source reference** | Piano V4 §2.2, impianto reale |
 | **Existing file/function** | `shadow_ems_types.h::BatteryConstraints::ratedCapacityKWh = 10.24` |
 | **Status** | **IMPLEMENTED_NOT_TESTED** |
 | **Compatibility** | **ALIGNED** — Nessun conflitto noto |
@@ -186,7 +203,8 @@ Le funzioni del controller CP4 existente sono indicate come:
 |---|---|
 | **ID** | R-NRG-02 |
 | **Full requirement** | Tensione nominale (per conversioni A↔W) = 51,2 V |
-| **Source** | Piano V4 §2.2, spec batteria |
+| **Source type** | APPROVED_PLAN |
+| **Source reference** | Piano V4 §2.2, spec batteria |
 | **Existing file/function** | **ABSENT** (opzionale: conversione non necessaria ma disponibile se serve diagnostica) |
 | **Status** | **ABSENT** |
 | **Compatibility** | **NOT_APPLICABLE** — Requisito opzionale/negativo |
@@ -203,7 +221,8 @@ Le funzioni del controller CP4 existente sono indicate come:
 |---|---|
 | **ID** | R-NRG-03 |
 | **Full requirement** | Efficienza di carica = 0,90 |
-| **Source** | Piano V4 §2.2, Blueprint V3.3 HA |
+| **Source type** | APPROVED_PLAN, BLUEPRINT_V3_3 |
+| **Source reference** | Piano V4 §2.2, Blueprint V3.3 HA |
 | **Existing file/function** | **ABSENT** |
 | **Status** | **ABSENT** |
 | **Compatibility** | **ALIGNED** — Nessun conflitto noto |
@@ -220,7 +239,8 @@ Le funzioni del controller CP4 existente sono indicate come:
 |---|---|
 | **ID** | R-NRG-04 |
 | **Full requirement** | Margine di sicurezza sul fabbisogno = 1,2 |
-| **Source** | Piano V4 §2.2, Blueprint V3.3 HA |
+| **Source type** | APPROVED_PLAN, BLUEPRINT_V3_3 |
+| **Source reference** | Piano V4 §2.2, Blueprint V3.3 HA |
 | **Existing file/function** | **ABSENT** |
 | **Status** | **ABSENT** |
 | **Compatibility** | **ALIGNED** — Nessun conflitto noto |
@@ -237,7 +257,8 @@ Le funzioni del controller CP4 existente sono indicate come:
 |---|---|
 | **ID** | R-NRG-05 |
 | **Full requirement** | Deficit = (SOC target − SOC attuale) × capacità [kWh] |
-| **Source** | Piano V4 §2.2, Blueprint V3.3 HA |
+| **Source type** | APPROVED_PLAN, BLUEPRINT_V3_3 |
+| **Source reference** | Piano V4 §2.2, Blueprint V3.3 HA |
 | **Existing file/function** | **ABSENT** — CP4 non calcola deficit |
 | **Status** | **ABSENT** |
 | **Compatibility** | **ALIGNED** — Nessun conflitto noto |
@@ -254,7 +275,8 @@ Le funzioni del controller CP4 existente sono indicate come:
 |---|---|
 | **ID** | R-NRG-06 |
 | **Full requirement** | Potenza media richiesta = deficit / ore effettive / efficienza [W] |
-| **Source** | Piano V4 §2.2, Blueprint V3.3 HA |
+| **Source type** | APPROVED_PLAN, BLUEPRINT_V3_3 |
+| **Source reference** | Piano V4 §2.2, Blueprint V3.3 HA |
 | **Existing file/function** | **ABSENT** |
 | **Status** | **ABSENT** |
 | **Compatibility** | **ALIGNED** — Nessun conflitto noto |
@@ -271,7 +293,8 @@ Le funzioni del controller CP4 existente sono indicate come:
 |---|---|
 | **ID** | R-NRG-07 |
 | **Full requirement** | Proiezione SOC al target dal ritmo reale di carica [%] |
-| **Source** | Piano V4 §2.2, Blueprint V3.3 HA |
+| **Source type** | APPROVED_PLAN, BLUEPRINT_V3_3 |
+| **Source reference** | Piano V4 §2.2, Blueprint V3.3 HA |
 | **Existing file/function** | **ABSENT** |
 | **Status** | **ABSENT** |
 | **Compatibility** | **ALIGNED** — Nessun conflitto noto |
@@ -288,7 +311,8 @@ Le funzioni del controller CP4 existente sono indicate come:
 |---|---|
 | **ID** | R-NRG-08 |
 | **Full requirement** | Feedback sul ritmo reale: ritardo se potenza reale < richiesta × 0,85 (tolleranza 0,85) |
-| **Source** | Piano V4 §2.2, Blueprint V3.3 HA |
+| **Source type** | APPROVED_PLAN, BLUEPRINT_V3_3 |
+| **Source reference** | Piano V4 §2.2, Blueprint V3.3 HA |
 | **Existing file/function** | **ABSENT** |
 | **Status** | **ABSENT** |
 | **Compatibility** | **ALIGNED** — Nessun conflitto noto |
@@ -305,7 +329,8 @@ Le funzioni del controller CP4 existente sono indicate come:
 |---|---|
 | **ID** | R-NRG-09 |
 | **Full requirement** | Stato critico se scostamento proiettato ≥ 8 punti SOC o richiesta ≥ 90% del massimo |
-| **Source** | Piano V4 §2.2, Blueprint V3.3 HA |
+| **Source type** | APPROVED_PLAN, BLUEPRINT_V3_3 |
+| **Source reference** | Piano V4 §2.2, Blueprint V3.3 HA |
 | **Existing file/function** | **ABSENT** |
 | **Status** | **ABSENT** |
 | **Compatibility** | **ALIGNED** — Nessun conflitto noto |
@@ -322,14 +347,16 @@ Le funzioni del controller CP4 existente sono indicate come:
 |---|---|
 | **ID** | R-NRG-10 |
 | **Full requirement** | Potenza batteria Afore: negativa in carica, positiva in scarica (da confermare empiricamente) |
-| **Source** | Piano V4 §2.2, osservazione preliminare Solarman |
+| **Source type** | APPROVED_PLAN |
+| **Source reference** | Piano V4 §2.2, osservazione preliminare Solarman |
 | **Existing file/function** | `afore_telemetry_engine.cpp::decodeBatteryBlock()`: scale=-1 sul registro `0x07D8` |
 | **Status** | **IMPLEMENTED_NOT_TESTED** |
-| **Compatibility** | **CONFLICTING** — CRITICAL_UNVERIFIED_SIGN_CONVENTION: sign flip battery power pending validazione M8 |
+| **Compatibility** | **ALIGNED** — trasformazione coerente col requisito, segno non ancora verificato empiricamente |
+| **Risk** | **CRITICAL_UNVERIFIED_SIGN_CONVENTION** |
 | **Gap** | Convenzione implementata (flip segno) ma **mai confermata su bus reale** |
 | **Target module** | `afore_telemetry_engine` (CP3 authored) |
 | **Planned unit test** | `test_afore_telemetry::test_battery_power_sign_flip` (authored, pending M3) |
-| **Planned integration test** | **M8** (Convenzioni dei segni): osservare carica/scarica reale, confermare flip |
+| **Planned integration test** | **M8 read-only**: correlare raw `0x07D8`, Battery Status, corrente e variazione SOC durante carica/scarica certa; nessuna scrittura |
 | **Dependency** | Validazione empirica M7/M8 con inverter reale |
 | **Milestone** | **M8** (validazione empirica, non M4) |
 | **Notes** | Critico: se convenzione errata, tutte le decisioni EMS sono invertite; profilo TOML ha `scale = -1`; conferma attende M8 |
@@ -343,7 +370,8 @@ Le funzioni del controller CP4 existente sono indicate come:
 |---|---|
 | **ID** | R-PV-01 |
 | **Full requirement** | Usare `detailedForecast` a slot di 30 min, stima selezionabile (`pv_estimate`, alternative 10/90) |
-| **Source** | Piano V4 §2.3, Solcast API via HA |
+| **Source type** | APPROVED_PLAN |
+| **Source reference** | Piano V4 §2.3, Solcast API via HA |
 | **Existing file/function** | **ABSENT** — nessuna integrazione Solcast |
 | **Status** | **ABSENT** |
 | **Compatibility** | **ALIGNED** — Nessun conflitto noto |
@@ -360,7 +388,8 @@ Le funzioni del controller CP4 existente sono indicate come:
 |---|---|
 | **ID** | R-PV-02 |
 | **Full requirement** | Età massima previsione valida = 14 h |
-| **Source** | Piano V4 §2.3, Blueprint V3.3 HA |
+| **Source type** | APPROVED_PLAN, BLUEPRINT_V3_3 |
+| **Source reference** | Piano V4 §2.3, Blueprint V3.3 HA |
 | **Existing file/function** | **ABSENT** |
 | **Status** | **ABSENT** |
 | **Compatibility** | **ALIGNED** — Nessun conflitto noto |
@@ -377,7 +406,8 @@ Le funzioni del controller CP4 existente sono indicate come:
 |---|---|
 | **ID** | R-PV-03 |
 | **Full requirement** | Surplus utile = previsione corretta − carico domestico, solo fino all'orario target [kWh] |
-| **Source** | Piano V4 §2.3, Blueprint V3.3 HA |
+| **Source type** | APPROVED_PLAN, BLUEPRINT_V3_3 |
+| **Source reference** | Piano V4 §2.3, Blueprint V3.3 HA |
 | **Existing file/function** | **ABSENT** |
 | **Status** | **ABSENT** |
 | **Compatibility** | **ALIGNED** — estimated-load è limitazione accuracy, non conflitto con R-LOAD-04 |
@@ -394,7 +424,8 @@ Le funzioni del controller CP4 existente sono indicate come:
 |---|---|
 | **ID** | R-PV-04 |
 | **Full requirement** | Correzione con FV reale (rapporto reale/previsto) sulle prossime ore (orizzonte 2 h, minimo 0,5, massimo 1,0) |
-| **Source** | Piano V4 §2.3, Blueprint V3.3 HA |
+| **Source type** | APPROVED_PLAN, BLUEPRINT_V3_3 |
+| **Source reference** | Piano V4 §2.3, Blueprint V3.3 HA |
 | **Existing file/function** | **ABSENT** |
 | **Status** | **ABSENT** |
 | **Compatibility** | **ALIGNED** — Nessun conflitto noto |
@@ -411,7 +442,8 @@ Le funzioni del controller CP4 existente sono indicate come:
 |---|---|
 | **ID** | R-PV-05 |
 | **Full requirement** | Senza Solcast valido: modalità conservativa (priorità target, nessuna ottimizzazione aggressiva) |
-| **Source** | Piano V4 §2.3 |
+| **Source type** | APPROVED_PLAN |
+| **Source reference** | Piano V4 §2.3 |
 | **Existing file/function** | **ABSENT** — CP4 non ha modalità conservativa/aggressiva |
 | **Status** | **ABSENT** |
 | **Compatibility** | **ALIGNED** — Nessun conflitto noto |
@@ -428,7 +460,8 @@ Le funzioni del controller CP4 existente sono indicate come:
 |---|---|
 | **ID** | R-PV-06 |
 | **Full requirement** | Il controller deve funzionare anche senza Solcast usando solo dati locali (degrado dichiarato) |
-| **Source** | Piano V4 §2.3, R-SAF-06 (autonomia senza HA) |
+| **Source type** | APPROVED_PLAN |
+| **Source reference** | Piano V4 §2.3, R-SAF-06 (autonomia senza HA) |
 | **Existing file/function** | **PARTIAL** — CP4 usa solo dati locali (non Solcast) ma non implementa target-aware |
 | **Status** | **PARTIAL** |
 | **Compatibility** | **ALIGNED** — Nessun conflitto noto |
@@ -449,7 +482,8 @@ Le funzioni del controller CP4 existente sono indicate come:
 |---|---|
 | **ID** | R-FOG-01 |
 | **Full requirement** | Nebbia se (T − Td) ≤ 1,5 °C e radiazione < 100 W/m² |
-| **Source** | Piano V4 §2.4, Blueprint V3.3 HA |
+| **Source type** | APPROVED_PLAN, BLUEPRINT_V3_3 |
+| **Source reference** | Piano V4 §2.4, Blueprint V3.3 HA |
 | **Existing file/function** | **ABSENT** |
 | **Status** | **ABSENT** |
 | **Compatibility** | **ALIGNED** — Nessun conflitto noto |
@@ -466,7 +500,8 @@ Le funzioni del controller CP4 existente sono indicate come:
 |---|---|
 | **ID** | R-FOG-02 |
 | **Full requirement** | Uscita nebbia se (T − Td) ≥ 2,5 °C, radiazione ≥ 180 W/m², FV/Solcast ≥ 0,75 (isteresi) |
-| **Source** | Piano V4 §2.4, Blueprint V3.3 HA |
+| **Source type** | APPROVED_PLAN, BLUEPRINT_V3_3 |
+| **Source reference** | Piano V4 §2.4, Blueprint V3.3 HA |
 | **Existing file/function** | **ABSENT** |
 | **Status** | **ABSENT** |
 | **Compatibility** | **ALIGNED** — Nessun conflitto noto |
@@ -483,7 +518,8 @@ Le funzioni del controller CP4 existente sono indicate come:
 |---|---|
 | **ID** | R-FOG-03 |
 | **Full requirement** | Preferire il sensore stabilizzato `binary_sensor.sem_nebbia_stabile` (fallback sul calcolo istantaneo) |
-| **Source** | Piano V4 §2.4, Blueprint V3.3 HA |
+| **Source type** | APPROVED_PLAN, BLUEPRINT_V3_3 |
+| **Source reference** | Piano V4 §2.4, Blueprint V3.3 HA |
 | **Existing file/function** | **ABSENT** |
 | **Status** | **ABSENT** |
 | **Compatibility** | **ALIGNED** — Nessun conflitto noto |
@@ -500,7 +536,8 @@ Le funzioni del controller CP4 existente sono indicate come:
 |---|---|
 | **ID** | R-FOG-04 |
 | **Full requirement** | Con nebbia: fattore FV sulle prossime ore = 0,3 |
-| **Source** | Piano V4 §2.4, Blueprint V3.3 HA |
+| **Source type** | APPROVED_PLAN, BLUEPRINT_V3_3 |
+| **Source reference** | Piano V4 §2.4, Blueprint V3.3 HA |
 | **Existing file/function** | **ABSENT** |
 | **Status** | **ABSENT** |
 | **Compatibility** | **ALIGNED** — Nessun conflitto noto |
@@ -517,7 +554,8 @@ Le funzioni del controller CP4 existente sono indicate come:
 |---|---|
 | **ID** | R-FOG-05 |
 | **Full requirement** | Nessun orario rigido di dissoluzione nebbia (solo diagnostica) |
-| **Source** | Piano V4 §2.4 |
+| **Source type** | APPROVED_PLAN |
+| **Source reference** | Piano V4 §2.4 |
 | **Existing file/function** | **ABSENT** — requisito negativo: verifica assenza hard-coded time |
 | **Status** | **ABSENT** |
 | **Compatibility** | **NOT_APPLICABLE** — Requisito opzionale/negativo |
@@ -538,7 +576,8 @@ Le funzioni del controller CP4 existente sono indicate come:
 |---|---|
 | **ID** | R-LOAD-01 |
 | **Full requirement** | Carico feriale stimato = 0,6 kW |
-| **Source** | Piano V4 §2.5, Blueprint V3.3 HA |
+| **Source type** | APPROVED_PLAN, BLUEPRINT_V3_3 |
+| **Source reference** | Piano V4 §2.5, Blueprint V3.3 HA |
 | **Existing file/function** | **ABSENT** |
 | **Status** | **ABSENT** |
 | **Compatibility** | **ALIGNED** — Nessun conflitto noto |
@@ -555,7 +594,8 @@ Le funzioni del controller CP4 existente sono indicate come:
 |---|---|
 | **ID** | R-LOAD-02 |
 | **Full requirement** | Carico weekend stimato = 0,9 kW |
-| **Source** | Piano V4 §2.5, Blueprint V3.3 HA |
+| **Source type** | APPROVED_PLAN, BLUEPRINT_V3_3 |
+| **Source reference** | Piano V4 §2.5, Blueprint V3.3 HA |
 | **Existing file/function** | **ABSENT** |
 | **Status** | **ABSENT** |
 | **Compatibility** | **ALIGNED** — Nessun conflitto noto |
@@ -572,7 +612,8 @@ Le funzioni del controller CP4 existente sono indicate come:
 |---|---|
 | **ID** | R-LOAD-03 |
 | **Full requirement** | Giorni weekend configurabili (default: sab, dom) |
-| **Source** | Piano V4 §2.5, Blueprint V3.3 HA |
+| **Source type** | APPROVED_PLAN, BLUEPRINT_V3_3 |
+| **Source reference** | Piano V4 §2.5, Blueprint V3.3 HA |
 | **Existing file/function** | **ABSENT** |
 | **Status** | **ABSENT** |
 | **Compatibility** | **ALIGNED** — Nessun conflitto noto |
@@ -589,7 +630,8 @@ Le funzioni del controller CP4 existente sono indicate come:
 |---|---|
 | **ID** | R-LOAD-04 |
 | **Full requirement** | Quando validato, sostituire la stima con il carico misurato dal bilancio (fase successiva) |
-| **Source** | Piano V4 §2.5 |
+| **Source type** | APPROVED_PLAN |
+| **Source reference** | Piano V4 §2.5 |
 | **Existing file/function** | **ABSENT** — non prioritario, fase successiva |
 | **Status** | **ABSENT** |
 | **Compatibility** | **ALIGNED** — Nessun conflitto noto |
@@ -610,7 +652,8 @@ Le funzioni del controller CP4 existente sono indicate come:
 |---|---|
 | **ID** | R-SEA-01 |
 | **Full requirement** | Valutazione giornaliera della priorità di carica (ore 08:30) |
-| **Source** | Piano V4 §2.6, Blueprint V3.3 HA (automation trigger time) |
+| **Source type** | APPROVED_PLAN, BLUEPRINT_V3_3 |
+| **Source reference** | Piano V4 §2.6, Blueprint V3.3 HA (automation trigger time) |
 | **Existing file/function** | **ABSENT** |
 | **Status** | **ABSENT** |
 | **Compatibility** | **ALIGNED** — Nessun conflitto noto |
@@ -627,7 +670,8 @@ Le funzioni del controller CP4 existente sono indicate come:
 |---|---|
 | **ID** | R-SEA-02 |
 | **Full requirement** | Stagione invernale configurabile (default: 25/10 – 28/02) |
-| **Source** | Piano V4 §2.6, Blueprint V3.3 HA |
+| **Source type** | APPROVED_PLAN, BLUEPRINT_V3_3 |
+| **Source reference** | Piano V4 §2.6, Blueprint V3.3 HA |
 | **Existing file/function** | **ABSENT** |
 | **Status** | **ABSENT** |
 | **Compatibility** | **ALIGNED** — Nessun conflitto noto |
@@ -644,7 +688,8 @@ Le funzioni del controller CP4 existente sono indicate come:
 |---|---|
 | **ID** | R-SEA-03 |
 | **Full requirement** | Attivare priorità carica se surplus oggi < deficit al 100% × 1,1 **e** domani non favorevole (margine 1,1) |
-| **Source** | Piano V4 §2.6, Blueprint V3.3 HA |
+| **Source type** | APPROVED_PLAN, BLUEPRINT_V3_3 |
+| **Source reference** | Piano V4 §2.6, Blueprint V3.3 HA |
 | **Existing file/function** | **ABSENT** |
 | **Status** | **ABSENT** |
 | **Compatibility** | **ALIGNED** — Nessun conflitto noto |
@@ -661,7 +706,8 @@ Le funzioni del controller CP4 existente sono indicate come:
 |---|---|
 | **ID** | R-SEA-04 |
 | **Full requirement** | Domani favorevole se surplus domani ≥ 7 kWh e SOC ≥ SOC minimo per domani (SOC min 30%) |
-| **Source** | Piano V4 §2.6, Blueprint V3.3 HA |
+| **Source type** | APPROVED_PLAN, BLUEPRINT_V3_3 |
+| **Source reference** | Piano V4 §2.6, Blueprint V3.3 HA |
 | **Existing file/function** | **ABSENT** |
 | **Status** | **ABSENT** |
 | **Compatibility** | **ALIGNED** — Nessun conflitto noto |
@@ -678,7 +724,8 @@ Le funzioni del controller CP4 existente sono indicate come:
 |---|---|
 | **ID** | R-SEA-05 |
 | **Full requirement** | Nella V4 shadow la decisione "ChgFst" è registrata come stato strategico, non come cambio modalità inverter |
-| **Source** | Piano V4 §2.6 |
+| **Source type** | APPROVED_PLAN |
+| **Source reference** | Piano V4 §2.6 |
 | **Existing file/function** | **ABSENT** — stato "priority charge" non presente in CP4 |
 | **Status** | **ABSENT** |
 | **Compatibility** | **ALIGNED** — Nessun conflitto noto |
@@ -699,7 +746,8 @@ Le funzioni del controller CP4 existente sono indicate come:
 |---|---|
 | **ID** | R-CAL-01 |
 | **Full requirement** | Considerare calibrata la batteria con SOC pieno stabile (100% per 5 min) |
-| **Source** | Piano V4 §2.7, Blueprint V3.3 HA |
+| **Source type** | APPROVED_PLAN, BLUEPRINT_V3_3 |
+| **Source reference** | Piano V4 §2.7, Blueprint V3.3 HA |
 | **Existing file/function** | **ABSENT** |
 | **Status** | **ABSENT** |
 | **Compatibility** | **CONFLICTING** — CONF-03: calibrazione 100% vs CP4 maxSOC 95% |
@@ -716,7 +764,8 @@ Le funzioni del controller CP4 existente sono indicate come:
 |---|---|
 | **ID** | R-CAL-02 |
 | **Full requirement** | Dopo calibrazione, ritorno alla strategia ordinaria (equivalente ritorno SelfUse) |
-| **Source** | Piano V4 §2.7 |
+| **Source type** | APPROVED_PLAN |
+| **Source reference** | Piano V4 §2.7 |
 | **Existing file/function** | **ABSENT** |
 | **Status** | **ABSENT** |
 | **Compatibility** | **ALIGNED** — Nessun conflitto noto |
@@ -733,7 +782,8 @@ Le funzioni del controller CP4 existente sono indicate come:
 |---|---|
 | **ID** | R-CAL-03 |
 | **Full requirement** | Il profilo longevità (es. SOC max 95%) è opzionale e non deve impedire la calibrazione al 100% |
-| **Source** | Piano V4 §2.7 |
+| **Source type** | APPROVED_PLAN |
+| **Source reference** | Piano V4 §2.7 |
 | **Existing file/function** | `shadow_ems_types.h::BatteryConstraints::maxSOC = 95.0` — conflitto potenziale |
 | **Status** | **PARTIAL** |
 | **Compatibility** | **CONFLICTING** — CONF-03: calibrazione 100% override vs CP4 maxSOC 95% |
@@ -754,24 +804,26 @@ Le funzioni del controller CP4 existente sono indicate come:
 |---|---|
 | **ID** | R-CMD-01 |
 | **Full requirement** | Setpoint espresso in W (carica negativa secondo convenzione Afore, da confermare) |
-| **Source** | Piano V4 §2.8, doc Afore External EMS |
+| **Source type** | APPROVED_PLAN, AFORE_DOCUMENTATION |
+| **Source reference** | Piano V4 §2.8, doc Afore External EMS |
 | **Existing file/function** | `shadow_ems_controller.cpp`: setpoint in W (canonical: positivo=carica); convenzione Afore inversa da confermare |
 | **Status** | **PARTIAL** |
 | **Compatibility** | **ALIGNED** — Nessun conflitto noto |
 | **Gap** | CP4 usa W canonici (positivo=carica); convenzione Afore (negativo=carica) da validare empiricamente (M8) e flip da applicare prima dell'invio comando (fase attiva post-G4) |
 | **Target module** | `shadow_ems_controller` (già W); `afore_command_sender` (flip sign, fase attiva) |
-| **Planned unit test** | `test_shadow_ems::test_setpoint_in_watts` (CP4 authored) |
-| **Planned integration test** | **M8**: conferma convenzione Afore su registri `0x0A09-0x0A0A` |
+| **Planned unit test** | Convenzione canonica interna: `positive = charge`; conversione wire isolata e non attiva in Phase 0 |
+| **Planned integration test** | **M8** valida solo il segno della telemetria `0x07D8`. **Post-G4**: prova attiva presidiata per il segno del comando External EMS `0x0A09–0x0A0A` |
 | **Dependency** | R-NRG-10 (convenzione power), validazione M8 |
-| **Milestone** | **M8** (validazione) + fase attiva post-G4 (invio comando) |
-| **Notes** | CP4 setpoint già in W (positivo=carica); doc Afore indica negativo=carica per External EMS → flip necessario al momento dell'invio |
+| **Milestone** | M4 per modello canonico; M8 per telemetria; post-G4 per comando External EMS |
+| **Notes** | Nessuna scrittura External EMS è consentita in M8. La semantica del comando su `0x0A09–0x0A0A` resta non verificata fino al piano attivo post-G4. |
 
 ### R-CMD-02
 | Campo | Valore |
 |---|---|
 | **ID** | R-CMD-02 |
 | **Full requirement** | Rampa massima ordinaria in salita/discesa (traduzione di 5 A / 8 A per ciclo) ≈ 256 W / 410 W per ciclo |
-| **Source** | Piano V4 §2.8, Blueprint V3.3 HA (conversione A→W a 51.2V) |
+| **Source type** | APPROVED_PLAN, BLUEPRINT_V3_3 |
+| **Source reference** | Piano V4 §2.8, Blueprint V3.3 HA (conversione A→W a 51.2V) |
 | **Existing file/function** | `shadow_ems_controller.cpp::applySmoothing()`: `maxPowerRampWPerS = 500.0` — valore generico per secondo, non per ciclo |
 | **Status** | **PARTIAL** |
 | **Compatibility** | **ALIGNED** — Nessun conflitto noto |
@@ -788,7 +840,8 @@ Le funzioni del controller CP4 existente sono indicate come:
 |---|---|
 | **ID** | R-CMD-03 |
 | **Full requirement** | Isteresi minima per variazione setpoint (traduzione di 2 A) ≈ 100 W |
-| **Source** | Piano V4 §2.8, Blueprint V3.3 HA |
+| **Source type** | APPROVED_PLAN, BLUEPRINT_V3_3 |
+| **Source reference** | Piano V4 §2.8, Blueprint V3.3 HA |
 | **Existing file/function** | `shadow_ems_controller.cpp`: hysteresisW = 30W (usato per grid, non per setpoint) |
 | **Status** | **PARTIAL** |
 | **Compatibility** | **CONFLICTING** — CONF-02: CP4 hysteresis 30W grid-decision vs R-CMD-03 ~100W setpoint hysteresis approvato |
@@ -805,7 +858,8 @@ Le funzioni del controller CP4 existente sono indicate come:
 |---|---|
 | **ID** | R-CMD-04 |
 | **Full requirement** | In stato critico nessuna rampa lenta |
-| **Source** | Piano V4 §2.8, Blueprint V3.3 HA |
+| **Source type** | APPROVED_PLAN, BLUEPRINT_V3_3 |
+| **Source reference** | Piano V4 §2.8, Blueprint V3.3 HA |
 | **Existing file/function** | **ABSENT** — CP4 applica sempre smoothing, non ha stato critico |
 | **Status** | **ABSENT** |
 | **Compatibility** | **ALIGNED** — Nessun conflitto noto |
@@ -822,7 +876,8 @@ Le funzioni del controller CP4 existente sono indicate come:
 |---|---|
 | **ID** | R-CMD-05 |
 | **Full requirement** | Limiti min/max carica configurabili (equivalente 5–50 A) ≈ 256–2560 W, da validare col BMS |
-| **Source** | Piano V4 §2.8, Blueprint V3.3 HA, limiti BMS |
+| **Source type** | APPROVED_PLAN, BLUEPRINT_V3_3 |
+| **Source reference** | Piano V4 §2.8, Blueprint V3.3 HA, limiti BMS |
 | **Existing file/function** | `shadow_ems_types.h::BatteryConstraints`: maxChargePowerW = 5000W, maxDischargePowerW = 5000W — valori nominali inverter, non limiti utente configurabili |
 | **Status** | **PARTIAL** |
 | **Compatibility** | **ALIGNED** — Nessun conflitto noto |
@@ -839,7 +894,8 @@ Le funzioni del controller CP4 existente sono indicate come:
 |---|---|
 | **ID** | R-CMD-06 |
 | **Full requirement** | Nella Phase 0 nessuna scarica comandata nel setpoint primario (`allow_discharge = false`) |
-| **Source** | Piano V4 §2.8 |
+| **Source type** | APPROVED_PLAN |
+| **Source reference** | Piano V4 §2.8 |
 | **Existing file/function** | **ABSENT** — CP4 raccomanda scarica (`Discharging` mode, power negativo) ma non invia comandi (shadow) |
 | **Status** | **PARTIAL** |
 | **Compatibility** | **CONFLICTING** — CONFLICTING con CP4 Discharging mode (Phase 0 no discharge) |
@@ -856,7 +912,8 @@ Le funzioni del controller CP4 existente sono indicate come:
 |---|---|
 | **ID** | R-CMD-07 |
 | **Full requirement** | Heartbeat futuro External EMS 30–60 s, timeout Afore 2 min → 0 W (comportamento documentato) |
-| **Source** | Piano V4 §2.8, doc Afore External EMS |
+| **Source type** | APPROVED_PLAN, AFORE_DOCUMENTATION |
+| **Source reference** | Piano V4 §2.8, doc Afore External EMS |
 | **Existing file/function** | **ABSENT** — solo progettazione, non implementare in Phase 0 |
 | **Status** | **ABSENT** |
 | **Compatibility** | **ALIGNED** — Nessun conflitto noto |
@@ -873,7 +930,8 @@ Le funzioni del controller CP4 existente sono indicate come:
 |---|---|
 | **ID** | R-CMD-08 |
 | **Full requirement** | Ritorno controllato a SelfUse dopo timeout >2min produce power/setpoint 0W (comportamento documentato); ritorno automatico SelfUse NON documentato in spec Afore |
-| **Source** | Piano V4 §2.8, doc Afore External EMS |
+| **Source type** | APPROVED_PLAN, AFORE_DOCUMENTATION |
+| **Source reference** | Piano V4 §2.8, doc Afore External EMS |
 | **Existing file/function** | **ABSENT** — solo progettazione, non implementare in Phase 0 |
 | **Status** | **ABSENT** |
 | **Compatibility** | **ALIGNED** — Nessun conflitto noto |
@@ -894,7 +952,8 @@ Le funzioni del controller CP4 existente sono indicate come:
 |---|---|
 | **ID** | R-DIA-01 |
 | **Full requirement** | Riepilogo serale (20:13): modalità, SOC, previsione domani, stato nebbia |
-| **Source** | Piano V4 §2.9, Blueprint V3.3 HA (automation time trigger) |
+| **Source type** | APPROVED_PLAN, BLUEPRINT_V3_3 |
+| **Source reference** | Piano V4 §2.9, Blueprint V3.3 HA (automation time trigger) |
 | **Existing file/function** | **ABSENT** |
 | **Status** | **ABSENT** |
 | **Compatibility** | **ALIGNED** — Nessun conflitto noto |
@@ -911,7 +970,8 @@ Le funzioni del controller CP4 existente sono indicate come:
 |---|---|
 | **ID** | R-DIA-02 |
 | **Full requirement** | Evento all'attivazione della priorità di carica |
-| **Source** | Piano V4 §2.9, Blueprint V3.3 HA |
+| **Source type** | APPROVED_PLAN, BLUEPRINT_V3_3 |
+| **Source reference** | Piano V4 §2.9, Blueprint V3.3 HA |
 | **Existing file/function** | **ABSENT** |
 | **Status** | **ABSENT** |
 | **Compatibility** | **ALIGNED** — Nessun conflitto noto |
@@ -928,7 +988,8 @@ Le funzioni del controller CP4 existente sono indicate come:
 |---|---|
 | **ID** | R-DIA-03 |
 | **Full requirement** | Evento a calibrazione completata |
-| **Source** | Piano V4 §2.9, Blueprint V3.3 HA |
+| **Source type** | APPROVED_PLAN, BLUEPRINT_V3_3 |
+| **Source reference** | Piano V4 §2.9, Blueprint V3.3 HA |
 | **Existing file/function** | **ABSENT** |
 | **Status** | **ABSENT** |
 | **Compatibility** | **ALIGNED** — Nessun conflitto noto |
@@ -945,7 +1006,8 @@ Le funzioni del controller CP4 existente sono indicate come:
 |---|---|
 | **ID** | R-DIA-04 |
 | **Full requirement** | Evento previsione Solcast non valida |
-| **Source** | Piano V4 §2.9 |
+| **Source type** | APPROVED_PLAN |
+| **Source reference** | Piano V4 §2.9 |
 | **Existing file/function** | **ABSENT** |
 | **Status** | **ABSENT** |
 | **Compatibility** | **ALIGNED** — Nessun conflitto noto |
@@ -962,7 +1024,8 @@ Le funzioni del controller CP4 existente sono indicate come:
 |---|---|
 | **ID** | R-DIA-05 |
 | **Full requirement** | Ogni decisione con `decision`, `reason`, `confidence`, input usati e loro qualità |
-| **Source** | Piano V4 §2.9 |
+| **Source type** | APPROVED_PLAN |
+| **Source reference** | Piano V4 §2.9 |
 | **Existing file/function** | **PARTIAL** — CP4 ha `ControlRecommendation` con mode, reason, confidenceScore ma non registra input usati e qualità |
 | **Status** | **PARTIAL** |
 | **Compatibility** | **ALIGNED** — Nessun conflitto noto |
@@ -983,7 +1046,8 @@ Le funzioni del controller CP4 existente sono indicate come:
 |---|---|
 | **ID** | R-SAF-01 |
 | **Full requirement** | Un dato mancante non è mai zero (`unknown ≠ 0`) |
-| **Source** | Piano V4 §2.10, AGENTS.md:18-20 |
+| **Source type** | APPROVED_PLAN |
+| **Source reference** | Piano V4 §2.10, AGENTS.md:18-20 |
 | **Existing file/function** | `telemetry_quality.h::TelemetrySample`: se Invalid, valore non dovrebbe essere usato; ma inizializzato a 0.0 |
 | **Status** | **PARTIAL** |
 | **Compatibility** | **ALIGNED** — Nessun conflitto noto |
@@ -1000,7 +1064,8 @@ Le funzioni del controller CP4 existente sono indicate come:
 |---|---|
 | **ID** | R-SAF-02 |
 | **Full requirement** | Stati qualità: VALID, STALE, INVALID, OUT_OF_RANGE, COMM_ERROR, UNAVAILABLE, UNVERIFIED |
-| **Source** | Piano V4 §2.10 |
+| **Source type** | APPROVED_PLAN |
+| **Source reference** | Piano V4 §2.10 |
 | **Existing file/function** | `telemetry_quality.h::Quality`: Good, Degraded, Stale, Invalid (4 stati) — subset del requisito |
 | **Status** | **PARTIAL** |
 | **Compatibility** | **CONFLICTING** — CONFLICTING (risolto): Degraded actionable vs documentazione |
@@ -1017,7 +1082,8 @@ Le funzioni del controller CP4 existente sono indicate come:
 |---|---|
 | **ID** | R-SAF-03 |
 | **Full requirement** | SOC/potenza batteria/FV non validi → decisione `DATA_INVALID`, setpoint nullo |
-| **Source** | Piano V4 §2.10 |
+| **Source type** | APPROVED_PLAN |
+| **Source reference** | Piano V4 §2.10 |
 | **Existing file/function** | `shadow_ems_controller.cpp::checkTelemetryQuality()` + `transitionToFailSafe()`: se critical measurements non actionable → SafeIdle, power 0 |
 | **Status** | **IMPLEMENTED_NOT_TESTED** |
 | **Compatibility** | **ALIGNED** — Nessun conflitto noto |
@@ -1034,7 +1100,8 @@ Le funzioni del controller CP4 existente sono indicate come:
 |---|---|
 | **ID** | R-SAF-04 |
 | **Full requirement** | Override da HA non possono superare limiti di sicurezza |
-| **Source** | Piano V4 §2.10 |
+| **Source type** | APPROVED_PLAN |
+| **Source reference** | Piano V4 §2.10 |
 | **Existing file/function** | **ABSENT** — nessun ingresso override da HA in CP4 |
 | **Status** | **ABSENT** |
 | **Compatibility** | **ALIGNED** — Nessun conflitto noto |
@@ -1051,7 +1118,8 @@ Le funzioni del controller CP4 existente sono indicate come:
 |---|---|
 | **ID** | R-SAF-05 |
 | **Full requirement** | Gerarchia: sicurezza > validità dati > limiti BMS/inverter > anti-import > override > target > ottimizzazione |
-| **Source** | Piano V4 §2.10 |
+| **Source type** | APPROVED_PLAN |
+| **Source reference** | Piano V4 §2.10 |
 | **Existing file/function** | **PARTIAL** — CP4 ha: validità dati (checkTelemetryQuality) → fail-safe; limiti (BatteryConstraints); ma non gerarchia completa override/target/ottimizzazione |
 | **Status** | **PARTIAL** |
 | **Compatibility** | **ALIGNED** — Nessun conflitto noto |
@@ -1068,7 +1136,8 @@ Le funzioni del controller CP4 existente sono indicate come:
 |---|---|
 | **ID** | R-SAF-06 |
 | **Full requirement** | Il funzionamento senza HA/MQTT deve continuare con dati locali |
-| **Source** | Piano V4 §2.10 |
+| **Source type** | APPROVED_PLAN |
+| **Source reference** | Piano V4 §2.10 |
 | **Existing file/function** | **PARTIAL** — CP4 usa solo dati locali (battery, grid, pv da Modbus); nessuna dipendenza HA; ma logica target-aware richiede forecast → degradata senza HA |
 | **Status** | **PARTIAL** |
 | **Compatibility** | **ALIGNED** — Nessun conflitto noto |
@@ -1095,7 +1164,7 @@ Le funzioni del controller CP4 existente sono indicate come:
 ### 11.2 Partially implemented (codice parziale o generico authored CP4)
 | Requisito | Gap | Modulo target M4 |
 |---|---|---|
-| R-CMD-01 | Setpoint già in W ma convenzione Afore (negativo=carica) da validare M8 e flip da applicare fase attiva | `afore_command_sender` (fase attiva) |
+| R-CMD-01 | Setpoint già in W ma convenzione canonica interna definita; telemetria validata in M8, segno comando External EMS validato solo post-G4 | `afore_command_sender` (fase attiva) |
 | R-CMD-02 | Rampa 500W/s authored generica; requisito specifica 256/410 W/ciclo | `setpoint_shaper::applyRampLimits()` |
 | R-CMD-03 | Isteresi 30W per grid-driven; requisito richiede 100W per setpoint | `setpoint_shaper::applyHysteresis()` |
 | R-CMD-05 | Limiti fissi 5000W (nominale); requisito richiede configurabili 256–2560W | `BatteryConstraints` esteso |
@@ -1140,7 +1209,7 @@ Le funzioni del controller CP4 existente sono indicate come:
 | Requisito | Dipendenza | Milestone validazione |
 |---|---|---|
 | R-NRG-10 | Conferma convenzione segno batteria power su bus reale | **M8** |
-| R-CMD-01 | Conferma convenzione Afore External EMS (negativo=carica) | **M8** |
+| R-CMD-01 | Telemetria: validazione segno `0x07D8` in M8; comando External EMS `0x0A09–0x0A0A` solo post-G4 | **M8 / post-G4** |
 | R-CMD-05 | Validazione limiti BMS reali (5–50A) | **M7/M8** |
 | R-PV-01, 02, 03, 04 | Integrazione Solcast via HA (MQTT) | **M10** |
 | R-FOG-01, 02, 03 | Sensori meteo da HA (temperatura, punto rugiada, radiazione, nebbia stabilizzata) | **M10** |
@@ -1200,7 +1269,7 @@ Questa sezione documenta i conflitti identificati tra requisiti, comportamenti a
 | **CONF-03** | R-CAL-01 e R-CAL-03 (calibrazione 100%) vs CP4 BatteryConstraints::maxSOC 95% | CP4 authored: `BatteryConstraints::maxSOC = 95%` (longevità). R-CAL-01 e R-CAL-03 richiedono calibrazione 100% per 5 min. | **RISOLUZIONE M4**: Implementare override temporaneo `calibration_tracker::overrideMaxSOC()`. Calibrazione prioritaria su longevità. NON riferire R-CMD-03 per maxSOC. |
 | **CONF-04** | R-CMD-06 (Phase 0 no discharge) vs CP4 `Discharging` mode | CP4 raccomanda mode `Discharging` con power negativo ma shadow mode non invia comandi (conforme de facto). Flag `allow_discharge` esplicito assente. | **RISOLUZIONE M4**: Aggiungere flag configurabile `setpoint_shaper::allowDischarge`. Phase 0: false. Fase attiva: configurabile. |
 | **LIMIT-01** | R-PV-03 (surplus = FV − carico) estimated-load accuracy | Surplus calculation usa carico stimato 0.6/0.9 kW (R-LOAD-01/02). Carico reale misurato non disponibile fino a power balance validato (M8). | **LIMITATION**: Accuracy limitata fino a bilancio validato M8. Post-M8: sostituire stima con misurato da bilancio (grid + pv − battery). R-PV-03 ALIGNED (estimated-load = limitazione, non conflitto con R-LOAD-04). |
-| **CONF-06** | R-NRG-10 (sign flip battery power) vs convenzione Afore | CP4 authored: scale=-1 sul registro `0x07D8` (assume carica negativa). Convenzione Afore External EMS indica negativo=carica. Validazione empirica pendente M8. | **CRITICAL**: Se convenzione errata, decisioni EMS invertite. Validazione M8 obbligatoria prima fase attiva. |
+| **ASSUMPTION-01** | Segno telemetria batteria `0x07D8` | La convenzione raw non è ancora verificata empiricamente sul bus. Un segno errato invertirebbe i calcoli EMS. | **M8 read-only**: correlazione con stato batteria, corrente e variazione SOC. |
 
 ### 14.2 Aggiunta colonna Compatibility ai requisiti
 
@@ -1216,4 +1285,15 @@ La colonna **Compatibility** è stata aggiunta dopo "Status" in tutte le 59 tabe
 - R-CAL-01 (calibrazione 100%) → CONF-03
 - R-CAL-03 (calibrazione override maxSOC) → CONF-03
 - R-SAF-02 (Degraded actionable) → CONF-01 (risolto)
-- R-NRG-10 (sign flip) → CONF-06 (critico, pending M8)
+
+
+---
+
+## Rettifica finale M1 a cura della revisione tecnica
+
+- `R-NRG-10` non è un conflitto: è `IMPLEMENTED_NOT_TESTED`, compatibile ma con rischio `CRITICAL_UNVERIFIED_SIGN_CONVENTION`.
+- `CONF-06` è sostituito da `ASSUMPTION-01`.
+- M8 valida esclusivamente il segno della telemetria batteria `0x07D8` in sola lettura.
+- Il segno dei comandi External EMS `0x0A09–0x0A0A` sarà verificato soltanto post-G4 con un piano attivo dedicato.
+- Le fonti sono state normalizzate in `Source type` e `Source reference`.
+- Nessuna modifica riguarda codice C++, build, seriale o inverter.

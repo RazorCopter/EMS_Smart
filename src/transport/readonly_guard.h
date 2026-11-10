@@ -1,59 +1,94 @@
 // SPDX-License-Identifier: MIT
 //
-// Read-only transport guard: Phase 0 Shadow safety enforcement.
+// Read-only transport guard: Afore Shadow M2 hardening.
 //
-// Wraps any Transport implementation and enforces a strict read-only policy by intercepting
-// write() calls and rejecting Modbus function codes that perform writes. This is the
-// multi-level defense for Phase 0 Shadow mode: even if application logic attempts a write,
-// this guard prevents the packet from reaching the wire.
+// Wraps any Transport implementation and enforces a strict read-only policy with multi-level
+// defense for Afore Shadow mode. This guard performs frame-aware validation of Modbus RTU
+// requests and blocks ANY frame that is not a valid, complete FC03 or FC04 read request.
 //
-// ENFORCEMENT LEVELS:
-//   1. Modbus function code detection (0x05, 0x06, 0x0F, 0x10, etc.)
-//   2. Runtime flag check (forceReadOnly, default true)
-//   3. Detailed logging of all rejected writes
+// M2 ENFORCEMENT LAYERS (Trust Boundary):
+//   1. Modbus function code: ONLY 0x03 (Read Holding) and 0x04 (Read Input) allowed
+//   2. Frame structure: slave ID > 0, valid length (8 bytes for FC03/FC04 RTU request)
+//   3. CRC-16 validation: computed CRC must match transmitted CRC (Modbus-16, polynomial 0xA001)
+//   4. Quantity validation: > 0 and <= 125 registers (Modbus RTU limit)
+//   5. Address range: start_address + quantity must not overflow uint16
+//   6. Trailing bytes: zero bytes after expected frame length
+//   7. Configured slave validation: slave ID must match configured device address
 //
-// The guard is transparent for reads: configure(), read(), lock/unlock all pass through.
-// Only write() is intercepted and gated.
+// BLOCKED FRAME BEHAVIOR (SECURITY_BLOCK):
+//   - Zero bytes transmitted to underlying transport (lower transport write() NOT called)
+//   - Increment blocked_frame_count metric
+//   - Log event with timestamp, frame length, slave ID, FC, specific ReasonCode
+//   - Process remains alive and operational (no abort, no exit, no throw)
+//   - Return 0 to caller to signal write failure
+//
+// FRAME AUTHORIZATION:
+//   Allowed: Modbus RTU FC03 or FC04, slave > 0 configured, valid CRC, valid quantity,
+//            no address overflow, exact 8-byte length, no trailing bytes
+//   Blocked: All other frames including FC01, FC02, FC05, FC06, FC0F, FC10 (0x10), FC16, FC17,
+//            unknown FC, broadcast (slave 0), wrong slave, bad CRC, invalid quantity,
+//            short/long/empty frames, trailing bytes
 
 #pragma once
 
 #include <cstddef>
 #include <cstdint>
 #include <memory>
+#include <string>
 
 #include "transport.h"
 
 namespace heliograph {
 
-/// Transport wrapper that enforces read-only operation by blocking Modbus write function codes.
+/// Reason codes for blocked frames (M2 observability and audit trail)
+enum class BlockReasonCode : uint8_t {
+    ALLOWED = 0,                    // Frame passed all checks and was transmitted
+    FUNCTION_NOT_ALLOWED,           // FC not 0x03 or 0x04
+    EMPTY_FRAME,                    // len == 0
+    SHORT_FRAME,                    // len < 8
+    INVALID_LENGTH,                 // len != 8 for FC03/FC04 RTU request
+    INVALID_CRC,                    // CRC-16 mismatch
+    BROADCAST_NOT_ALLOWED,          // slave ID == 0
+    SLAVE_NOT_ALLOWED,              // slave ID not in configured set
+    QUANTITY_ZERO,                  // quantity == 0
+    QUANTITY_OUT_OF_RANGE,          // quantity > 125
+    ADDRESS_RANGE_OVERFLOW,         // start_address + quantity > 0x10000
+    TRAILING_BYTES,                 // bytes after expected frame length
+};
+
+/// Human-readable reason code names (for logging)
+const char* blockReasonToString(BlockReasonCode code);
+
+/// Event logged for each blocked frame (M2 audit trail)
+struct BlockedFrameEvent {
+    uint64_t        timestamp_ms;
+    size_t          frame_length;
+    uint8_t         slave_id;
+    uint8_t         function_code;
+    BlockReasonCode reason;
+};
+
+/// Transport wrapper that enforces Afore Shadow read-only operation with frame-aware validation.
 ///
-/// Phase 0 Shadow requirement: the bridge must observe inverter state without any possibility
-/// of modifying it. This guard provides defense-in-depth: even if a bug or misconfiguration
-/// causes a write command to be constructed, it cannot reach the physical device.
+/// M2 requirement: the Afore Shadow build must be structurally and physically incapable of
+/// transmitting ANY Modbus RTU frame different from a valid FC03/FC04 read request with correct
+/// CRC-16, valid slave ID, valid quantity, and exact length.
 ///
-/// RECOGNIZED WRITE FUNCTION CODES (Modbus standard):
-///   0x05  Write Single Coil
-///   0x06  Write Single Register
-///   0x0F  Write Multiple Coils
-///   0x10  Write Multiple Registers
-///   0x16  Mask Write Register
-///   0x17  Read/Write Multiple Registers
-///
-/// Any packet starting with unit_id + write_function_code is rejected before transmission.
-/// Read function codes (0x01-0x04) pass through unchanged.
+/// Defense-in-depth: even if application logic constructs a write command, it cannot reach
+/// the physical serial port. Zero bytes transmitted for blocked frames.
 class ReadOnlyGuard : public Transport {
 public:
-    /// Wraps an existing transport. The guard takes ownership via unique_ptr; the underlying
-    /// transport is destroyed when the guard is destroyed.
+    /// Wraps an existing transport. The guard takes ownership via unique_ptr.
     explicit ReadOnlyGuard(std::unique_ptr<Transport> underlying);
     ~ReadOnlyGuard() override = default;
 
     TransportType type() const override { return underlying_->type(); }
-    bool configure(const SerialProfile& profile) override { return underlying_->configure(profile); }
+    bool configure(const SerialProfile& profile) override;
     void flushInput() override { underlying_->flushInput(); }
 
-    /// Intercepts writes. If forceReadOnly is true (default), scans the payload for Modbus
-    /// write function codes and rejects them. Returns 0 and logs an error if blocked.
+    /// Intercepts writes with frame-aware validation. If forceReadOnly is true (default),
+    /// performs complete Modbus RTU FC03/FC04 validation including CRC-16, slave ID, quantity,
+    /// address range, and frame structure. Returns 0 and logs BlockedFrameEvent if blocked.
     size_t write(const uint8_t* data, size_t len) override;
 
     size_t   read(uint8_t* buf, size_t len, uint32_t timeoutMs) override {
@@ -63,22 +98,43 @@ public:
     bool     lock(uint32_t timeoutMs) override { return underlying_->lock(timeoutMs); }
     void     unlock() override { underlying_->unlock(); }
 
-    /// Controls write blocking. Default true for Phase 0 Shadow.
-    /// Setting this to false bypasses the guard (for testing or future write-enabled phases).
+    /// Controls frame validation. Default true for Afore Shadow M2.
+    /// Setting false bypasses all checks (for testing or non-Shadow builds).
     void setForceReadOnly(bool enabled) { forceReadOnly_ = enabled; }
     bool forceReadOnly() const { return forceReadOnly_; }
 
-    /// Counters for observability
-    uint32_t blockedWrites() const { return blockedWrites_; }
-    uint32_t allowedWrites() const { return allowedWrites_; }
+    /// Configures allowed slave ID (default 0 = accept all non-broadcast).
+    /// When set to non-zero, only frames for that slave pass validation.
+    void setConfiguredSlaveId(uint8_t slaveId) { configuredSlaveId_ = slaveId; }
+    uint8_t configuredSlaveId() const { return configuredSlaveId_; }
+
+    /// Counters for observability (M2 metrics)
+    uint32_t blockedFrameCount() const { return blockedFrameCount_; }
+    uint32_t allowedFrameCount() const { return allowedFrameCount_; }
+
+    /// Access last blocked event (for testing and diagnostics)
+    const BlockedFrameEvent& lastBlockedEvent() const { return lastBlockedEvent_; }
+
+    // Legacy counters (kept for compatibility with existing tests)
+    uint32_t blockedWrites() const { return blockedFrameCount_; }
+    uint32_t allowedWrites() const { return allowedFrameCount_; }
 
 private:
-    bool isModbusWriteFunction(uint8_t functionCode) const;
+    /// Frame-aware validation: checks FC, CRC, slave, quantity, length, address range
+    BlockReasonCode validateModbusRtuFrame(const uint8_t* data, size_t len);
+
+    /// Checks if function code is Read Holding (0x03) or Read Input (0x04)
+    bool isAllowedReadFunction(uint8_t functionCode) const;
+
+    /// Computes Modbus CRC-16 (polynomial 0xA001, initial 0xFFFF, little-endian)
+    uint16_t computeModbusCrc16(const uint8_t* data, size_t len) const;
 
     std::unique_ptr<Transport> underlying_;
     bool                       forceReadOnly_ = true;
-    uint32_t                   blockedWrites_ = 0;
-    uint32_t                   allowedWrites_ = 0;
+    uint8_t                    configuredSlaveId_ = 0;  // 0 = accept all non-broadcast
+    uint32_t                   blockedFrameCount_ = 0;
+    uint32_t                   allowedFrameCount_ = 0;
+    BlockedFrameEvent          lastBlockedEvent_{};
 };
 
 }  // namespace heliograph

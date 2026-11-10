@@ -24,6 +24,10 @@ include_directories(
     ${CMAKE_SOURCE_DIR}/test
 )
 
+# M2: Conditional compilation for Afore Shadow read-only build
+# When AFORE_SHADOW_BUILD=1, exclude all write-capable sources to enforce
+# structural read-only guarantee at compile time.
+
 # Common host-compilable sources (aligned with platformio.ini env:native build_src_filter)
 set(COMMON_SOURCES
     src/device/capability.cpp
@@ -36,12 +40,6 @@ set(COMMON_SOURCES
     src/transport/posix_serial_transport.cpp
     src/transport/readonly_guard.cpp
     src/state/state_store.cpp
-    src/commands/command_dispatcher.cpp
-    src/commands/command_queue.cpp
-    src/relays/drm.cpp
-    src/relays/relay_controller.cpp
-    src/status/boot_button.cpp
-    src/status/status_led.cpp
     src/config/configuration.cpp
     src/config/host_config_backend.cpp
     src/protocols/modbus/modbus_rtu.cpp
@@ -50,8 +48,21 @@ set(COMMON_SOURCES
     src/app/afore_v4_mqtt.cpp
     src/ems/shadow_ems_types.cpp
     src/ems/shadow_ems_controller.cpp
-    # Add more as needed from the native build filter
 )
+
+# M2: Sources excluded from AFORE_SHADOW_BUILD (write-capable components)
+# These files enable write operations and are physically excluded when building
+# the Afore Shadow read-only daemon to prevent any write capability at link time.
+if(NOT AFORE_SHADOW_BUILD)
+    list(APPEND COMMON_SOURCES
+        src/commands/command_dispatcher.cpp
+        src/commands/command_queue.cpp
+        src/relays/drm.cpp
+        src/relays/relay_controller.cpp
+        src/status/boot_button.cpp
+        src/status/status_led.cpp
+    )
+endif()
 
 # Host daemon executable (Phase 0 Shadow)
 add_executable(heliograph-daemon
@@ -59,12 +70,22 @@ add_executable(heliograph-daemon
     ${COMMON_SOURCES}
 )
 
+# M2: Afore Shadow build option - pass AFORE_SHADOW_BUILD to code if enabled
+# Usage: cmake -DAFORE_SHADOW_BUILD=ON ..
+# Default: OFF (standard build with all capabilities)
+option(AFORE_SHADOW_BUILD "Build Afore Shadow read-only daemon (M2 hardening)" OFF)
+
 target_compile_definitions(heliograph-daemon PRIVATE
     ENABLE_DRIVER_MODBUS_PROFILE=1
     ENABLE_DRIVER_SUNSPEC=1
     ENABLE_DRIVER_SOLARMAX=1
     ENABLE_DRIVER_MOCK=1
 )
+
+if(AFORE_SHADOW_BUILD)
+    target_compile_definitions(heliograph-daemon PRIVATE AFORE_SHADOW_BUILD=1)
+    message(STATUS "M2: Building Afore Shadow read-only daemon (write sources excluded)")
+endif()
 
 # Link pthread for std::mutex and std::timed_mutex
 target_link_libraries(heliograph-daemon pthread)

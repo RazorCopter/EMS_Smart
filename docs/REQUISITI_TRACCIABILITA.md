@@ -1297,3 +1297,83 @@ La colonna **Compatibility** è stata aggiunta dopo "Status" in tutte le 59 tabe
 - Il segno dei comandi External EMS `0x0A09–0x0A0A` sarà verificato soltanto post-G4 con un piano attivo dedicato.
 - Le fonti sono state normalizzate in `Source type` e `Source reference`.
 - Nessuna modifica riguarda codice C++, build, seriale o inverter.
+
+---
+
+## Aggiornamento M2: Hardening Read-Only Boundary
+
+**Data:** 2026-11-10
+**Milestone:** M2
+
+### Impatto sulla tracciabilità requisiti
+
+La milestone M2 **non introduce nuovi requisiti funzionali** e **non modifica lo stato di tracciabilità dei requisiti EMS** (R-TGT, R-NRG, R-PV, R-FOG, R-LOAD, R-SEA, R-CAL, R-CMD, R-NOT, R-SAF, R-DAT).
+
+M2 implementa **requisiti di sicurezza infrastrutturali** (trust boundary, hardening compile-time, frame validation) che NON erano tracciati esplicitamente in M1 perché **trasversali** al piano EMS e **prerequisiti** per qualsiasi milestone successiva che coinvolga hardware.
+
+### Nuovi requisiti infrastrutturali M2 (non in matrice M1)
+
+Questi requisiti sono **IMPLEMENTED_NOT_TESTED** (M2 static verification, M3 runtime verification):
+
+#### R-SEC-01: ReadOnlyGuard Frame-Aware Validation
+- **Requisito:** Bloccare qualsiasi frame Modbus RTU diverso da FC03/FC04 valido con CRC corretto
+- **File:** `src/transport/readonly_guard.h`, `src/transport/readonly_guard.cpp`
+- **Status:** `IMPLEMENTED_NOT_TESTED` (authored, non eseguito a runtime)
+- **Test:** `test/host/test_readonly_guard.cpp` (test matrix A-Y, marcati `TEST_AUTHORED`)
+- **Verifica M3:** Esecuzione runtime test A-Y, binary verification (`nm`, `objdump`)
+
+#### R-SEC-02: Compile-Time Write Exclusion
+- **Requisito:** Escludere fisicamente sorgenti write-capable sotto `AFORE_SHADOW_BUILD=1`
+- **File:** `CMakeLists.txt` (conditional exclusion)
+- **Status:** `IMPLEMENTED_NOT_TESTED` (manifest verificato staticamente)
+- **Test:** `tools/check_afore_shadow_manifest.py` (eseguito localmente, PASS)
+- **Verifica M3:** Binary verification (simboli `command_dispatcher`, `relay_controller` assenti)
+
+#### R-SEC-03: Profile Read-Only Compliance
+- **Requisito:** Zero `[[write]]` blocks in `profiles/afore/af5k_sl.toml`
+- **File:** `profiles/afore/af5k_sl.toml` (preservato read-only)
+- **Status:** `VERIFIED` (static verification PASS)
+- **Test:** `tools/check_afore_shadow_manifest.py` check 2/3
+- **Verifica M3:** Nessuna (già verificato staticamente)
+
+#### R-SEC-04: No-Abort Guarantee
+- **Requisito:** Processo sempre vivo su frame bloccato (no `assert/abort/exit/throw`)
+- **File:** `src/transport/readonly_guard.cpp` (blocked frame path)
+- **Status:** `IMPLEMENTED_NOT_TESTED` (dedotto da analisi statica)
+- **Test:** Test matrix U (repeated blocks, process alive)
+- **Verifica M3:** Runtime execution, fault injection
+
+#### R-SEC-05: Zero Byte Transmission on Block
+- **Requisito:** Frame bloccato → 0 byte trasmessi (lower transport NON chiamato)
+- **File:** `src/transport/readonly_guard.cpp::write()` (`return 0` senza `underlying_->write()`)
+- **Status:** `IMPLEMENTED_NOT_TESTED` (dedotto da analisi statica)
+- **Test:** Test matrix A-Y (invariante FakeLowerTransport)
+- **Verifica M3:** Wire monitoring (`strace`, `tcpdump`), oscilloscopio
+
+### Impatto su requisiti esistenti
+
+**Nessun requisito della matrice M1 è modificato da M2.**
+
+Tutti i requisiti R-TGT, R-NRG, R-PV, R-FOG, R-LOAD, R-SEA, R-CAL, R-CMD, R-NOT, R-SAF, R-DAT mantengono:
+- **Status:** invariato (ABSENT, PARTIAL, IMPLEMENTED_NOT_TESTED)
+- **Compatibility:** invariato
+- **Milestone target:** invariato (M4, M5, M6, etc.)
+
+M2 fornisce **prerequisito di sicurezza** per tutte le milestone successive che coinvolgono hardware (M3, M7, M8, M9).
+
+### Documentazione M2
+
+- **SAFETY.md:** `docs/SAFETY.md` (586 righe, trust boundary, threat model, frame authorization, 12 sezioni)
+- **Verification script:** `tools/check_afore_shadow_manifest.py` (227 righe, eseguito con successo)
+- **Test matrix:** `test/host/test_readonly_guard.cpp` (25 test A-Y, `TEST_AUTHORED`)
+- **Avanzamento:** `Doc/avanzamentoPiano.md` aggiornato con sezione M2 completa
+
+### Prossimo aggiornamento tracciabilità
+
+**M3:** Aggiornamento status R-SEC-01, R-SEC-02, R-SEC-04, R-SEC-05 da `IMPLEMENTED_NOT_TESTED` → `VERIFIED` (se test runtime PASS)
+
+**M4-M12:** Aggiornamento status requisiti EMS secondo piano (nessun impatto M2)
+
+---
+
+**Fine aggiornamento M2 — Nessuna modifica ai requisiti EMS della matrice M1**

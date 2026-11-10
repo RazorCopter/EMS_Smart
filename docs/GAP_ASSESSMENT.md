@@ -93,10 +93,14 @@ Heliograph strictly enforces modular separation of concerns and clean layering b
   - `src/outputs/prometheus/`: Prometheus exposition format serializer (`prometheus_metrics.cpp`).
   - `src/outputs/rest/`: JSON payloads (`rest_payloads.cpp`) and HTTP handlers (`rest_api.cpp`).
   - `src/outputs/modbus_tcp/`: Modbus TCP server exposing cache snapshot on port 502 (`modbus_tcp_server.cpp`, `register_map.cpp`).
-- **Testing Subsystem**:
-  - 28 unit test suites in `test/` (e.g. `test_modbus`, `test_modbus_profile`, `test_measurements`, `test_rate_limiter`, `test_sha256`), written in portable C++ for the PlatformIO native test runner.
-  - `test/test_modbus/test_main.cpp`: Exercises the full Modbus stack via `run_modbus_rtu()` (wire codec, CRC-16, PDU encoding/decoding) and `run_modbus_client()` (transaction timeouts, exceptions, echo validation).
-  - `test/support/mock_transport.h`: In-memory byte-level bus simulator (`heliograph::test::MockTransport`) providing a programmable `Responder` callback and queue to simulate realistic inverter responses, frame drops, corrupted CRCs, and timeouts without physical hardware.
+- **Testing Subsystem & Host Test Harness (`platformio.ini:45-127`)**:
+  - 29 unit test suites in `test/` (e.g. `test_modbus`, `test_modbus_profile`, `test_measurements`, `test_rate_limiter`, `test_sha256`, `test_sunspec`, `test_relays`), written in standard portable C++17.
+  - Native Host Configuration: Configured in `platformio.ini:45-127` under `[env:native]`:
+    - Platform & Framework: `platform = native`, `test_framework = unity` (lines 46, 48).
+    - Source Inclusion Filter: `test_build_src = yes` combined with an explicit `build_src_filter` (lines 77-120) that compiles pure C++ core modules (`device/`, `state/`, `commands/`, `relays/`, `diagnostics/`, `drivers/`, `protocols/modbus/`, `outputs/modbus_tcp/`, `outputs/mqtt/`, `outputs/prometheus/`, `config/`) while strictly omitting ESP32-specific peripherals (`HardwareSerial`, `WiFi`, FreeRTOS tasks).
+    - Host-Compatible Dependencies: Only pure C++ libraries are linked (e.g. `bblanchon/ArduinoJson@7.4.3`, lines 121-127).
+    - Bus Simulation HAL: In-memory byte-level bus simulator (`test/support/mock_transport.h`: `heliograph::test::MockTransport`) provides a programmable `Responder` callback and transaction queue to simulate realistic inverter responses, frame drops, corrupted CRCs, and timeouts completely detached from physical hardware.
+    - Protocol Verification (`test/test_modbus/test_main.cpp`): Thoroughly exercises the Modbus stack via `run_modbus_rtu()` (wire codec, CRC-16, PDU encoding/decoding) and `run_modbus_client()` (transaction timeouts, exceptions, echo validation).
 
 ---
 
@@ -264,21 +268,24 @@ Evaluated in the project workspace:
 | Test / Check Suite | Command | Exit Code | Result | Observations |
 |---|---|---|---|---|
 | **Git Working Tree** | `git status --short` | 0 | **CLEAN** | Working directory clean on branch `phase0-host-shadow`. |
-| **Git Log Verification** | `git log --oneline -5` | 0 | **VERIFIED** | HEAD at `e049fcc`, remote `upstream` tracked. |
+| **Git Log Verification** | `git log --oneline -5` | 0 | **VERIFIED** | HEAD tracked on `phase0-host-shadow`, remote `upstream` tracked. |
 | **Measurement Taxonomy** | `python -X utf8 tools/check_measurement_ids.py` | 0 | **PASSED** | 57 canonical measurements, 55 dashboard rows, 55 Prometheus gauges validated. |
 | **TOML Profiles Linter** | `python -X utf8 tools/gen_profiles.py --check` | 0 | **PASSED** | 13 upstream inverter profiles syntactically and structurally sound. |
 | **Read-Back Rule Gate** | `python -X utf8 tools/check_readback_rule.py` | 0 | **PASSED** | Verification rule confirmed on all existing profile writes. |
 | **Web Assets Integrity** | `python -X utf8 tools/check_web_js.py` | 0 | **PASSED** | Embedded JS security checks passed. |
 | **Dashboard Layout** | `python -X utf8 tools/check_dashboard_layout.py` | 1 | **FAILED** | Requires headless Chromium/Chrome in Windows PATH. Non-blocking for host port. |
-| **PlatformIO Native Suite** | `pio test -e native` | N/A | **NOT RUN** | `platformio` CLI toolchain not installed on Windows developer host. |
+| **PlatformIO Native Suite** | `pio test -e native` | 1 | **NOT RUN** | `platformio` CLI toolchain not installed on Windows host (`where pio` / `where platformio` -> exit code 1). Recorded as **VERIFICA NON ESEGUITA** in `.phase0_logs/cp0_native_tests.txt` without installing packages. |
 
 ### 6.2 Reference Oracles Ecosystem
 Independent validation oracles are available across three layers:
 
-1. **Heliograph Internal Tooling & Oracles**:
-   - `tools/read_modbus.py`: Reference Python script reading the Heliograph Modbus TCP server output on port 502 against `src/outputs/modbus_tcp/register_map.h` (validates schema version 1, validity bitmap at 610, canonical floats, and strings at 700). Useful for validating external client output.
-   - `tools/decode_eversolar.py`: Decodes raw RS485 frames for packet inspection.
-   - **Current Afore Support Status**: **None**. Heliograph currently contains zero profiles or code paths for Afore in `profiles/` or `src/drivers/`.
+1. **Heliograph Internal Tooling & Validation Oracles**:
+   - `tools/read_modbus.py`: Reference Python client (`pymodbus`, lines 20-45) querying the internal Modbus TCP server on port 502 against `src/outputs/modbus_tcp/register_map.h`. It validates schema version 1 (line 24), validity bitmap at register 610 (line 27), canonical floats at registers 10-42 (lines 28-39), and device strings at 700-756 (lines 40-45). **Crucial distinction**: `read_modbus.py` serves as an oracle for the northbound client interface (e.g. Home Assistant Modbus TCP client integration), but does **not** interface directly with the RS485 serial bus or the Afore inverter hardware.
+   - `tools/decode_eversolar.py`: Decodes raw hex RS485 frames for packet inspection and offline parsing.
+   - `tools/check_measurement_ids.py`: Validates canonical measurement enum alignment with dashboard rows and Prometheus gauges.
+   - `tools/gen_profiles.py --check`: Validates syntax, spans, and registers of all TOML inverter profiles.
+   - `tools/check_readback_rule.py`: Enforces read-back verification gates for every writable register.
+   - **Current Afore Support Status**: **None**. Heliograph currently contains zero profiles or code paths for Afore in `profiles/` or `src/drivers/`. However, the data-driven architecture of `src/drivers/modbus_profile/` ensures that in CP2, adding full Afore AF5K-SL read-only telemetry only requires authoring `profiles/afore_af5k_sl.toml`, with zero custom C++ driver code required.
 2. **Dedicated Solarman Afore Oracles (`../Solarman/`)**:
    - `scan_afore_registers.py`: Field-proven Modbus RTU / Solarman V5 query tool tested on the actual Afore AF5K-SL hardware.
    - `scan_battery.py`: Targeted scanner for battery status (`0x07D0`), SOC (`0x07D2`), voltage (`0x07D4`), and current (`0x07D5`).

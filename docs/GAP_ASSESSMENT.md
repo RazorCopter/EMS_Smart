@@ -348,7 +348,34 @@ In strict adherence to project safety rules, no register address or scale factor
 
 ---
 
-## 10. Final Recommendation: GO
+## 10. Licensing & Intellectual Property Assessment
+
+### 10.1 Primary License (`LICENSE`)
+The root codebase is distributed under the permissive **MIT License** (`LICENSE:1-21`, Copyright (c) 2026 Tim de Bruijn). This grants full rights to use, modify, merge, and distribute without copyleft obligations or restrictive patent encumbrances.
+
+### 10.2 Third-Party Dependencies & Firmware Components (`LICENSE-THIRD-PARTY.md`)
+The project documents third-party dependencies and protocol provenance in detail (`LICENSE-THIRD-PARTY.md:1-71`):
+1. **Embedded Firmware Libraries**:
+   - `ArduinoJson`: MIT (`LICENSE-THIRD-PARTY.md:61`).
+   - `espMqttClient`: MIT (`LICENSE-THIRD-PARTY.md:62`).
+   - `eModbus`: MIT (`LICENSE-THIRD-PARTY.md:63`).
+   - `ESPAsyncWebServer` & `AsyncTCP`: LGPL-3.0 (`LICENSE-THIRD-PARTY.md:64-65`).
+   - `Arduino core for ESP32` + ESP-IDF: LGPL-2.1 / Apache-2.0 (`LICENSE-THIRD-PARTY.md:66`).
+   - `Unity`: MIT (`LICENSE-THIRD-PARTY.md:67`).
+2. **Host Porting Compatibility (Phase 0 Shadow)**:
+   - The LGPL-3.0 and LGPL-2.1 components (`ESPAsyncWebServer`, `AsyncTCP`, Arduino core) are strictly microcontroller-specific and are **excluded** from the host Linux build.
+   - The components reused on Linux (`protocols/modbus/`, `drivers/modbus_profile/`, `device/`, `state/`, and the new `PosixSerialTransport`) are 100% pure C++17 native Heliograph code under MIT.
+   - Therefore, the host binary carries zero LGPL copyleft linkage obligations and zero license contamination.
+   - Future host telemetry outputs using standard Linux libraries (e.g., `libmosquitto` under EPL-2.0 / EDL-1.0) remain fully compatible with permissive MIT distribution.
+
+### 10.3 Protocol Knowledge & Clean-Room Provenance
+In accordance with `LICENSE-THIRD-PARTY.md:3-8`:
+- Protocol implementations reflect functional facts, public register maps, and observed bus behavior; no proprietary code is copied.
+- Afore AF5K-SL integration follows this exact clean-room convention: register maps are derived from official manufacturer protocol documents (`Doc/外部Ems调度 - En_240312.docx`, `Doc/艾伏逆变器寄存器参数表（对外）v3.4_20251119_并网机和储能机分类(2).xlsx`) and empirical Modbus verification in `../Solarman/` (`scan_afore_registers.py`, `afore_AF5K-Sl.yaml`).
+
+---
+
+## 11. Final Recommendation: GO
 
 **Final Verdict:** **GO for Phase 0 Host Shadow Mode**
 

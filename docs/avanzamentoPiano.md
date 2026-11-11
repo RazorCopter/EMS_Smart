@@ -10,7 +10,7 @@
 | M0 Riallineamento e governance | RAGGIUNTA | 2026-11-10 | `561552d`, `afd1bae`, `cc09922` |
 | M1 Tracciabilità requisiti | RAGGIUNTA | 2026-11-10 | commit `docs(m1): add complete Smart EMS requirements traceability` (hash verificabile nel log successivo) |
 | M2 Hardening read-only | DA INIZIARE | | |
-| M3 Build host e test | DA INIZIARE | | |
+| M3 Build host e test | IN CORSO | 2026-11-11 | M3A completato |
 | M4 Core EMS target-aware | DA INIZIARE | | |
 | M5 Replay dati storici HA | DA INIZIARE | | |
 | M6 Mappa registri documentale | DA INIZIARE | | |
@@ -492,4 +492,145 @@ Chiudere direttamente il debito documentale residuo senza un ulteriore ciclo del
 - **CONFLITTO:** nessun conflitto documentale residuo noto per i punti corretti.
 
 ### Vincoli mantenuti
-Nessuna modifica al codice, nessuna compilazione, nessuna apertura seriale, nessuna build di interrogazione e nessuna comunicazione con l’inverter.
+Nessuna modifica al codice, nessuna compilazione, nessuna apertura seriale, nessuna build di interrogazione e nessuna comunicazione con l'inverter.
+
+---
+
+## M3A – Safety Core Validation (Offline)
+
+**Data:** 2026-11-11
+**Commit:** (in fase di commit)
+**Stato:** IN ATTESA DI APPROVAZIONE
+
+### Obiettivo
+Validare il ReadOnlyGuard safety core in completo isolamento da configurazione, rete, I/O seriale, host daemon, telemetry engine e shadow EMS controller.
+
+### Risultati
+- **Build:** ✅ SUCCESS (exit 0, -Werror, AFORE_SHADOW_BUILD=1)
+- **Test eseguiti:** 76/76
+- **Test passati:** 76
+- **Test falliti:** 0
+- **CTest exit:** 0
+- **Direct test exit:** 0
+- **Negative compile:** ✅ PASS (`setForceReadOnly()` correttamente non disponibile)
+- **Binary inspection:** ✅ PASS (nessun simbolo vietato trovato)
+- **I/O audit:** ✅ PASS (nessuna operazione I/O su /dev/tty o connect())
+
+### File creati
+- `m3a/CMakeLists.txt` - Build isolato con C++17, -Werror, AFORE_SHADOW_BUILD=1
+- `m3a/test_readonly_guard_m3a.cpp` - 76 test (4 allowed, 22 blocked)
+- `m3a/fake_lower_transport.h` - Mock transport senza I/O
+- `m3a/M3A_SOURCE_MANIFEST.md` - Documentazione esplicita delle esclusioni
+- `m3a/m3a_logger_stub.h` - Logger stub minimale
+- `m3a/m3a_bus_tap_stub.h` - BusTap stub minimale
+- `m3a/diagnostics/{logger,bus_tap}.h` - Redirect agli stub
+- `m3a/negative_compile/CMakeLists.txt` - Test negative compile
+- `m3a/negative_compile/disable_guard.cpp` - Verifica `setForceReadOnly()` non disponibile
+- `docs/M3A_SAFETY_CORE_REPORT.md` - Report completo
+
+### Production sources inclusi
+- `src/transport/readonly_guard.{h,cpp}` (safety core, 359 righe)
+- `src/transport/transport.{h,cpp}` (interfaccia + funzioni parity, 178 righe)
+- `src/protocols/modbus/modbus_rtu.{h,cpp}` (CRC16 production + frame helpers, 687 righe)
+- `src/protocols/byte_order.h` (header-only, conversioni endian, 98 righe)
+
+### Moduli esplicitamente esclusi
+ArduinoJson, Configuration, NVS backend, host config backend, PosixSerialTransport, Modbus TCP, MQTT, REST API, Web server, WiFi manager, time manager, telemetry engine, shadow EMS controller, command dispatcher, command queue, register reader, discovery runner, capture runner, tutti i driver, relay controller, DRM, board definitions, status LED, host main, systemd.
+
+### Test coverage
+**ALLOWED frames (4 test):**
+- FC03 slave 1 qty 1 → trasmessi 8 byte
+- FC04 slave 1 qty 1 → trasmessi 8 byte
+- FC04 qty 125 (max) → trasmessi 8 byte
+- FC03 addr=0xFFFF qty 1 → trasmessi 8 byte
+
+**BLOCKED frames (22 test):**
+- Empty, short, long, bad CRC, swapped CRC, broadcast, wrong slave, FC01, FC02, FC05, FC06, FC0F, FC10, FC17, FC99, qty=0, qty=126, overflow, modified after CRC → tutti 0 byte trasmessi
+
+**Evidence:** FakeLowerTransport.call_count e total_bytes verificati per ogni test.
+
+### Negative compile test
+File `disable_guard.cpp` tenta di chiamare `guard.setForceReadOnly(false)`. Compilazione fallisce con errore:
+```
+error: 'class heliograph::ReadOnlyGuard' has no member named 'setForceReadOnly'
+```
+**Risultato:** ✅ EXPECTED_COMPILE_FAILURE_PASS
+
+### Binary inspection
+**Simboli attesi (presenti):**
+- `heliograph::ReadOnlyGuard::write`
+- `heliograph::ReadOnlyGuard::validateModbusRtuFrame`
+- `heliograph::modbus::crc16`
+- `heliograph::FakeLowerTransport::write`
+
+**Simboli vietati (assenti):**
+- CommandDispatcher, CommandQueue, RelayController, DRM
+- writeSingleRegister, writeMultipleRegisters
+- PosixSerialTransport
+- /dev/tty, mqtt, command/set, factory, reboot
+
+**Risultato:** ✅ Nessun simbolo vietato trovato.
+
+### I/O audit
+`strace -f -e trace=openat,connect` eseguito sul binario test.
+**Risultato:** ✅ Nessuna operazione I/O su /dev/tty*, /dev/serial* o connect() rilevata.
+
+### Classificazione evidenze
+- **VERIFICATO:**
+  1. ReadOnlyGuard blocca tutti i frame non-read Modbus RTU
+  2. ReadOnlyGuard trasmette zero byte per frame bloccati
+  3. ReadOnlyGuard valida CRC usando `modbus::crc16()` production
+  4. ReadOnlyGuard richiede slave ID matching
+  5. `setForceReadOnly()` non disponibile sotto AFORE_SHADOW_BUILD=1
+  6. Binario test non contiene simboli serial, network o command
+  7. Esecuzione test non esegue operazioni I/O
+
+- **DEDOTTO (analisi statica, non verificato runtime in M3A):**
+  1. Processo resta vivo su frame bloccato (dedotto da code inspection, no abort/exit/throw)
+  2. Comportamento ReadOnlyGuard identico in build production (dedotto da analisi source)
+
+- **NON TESTATO (fuori scope M3A):**
+  1. Host daemon completo
+  2. Configuration backend reale
+  3. Telemetry engine
+  4. MQTT output
+  5. PosixSerialTransport reale
+  6. Comunicazione inverter reale
+  7. Host main lifecycle
+  8. Integrazione systemd
+
+- **CONFLITTO:** Nessuno identificato.
+
+### Dichiarazione
+**M3A valida solo il ReadOnlyGuard safety core.**
+
+Non valida: daemon completo, configuration backend, telemetry engine, MQTT, serial transport implementation, inverter communication, host lifecycle management.
+
+**Ulteriori validazioni richieste (M3B, M3C, M4):**
+- Integrazione con PosixSerialTransport
+- Integrazione con host daemon
+- Comunicazione inverter end-to-end
+- Comportamento runtime sotto configurazione production
+
+### Scostamenti
+Nessuno rispetto all'obiettivo M3A. Tutti i criteri di accettazione superati.
+
+### Punti aperti
+- M3B: Integrare ReadOnlyGuard con PosixSerialTransport (offline, no seriale reale)
+- M3C: Compilare e linkare full host daemon con ReadOnlyGuard
+- M4: Validazione runtime con inverter reale (solo operazioni read-only)
+
+### Verifiche di uscita M3A
+- [x] Build exit 0
+- [x] Configure exit 0
+- [x] Test count >= 26 (76 eseguiti)
+- [x] Test pass rate 100% (76/76)
+- [x] CTest exit 0
+- [x] Direct test exit 0
+- [x] Negative compile PASS (setForceReadOnly non disponibile)
+- [x] Binary: no write commands
+- [x] Binary: no serial/network symbols
+- [x] I/O audit: no device access
+
+**Target:** afore-m3 (rasp, Debian 12, g++ 12.2.0)
+**Report completo:** `docs/M3A_SAFETY_CORE_REPORT.md`

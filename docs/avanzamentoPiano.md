@@ -778,6 +778,9 @@ Consolidare la provenienza documentale di ciascun registro Afore e definire il p
 2. Nessuna porta seriale reale è stata aperta, nessun comando Modbus inviato sull'inverter fisico.
 3. La barriera di sicurezza read-only (M2, M3A, M3B) è attiva e verificata sia a livello architetturale (`ReadOnlyGuard`) sia a livello di compilazione (`-DAFORE_SHADOW_BUILD=ON`).
 4. I test M3, M4 e M5 passano al 100% in Docker pulito Debian/Linux e multipiattaforma.
+5. Qualificazione multi-piattaforma eseguita e certificata al 100%:
+   - **Host Linux x86_64 (Dev Container Docker):** GCC 14.2.0 con AddressSanitizer (ASAN) e UndefinedBehaviorSanitizer (UBSAN) attivi, CTest 7/7 PASS (0 memory leaks, 0 errori undefined behavior), layering check PASS, generazione profili Modbus PASS.
+   - **Target Raspberry Pi Zero 2W ARM64 (`aarch64`):** Debian 14.2.0 GCC, Linux 6.18, `-Wall -Wextra -Werror`, CTest 7/7 PASS (0.19s), Standalone Target-Aware EMS test 17/17 scenari PASS via [`scripts/verify_arm64.sh`](../scripts/verify_arm64.sh).
 
 ### Blocco Operativo
 In osservanza alla Regola Fondamentale del Piano Afore V4, **l'agente si arresta qui**. Nessuna attività relativa a M7 (prima interrogazione reale one-shot), M8 o successive potrà essere avviata prima della formale approvazione scritta di Gianvito per il Gate G1.

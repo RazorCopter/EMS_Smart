@@ -107,7 +107,42 @@ Tutte le componenti sono state verificate al **100% in modalità offline**, senz
 
 ---
 
-## 4. Direttiva di Arresto Tassativa (Halt Directive)
+## 4. Certificazione di Qualificazione Multi-Piattaforma Pre-G1
+
+### 4.1 Qualificazione Host Linux x86_64 con ASAN/UBSAN (Dev Container Docker)
+- **Toolchain:** `gcc (Ubuntu 14.2.0-4ubuntu2~24.04) 14.2.0`, `CMake 3.28.3`, `Ninja 1.11.1`.
+- **Sanitizers attivi:** `-fsanitize=address,undefined -fno-omit-frame-pointer`.
+- **Layering Check (`tools/check_layering.sh`):** **PASS** (Zero violazioni architetturali tra layer `core`, `device`, `protocol`, `app`).
+- **Device Profiles Generator (`tools/gen_profiles.py`):** **PASS** (Tutti i profili generati e validati, zero errori).
+- **CTest Suite (Host Clean Build):** **7/7 PASS (100%)**:
+  - `readonly-guard-tests`: **PASSED** (0 leak ASAN, 0 errori UBSAN).
+  - `posix-serial-tests`: **PASSED** (0 leak ASAN, 0 errori UBSAN).
+  - `host-config-tests`: **PASSED** (0 leak ASAN, 0 errori UBSAN).
+  - `afore-telemetry-tests`: **PASSED** (0 leak ASAN, 0 errori UBSAN).
+  - `target-aware-ems-tests`: **PASSED** (0 leak ASAN, 0 errori UBSAN).
+  - `test-ha-replay`: **PASSED** (0 leak ASAN, 0 errori UBSAN; replay fixture Home Assistant esteso).
+  - `shadow-ems-tests`: **PASSED** (0 leak ASAN, 0 errori UBSAN).
+- **Standalone `test-target-aware-ems`:** **17/17 PASS** su tutti gli scenari M4 auditati.
+
+### 4.2 Qualificazione Nativa Raspberry Pi ARM64 (`afore-m3`, `aarch64`)
+- **Piattaforma Target:** Raspberry Pi Zero 2W (`aarch64`, Kernel `6.18.50+rpt-rpi-v8`, RAM 512MB).
+- **Toolchain Target:** `c++ (Debian 14.2.0-19) 14.2.0`, `CMake 3.31.5`, `Ninja 1.12.1`.
+- **Script di Qualificazione:** [`scripts/verify_arm64.sh`](../scripts/verify_arm64.sh) (con `VERIFY_JOBS=1` per dispositivi con memoria limitata).
+- **Flag di compilazione:** `-DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=ON -DAFORE_SHADOW_BUILD=ON -DCMAKE_CXX_FLAGS="-Wall -Wextra -Werror"`.
+- **CTest Suite ARM64:** **7/7 PASS (100%)**:
+  - `readonly-guard-tests`: **PASSED** (0.01 sec).
+  - `posix-serial-tests`: **PASSED** (0.01 sec).
+  - `host-config-tests`: **PASSED** (0.01 sec).
+  - `afore-telemetry-tests`: **PASSED** (0.01 sec).
+  - `target-aware-ems-tests`: **PASSED** (0.01 sec).
+  - `test-ha-replay`: **PASSED** (0.08 sec).
+  - `shadow-ems-tests`: **PASSED** (0.01 sec).
+- **Standalone `test-target-aware-ems` su ARM64:** **PASS (17 named M4 target-aware EMS scenarios)**.
+- **Esito finale script nativo:** `=== ALL ARM64 NATIVE CHECKS PASSED SUCCESSFULLY ===`.
+
+---
+
+## 5. Direttiva di Arresto Tassativa (Halt Directive)
 
 > **AVVISO DI SICUREZZA E ARRESTO FORMALE:**  
 > In conformità alle direttive di progetto, **QUALSIASI ATTIVITÀ RELATIVA ALLA MILESTONE M7 (CONNESSIONE FISICA RS485, APERTURA PORTA SERIALE, PROBING HARDWARE DELL'INVERTER) È FORMALMENTE SOSPESA E INTERDETTA**.  

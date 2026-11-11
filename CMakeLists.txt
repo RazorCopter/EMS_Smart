@@ -201,6 +201,19 @@ if(BUILD_TESTING)
     target_link_libraries(test-target-aware-ems PRIVATE target-aware-ems-core)
     add_test(NAME target-aware-ems-tests COMMAND test-target-aware-ems)
 
+    # M5 pure historical Home Assistant replay engine: offline replay, no network or transport I/O
+    add_library(ha-replay-core STATIC
+        src/ems/ha_replay_engine.cpp
+    )
+    target_include_directories(ha-replay-core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
+    target_link_libraries(ha-replay-core PUBLIC target-aware-ems-core ArduinoJson)
+
+    add_executable(test-ha-replay
+        test/test_ha_replay/test_main.cpp
+    )
+    target_link_libraries(test-ha-replay PRIVATE ha-replay-core)
+    add_test(NAME test-ha-replay COMMAND test-ha-replay WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
+
     # Shadow EMS CP4 tests
     add_executable(test-shadow-ems
         test/test_shadow_ems/test_main.cpp

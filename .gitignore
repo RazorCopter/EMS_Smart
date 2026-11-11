@@ -2,6 +2,7 @@
 .pio/
 .cache/
 compile_commands.json
+build/
 
 # Generated at build time by tools/gen_profiles.py from profiles/*/*.toml. Never
 # commit it: the TOML files are the source of truth, and a stale generated copy

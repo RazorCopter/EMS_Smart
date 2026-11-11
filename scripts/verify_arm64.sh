@@ -27,8 +27,9 @@ cmake -S . -B "${BUILD_DIR}" \
   -DAFORE_SHADOW_BUILD=ON \
   -DCMAKE_CXX_FLAGS="-Wall -Wextra -Werror"
 
-echo "Building all targets on native ARM64..."
-cmake --build "${BUILD_DIR}"
+JOBS=${VERIFY_JOBS:-1}
+echo "Building all targets on native ARM64 with concurrency ${JOBS}..."
+cmake --build "${BUILD_DIR}" -j "${JOBS}"
 
 echo "Executing CTest test suite on native ARM64..."
 (cd "${BUILD_DIR}" && ctest --output-on-failure)

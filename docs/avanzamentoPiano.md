@@ -13,10 +13,10 @@
 | M3A Safety core validation offline | APPROVATA | 2026-11-11 | `ac1f9d1` |
 | M3B Host shadow daemon offline | APPROVATA | 2026-11-11 | `beb202f` |
 | M3 Build host e test | COMPLETATA | 2026-11-11 | M3A e M3B approvate |
-| M4 Core EMS target-aware | IN CORSO | 2026-11-11 | — |
-| M5 Replay dati storici HA | NON INIZIATA | — | — |
-| M6 Mappa registri documentale | NON INIZIATA | — | — |
-| **G1 Check formale Gianvito** | BLOCCATO | | |
+| M4 Core EMS target-aware | RAGGIUNTA | 2026-11-11 | `aae8c5f` |
+| M5 Replay dati storici HA | RAGGIUNTA | 2026-11-11 | `7037118` |
+| M6 Mappa registri documentale | RAGGIUNTA | 2026-11-11 | `0300359` |
+| **G1 Check formale Gianvito** | IN ATTESA DI APPROVAZIONE | 2026-11-11 | — |
 | M7 Build di interrogazione one-shot | BLOCCATO | | |
 | M8 Segni e bilancio | BLOCCATO | | |
 | **G2 Autorizzazione polling** | BLOCCATO | | |
@@ -715,3 +715,69 @@ Durante M3A è emersa un'inconsistenza nell'ambiente riportato:
 M3A è stato compilato e testato con successo su questo ambiente.
 
 **Questa è correzione documentale, non un fallimento tecnico M3A.**
+---
+
+## M4 – Core EMS Target-Aware Offline
+
+**Data:** 2026-11-11
+**Commit:** `aae8c5f`
+**Stato:** RAGGIUNTA
+
+### Obiettivo
+Implementare il core logico puro Target-Aware Smart EMS (`src/ems/target_aware_ems.h` e `.cpp`), isolato senza I/O hardware, che traduce la logica della blueprint Home Assistant V3.3 in raccomandazioni pure e setpoint potenze compatibili con External EMS.
+
+### Verifiche di uscita
+- [x] Core puro C++ senza inclusione di transport seriale o Modbus.
+- [x] Gestione finestra di arrivo target 15:30 con clamping SOC e pendenza dinamica.
+- [x] Test unitari CTest completi (`test-target-aware-ems`) con copertura scenari nominali, surplus, nebbia, assenza forecast e recovery.
+
+---
+
+## M5 – Replay su Dati Storici Home Assistant Offline
+
+**Data:** 2026-11-11
+**Commit:** `7037118`
+**Stato:** RAGGIUNTA
+
+### Obiettivo
+Validare la logica su serie temporali storiche Home Assistant in modalità 100% offline (nessuna connessione di rete, HTTP/REST o accesso bus).
+
+### Verifiche di uscita
+- [x] Dataset storici offline realistici JSON e CSV creati in `test/test_ha_replay/fixtures/` (giornata soleggiata, nebbiosa, picco carico serale, assenza forecast).
+- [x] Motore di replay C++ `HAReplayEngine` e suite `test-ha-replay` integrata in CTest.
+- [x] Tool CLI offline `tools/ha_replay.py` per report sintetico e controllo oscillazioni/ora setpoint.
+- [x] Report per giornata: ora 100% reale vs proiettata, SOC alle 15:30, decision breakdown e divergenza vs inverter non gestito.
+
+---
+
+## M6 – Validazione Documentale Mappa Registri e Probe Plan
+
+**Data:** 2026-11-11
+**Commit:** `0300359`
+**Stato:** RAGGIUNTA
+
+### Obiettivo
+Consolidare la provenienza documentale di ciascun registro Afore e definire il piano di interrogazione conservativo per Phase 0, senza eseguire alcuna sonda hardware.
+
+### Verifiche di uscita
+- [x] Creazione di `docs/AFORE_REGISTER_PROVENANCE.md` con classificazione a 5 stati rigorosi.
+- [x] `VERIFIED_EMPIRICALLY` limitato tassativamente al registro `0x07D2` (Battery SOC = 80%).
+- [x] Esclusione formale dei registri di controllo (`0x0A08`, `0x0A09-0x0A0A`), conflitto (`0x09C4`) e pericolo EEPROM (`0x0BC1`, `0x0BC2`).
+- [x] Definizione probe plan Phase 0 (solo dopo G1/G2): letture singole `0x07D2`, `0x07D8`, `0x022A`, `0x0212`, SOC 15 s, potenze 10 s, retry 0, gap >= 200 ms, arresto al 3° errore consecutivo.
+- [x] Oracolo Solarman `tools/solarman_oracle.py` per verifica formule di decodifica.
+
+---
+
+## 🛑 GATE G1 – Check Formale Gianvito (Readiness Package)
+
+**Data:** 2026-11-11
+**Stato:** IN ATTESA DI APPROVAZIONE
+
+### Dichiarazione di Readiness e Sicurezza
+1. Tutte le milestone da M0 a M6 sono state completate e verificate offline.
+2. Nessuna porta seriale reale è stata aperta, nessun comando Modbus inviato sull'inverter fisico.
+3. La barriera di sicurezza read-only (M2, M3A, M3B) è attiva e verificata sia a livello architetturale (`ReadOnlyGuard`) sia a livello di compilazione (`-DAFORE_SHADOW_BUILD=ON`).
+4. I test M3, M4 e M5 passano al 100% in Docker pulito Debian/Linux e multipiattaforma.
+
+### Blocco Operativo
+In osservanza alla Regola Fondamentale del Piano Afore V4, **l'agente si arresta qui**. Nessuna attività relativa a M7 (prima interrogazione reale one-shot), M8 o successive potrà essere avviata prima della formale approvazione scritta di Gianvito per il Gate G1.

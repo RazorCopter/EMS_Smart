@@ -36,21 +36,22 @@ passive sniffing if possible.
 | **B** | `Doc/Afore_Autonomous_EMS_V4_Roadmap.md` Section 4 — Telemetry registers validated against Solarman integration |
 | **C** | Solarman Home Assistant integration: `afore_AF5K-Sl.yaml` (production deployment, operational baseline) |
 
-### VERIFIED vs UNVERIFIED Classification
+### Formal Provenance Classification (Milestone M6 Baseline)
 
-In strict adherence to project safety rules (GAP_ASSESSMENT.md §7), no register address or scale
-factor is assumed without documentation. Each register below carries one of two states:
+In strict adherence to project safety rules and Milestone M6, registers are classified according
+to the rigorous 5-state taxonomy formalized in [`docs/AFORE_REGISTER_PROVENANCE.md`](AFORE_REGISTER_PROVENANCE.md):
 
-- **VERIFIED**: Confirmed in official Afore documentation (Source A) **AND/OR** validated in
-  operational Solarman integration (Sources B+C). Address, type, scale, and signedness are
-  documented by at least one authoritative source.
-  
-- **UNVERIFIED**: Estimated from vendor table variations, inferred from protocol patterns, or
-  observed in logs without cross-confirmation. Must be validated through passive observation in
-  Phase 0 before promoting to VERIFIED. **These registers may be wrong.**
-
-Every row states its verification status and source explicitly. No register is mapped without
-stating confidence.
+- **`VERIFIED_EMPIRICALLY`**: Confirmed by documentary consensus **AND** verified against live
+  sample capture (`af5k_sl_sample.json`). **RESTRICTED SOLELY TO `0x07D2` (Battery SOC = 80%).**
+- **`PROVISIONAL`**: Documented across official sources (Afore Excel v3.4, En_240312 External EMS,
+  Roadmap §4, Solarman YAML) but awaiting live hardware confirmation across charge/discharge cycles
+  post G1/G2 authorization.
+- **`DOCUMENTED_CONFLICTED`**: Register `0x09C4` (EMS Mode 2500 vs Inverter Status 0x0200 / semantic
+  conflict across firmware versions).
+- **`DOCUMENTED_CONTROL_EXCLUDED`**: External EMS control registers (`0x0A08`, `0x0A09-0x0A0A`).
+  Dormant and excluded from read/write until Phase 6.
+- **`CONFIGURATION_EXCLUDED`**: Non-volatile EEPROM registers (`0x0BC1`, `0x0BC2`). Permanently
+  prohibited to protect non-volatile memory cell endurance.
 
 ## Mapped Registers — Telemetry (Read-Only)
 

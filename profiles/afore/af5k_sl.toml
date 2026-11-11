@@ -9,9 +9,12 @@
 #      operational Solarman integration deployment
 #   C. Solarman Home Assistant integration: afore_AF5K-Sl.yaml (production baseline)
 #
-# VERIFICATION STATUS per register documented inline. VERIFIED = confirmed in official docs (A)
-# AND/OR validated in operational Solarman integration (B+C). UNVERIFIED = estimated, must be
-# validated through Phase 0 passive observation before field deployment.
+# FORMAL PROVENANCE STATUS per M6 milestone (see docs/AFORE_REGISTER_PROVENANCE.md):
+#   - VERIFIED_EMPIRICALLY: Solely 0x07D2 (Battery SOC = 80% in af5k_sl_sample.json).
+#   - PROVISIONAL: All telemetry registers documented across A1/A2/B/C pending live hardware confirmation.
+#   - DOCUMENTED_CONFLICTED: 0x09C4 (EMS Mode vs Inverter Running Status).
+#   - DOCUMENTED_CONTROL_EXCLUDED: 0x0A08, 0x0A09-0x0A0A (External EMS control path dormant).
+#   - CONFIGURATION_EXCLUDED: 0x0BC1, 0x0BC2 (Non-volatile EEPROM wear hazard; permanently forbidden).
 #
 # CRITICAL PHASE 0 CONSTRAINTS:
 #   - READ-ONLY PROFILE: Zero [[write]] blocks. External EMS control dormant until Phase 6.

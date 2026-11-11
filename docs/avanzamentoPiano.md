@@ -9,11 +9,13 @@
 |---|---|---|---|
 | M0 Riallineamento e governance | RAGGIUNTA | 2026-11-10 | `561552d`, `afd1bae`, `cc09922` |
 | M1 Tracciabilità requisiti | RAGGIUNTA | 2026-11-10 | commit `docs(m1): add complete Smart EMS requirements traceability` (hash verificabile nel log successivo) |
-| M2 Hardening read-only | DA INIZIARE | | |
-| M3 Build host e test | IN CORSO | 2026-11-11 | M3A completato |
-| M4 Core EMS target-aware | DA INIZIARE | | |
-| M5 Replay dati storici HA | DA INIZIARE | | |
-| M6 Mappa registri documentale | DA INIZIARE | | |
+| M2 Hardening read-only | APPROVATA | 2026-11-11 | `b82bac9` |
+| M3A Safety core validation offline | APPROVATA | 2026-11-11 | `ac1f9d1` |
+| M3B Host shadow daemon offline | APPROVATA | 2026-11-11 | `beb202f` |
+| M3 Build host e test | COMPLETATA | 2026-11-11 | M3A e M3B approvate |
+| M4 Core EMS target-aware | IN CORSO | 2026-11-11 | — |
+| M5 Replay dati storici HA | NON INIZIATA | — | — |
+| M6 Mappa registri documentale | NON INIZIATA | — | — |
 | **G1 Check formale Gianvito** | BLOCCATO | | |
 | M7 Build di interrogazione one-shot | BLOCCATO | | |
 | M8 Segni e bilancio | BLOCCATO | | |

@@ -188,6 +188,19 @@ if(BUILD_TESTING)
     target_link_libraries(test-afore-telemetry PRIVATE pthread ArduinoJson unity)
     add_test(NAME afore-telemetry-tests COMMAND test-afore-telemetry)
 
+    # M4 pure target-aware EMS core: intentionally isolated from COMMON_SOURCES so
+    # this target cannot acquire transport, network, serial, protocol, or driver I/O.
+    add_library(target-aware-ems-core STATIC
+        src/ems/target_aware_ems.cpp
+    )
+    target_include_directories(target-aware-ems-core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
+
+    add_executable(test-target-aware-ems
+        test/test_target_aware_ems/test_main.cpp
+    )
+    target_link_libraries(test-target-aware-ems PRIVATE target-aware-ems-core)
+    add_test(NAME target-aware-ems-tests COMMAND test-target-aware-ems)
+
     # Shadow EMS CP4 tests
     add_executable(test-shadow-ems
         test/test_shadow_ems/test_main.cpp

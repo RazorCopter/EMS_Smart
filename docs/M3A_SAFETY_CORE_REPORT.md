@@ -1,8 +1,8 @@
 # M3A Safety Core Validation Report
 
-**Date:** 2026-11-11  
-**Target:** afore-m3 (rasp, Debian GNU/Linux 12)  
-**Branch:** m3-offline-validation  
+**Date:** 2026-11-11
+**Target:** afore-m3 (rasp, Debian GNU/Linux 13 trixie)
+**Branch:** m3-offline-validation
 **Objective:** Validate ReadOnlyGuard safety core in complete isolation
 
 ---
@@ -35,7 +35,7 @@ All 76 tests passed. The safety core correctly:
 ### Build
 - **Command:** `cmake --build build-m3a-safety -j2 --verbose`
 - **Exit code:** 0
-- **Compiler:** g++ (Debian 12.2.0-14) 12.2.0
+- **Compiler:** g++ (Debian 14.2.0-19) 14.2.0
 - **Flags:** `-DAFORE_SHADOW_BUILD=1 -O2 -g -DNDEBUG -std=c++17 -Wall -Wextra -Wpedantic -Werror`
 - **Status:** ✅ SUCCESS
 
@@ -344,5 +344,5 @@ M3A demonstrates that the safety core **in isolation**:
 ---
 
 **Report generated:** 2026-11-11T00:33:15Z  
-**Validated by:** M3A test harness (76 tests, all passed)  
-**Target:** afore-m3 (Raspberry Pi, Debian 12)
+**Validated by:** M3A test harness (76 tests, all passed)
+**Target:** afore-m3 (Raspberry Pi, Debian 13 trixie)

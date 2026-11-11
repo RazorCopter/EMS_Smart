@@ -632,5 +632,84 @@ Nessuno rispetto all'obiettivo M3A. Tutti i criteri di accettazione superati.
 - [x] Binary: no serial/network symbols
 - [x] I/O audit: no device access
 
-**Target:** afore-m3 (rasp, Debian 12, g++ 12.2.0)
+**Target:** afore-m3 (rasp, Debian 13 trixie, g++ 14.2.0)
 **Report completo:** `docs/M3A_SAFETY_CORE_REPORT.md`
+
+---
+
+## Rettifica – Sequenza M3/M4 Corretta
+
+**Data:** 2026-11-11
+**Commit M3A approvato:** `ac1f9d1a6f7b0f7ceb1cc686771d3f630caedc9f`
+
+### Sequenza corretta approvata
+
+La sequenza milestone corretta è:
+
+| Milestone | Descrizione |
+|---|---|
+| M3A | Safety core validation (offline) — ✅ APPROVATO |
+| M3B | Complete host shadow daemon offline build |
+| M3C | Final offline host integration (se necessario) |
+| M4 | Target-aware Smart EMS core |
+| M5 | Historical Home Assistant replay |
+| M6 | Register provenance and probe plan |
+| **G1** | **Formal approval gate** |
+| M7 | First real one-shot interrogation |
+| M8 | Sign convention and energy balance |
+| **G2** | **Polling authorization gate** |
+| M9 | Endurance polling |
+| M10 | Home Assistant integration |
+| M11 | Shadow 7 giorni |
+| **G3** | **ESP32 porting approval** |
+| M12 | Porting Waveshare ESP32 |
+
+### Correzione
+
+Ogni documento che indicava:
+
+> "M4 = runtime validation with real inverter"
+
+è ora corretto. La sequenza approvata richiede:
+
+1. **M3B:** build completo del daemon host shadow offline
+2. **M3C:** integrazione host finale offline (se necessario)
+3. **M4:** core Smart EMS target-aware
+4. **M5-M6:** replay storico e provenance registri
+5. **G1:** approvazione formale gate
+6. **M7:** prima interrogazione reale one-shot
+
+**Nessuna comunicazione con l'inverter è consentita prima dell'approvazione G1.**
+
+### Motivazione
+
+La validazione M3A ha confermato il safety core in isolamento. Prima di procedere con comunicazione hardware reale, il daemon host completo deve essere:
+
+1. Compilato offline (M3B)
+2. Integrato e verificato offline (M3C se necessario)
+3. Esteso con logica target-aware (M4)
+4. Testato con dati storici (M5)
+5. Documentato con provenance registri (M6)
+6. Approvato formalmente (G1)
+
+Solo dopo G1 è autorizzata la prima interrogazione reale (M7).
+
+### Debito documentale identificato e corretto
+
+Durante M3A è emersa un'inconsistenza nell'ambiente riportato:
+- Report M3A iniziale indicava erroneamente: Debian 12 / GCC 12.2
+- Ambiente reale verificato: Debian 13 trixie / GCC 14.2.0
+
+**Correzione applicata:** Tutti i documenti M3A sono stati aggiornati con l'ambiente corretto (Debian 13 trixie / GCC 14.2.0).
+
+**Verifica ambiente definitiva (2026-11-11):**
+- Hostname: rasp
+- OS: Debian GNU/Linux 13 (trixie) 13.7
+- Kernel: Linux 6.18.50+rpt-rpi-v8 aarch64
+- Compiler: g++ (Debian 14.2.0-19) 14.2.0
+- CMake: 3.31.6
+- Python: 3.13.5
+
+M3A è stato compilato e testato con successo su questo ambiente.
+
+**Questa è correzione documentale, non un fallimento tecnico M3A.**

@@ -108,6 +108,7 @@ struct EMSConfig {
   uint16_t seasonalEvaluationMinute = 8 * 60 + 30;
   double tomorrowFavorableKWh = 7.0;
   double tomorrowMinimumSocPct = 30.0;
+  uint64_t fullSocCalibrationDurationSeconds = 300;
 };
 
 enum class Feasibility : uint8_t { Feasible, NotFeasible, Unknown };

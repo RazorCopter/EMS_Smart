@@ -18,32 +18,50 @@ The register definitions for the Afore AF5K-SL single-phase hybrid inverter (5 k
    `Doc/Afore_Autonomous_EMS_V4_Roadmap.md` (Section 4 Telemetry Registers & Section 5 EEPROM Protection).
 4. **Source C (Solarman Production Integration):**  
    Solarman Home Assistant integration configuration `afore_AF5K-Sl.yaml` (field-deployed operational baseline).
-5. **Empirical Reference Fixture:**  
-   `test/test_afore/fixtures/af5k_sl_sample.json` (captured operational telemetry frame matching Solarman sensor outputs).
+5. **Reference Validation Fixture:**
+   `test/test_afore/fixtures/af5k_sl_sample.json` (explicitly documented as synthetic test fixture for Phase 0 validation).
 
 ---
 
-## 2. Formal Classification States (Tassative Assignment)
+## 2. Evidence Audit & Discrepancy Resolution on Battery SOC (0x07D2)
+
+A rigorous audit of repository history reveals two distinct SOC values referenced across project notes:
+1. **Observed Dashboard Prototyping Value: 27% (raw hex `0x001B`):**
+   - Mentioned in early conversational notes and dashboard summaries during initial project scoping.
+   - **Repository Trace Audit Result:** **NO RAW BUS TRACE OR HARDWARE SERIAL CAPTURE EXISTS IN THE REPOSITORY FOR 27% (`0x001B`).** It is an unverified conversational/dashboard observation without certified physical frame evidence.
+2. **Synthetic Validation Fixture Value: 80% (raw hex `0x0050`):**
+   - Present in `test/test_afore/fixtures/af5k_sl_sample.json` (line 74: `0x0050`, decoded to `80%`).
+   - Line 2 of `af5k_sl_sample.json` states unequivocally:
+     `"description": "Afore AF5K-SL sample telemetry frame — synthetic test fixture for Phase 0 validation"`
+   - This frame is a **synthetic test fixture** engineered to validate byte unpacking, profile decoding, and sign conversion offline without physical hardware.
+
+### Provenance Classification Re-alignment:
+Because no physical RS485 bus trace exists in the repository, register `0x07D2` **CANNOT** be classified as `VERIFIED_EMPIRICALLY`. Claiming empirical hardware verification prior to physical execution would be factually inaccurate.
+Consequently, `0x07D2` is classified as **`PROVISIONAL_FIXTURE_VERIFIED`** (provisional register verified against synthetic offline test fixtures; pending first live empirical read in M7 following G1/G2 approvals).
+
+---
+
+## 3. Formal Classification States (Tassative Assignment)
 
 Each register in the system is assigned one of the following five formal states:
 
 | Formal State | Definition & Boundary Rules | Permitted Phase 0 Action |
 |---|---|---|
-| **`VERIFIED_EMPIRICALLY`** | Confirmed by documentary consensus **AND** verified against a real operational telemetry capture (`af5k_sl_sample.json`). **RESTRICTED SOLELY TO `0x07D2` (Battery SOC = 80%).** | Read single / Included in conservative probe. |
-| **`PROVISIONAL`** | Documented coherently across official documentation (Sources A1, A2, B, C) but awaiting empirical verification across real charge/discharge/grid cycles. | Read single under conservative probe plan post G1/G2. Multi-register block reads prohibited during initial probing. |
+| **`PROVISIONAL_FIXTURE_VERIFIED`** | Documented consensus (A1, B, C) and verified against synthetic decoding fixtures (`af5k_sl_sample.json`). **Pending first live physical read in M7.** | Primary candidate for isolated single-register probe in M7 post-G1. |
+| **`PROVISIONAL`** | Documented coherently across official documentation (Sources A1, A2, B, C) but awaiting live empirical verification across real charge/discharge/grid cycles. | Read single under conservative probe plan post G1/G2. Multi-register block reads prohibited during initial probing. |
 | **`DOCUMENTED_CONFLICTED`** | Conflicting definitions or register overlap between different sources or firmware revisions (e.g. `0x09C4` EMS Mode vs Inverter Running Status). | Read blocked until register semantics and firmware revision disambiguation are established. Writes strictly prohibited. |
 | **`DOCUMENTED_CONTROL_EXCLUDED`** | Documented control/actuation registers for External EMS scheduling (`0x0A08`, `0x0A09-0x0A0A`). Dormant until Phase 6. | Excluded from read and write paths during Phase 0–5. No driver mapping. |
 | **`CONFIGURATION_EXCLUDED`** | Non-volatile configuration registers (`0x0BC1`, `0x0BC2`). Writes trigger EEPROM wear and damage the non-volatile memory cell endurance. | **PERMANENTLY FORBIDDEN** from any write automation. Excluded from dynamic polling. |
 
 ---
 
-## 3. Register Provenance Matrix
+## 4. Register Provenance Matrix
 
 The following table provides the exhaustive provenance and classification for all identified Afore registers:
 
 | Address (HEX) | Address (DEC) | FC | Type | Scale | Unit | Canonical / Documented Name | Sources | Formal Classification State | Notes & Verification Details |
 |---|---|---|---|---|---|---|---|---|---|
-| **`0x07D2`** | 2002 | 03/04 | U16 | 1 | % | Battery State of Charge (`battery.soc`) | A1 (R163), B (§4), C, Sample | **`VERIFIED_EMPIRICALLY`** | **SOLE EMPIRICAL REGISTER.** Real sample capture shows `0x0050` = 80%. Exactly matches BMS and Solarman sensor. |
+| **`0x07D2`** | 2002 | 03/04 | U16 | 1 | % | Battery State of Charge (`battery.soc`) | A1 (R163), B (§4), C, Sample | **`PROVISIONAL_FIXTURE_VERIFIED`** | Validated against synthetic test fixture (`0x0050` = 80%). Preliminary 27% (`0x001B`) unverified on wire. Pending first live read in M7 post-G1. |
 | **`0x07D8`** | 2008 | 03/04 | S16 | -1 (canonical flip) / 1 (raw) | W | Battery Power (`battery.power`) | A1, B (§4), C, Sample | **`PROVISIONAL`** | Raw value in sample is `0xFF38` (-200 W). Afore uses negative=charging. Scale -1 corrects to canonical Heliograph convention (+200 W). |
 | **`0x07D4`** | 2004 | 03/04 | U16 | 0.1 | V | Battery Voltage (`battery.voltage`) | A1 (R165), B (§4), C, Sample | **`PROVISIONAL`** | Excel `Vbat` U16 0.1V. Sample has `0x0208` = 520 (52.0 V). Matches 48V nominal battery pack. |
 | **`0x07D5`** | 2005 | 03/04 | S16 | 0.01 | A | Battery Current (`battery.current`) | A1 (R166), B (§4), C, Sample | **`PROVISIONAL`** | Excel `Ibat` S16 0.01A ("正表示电池放电 负表示电池充电"). Sample `0xFFC4` = -60 (-0.60 A). Sign direction requires Phase 0 confirmation. |

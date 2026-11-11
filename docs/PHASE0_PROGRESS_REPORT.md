@@ -243,7 +243,7 @@ verified_date = "2026-11-10"
 
 **Mapping Measurement IDs Canonici**:
 - `dc.power.total` ← 0x022A
-- `battery.soc` ← 0x07D2 (VERIFIED)
+- `battery.soc` ← 0x07D2 (PROVISIONAL_FIXTURE_VERIFIED, test fixture af5k_sl_sample.json)
 - `battery.voltage` ← 0x07D4
 - `battery.current` ← 0x07D5
 - `battery.power` ← 0x07D8 (scale=-1, VERIFIED)

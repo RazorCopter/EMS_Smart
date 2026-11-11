@@ -241,9 +241,90 @@ void scenario_typed_override_is_safety_clamped() {
         "override reason expected");
 }
 
+void scenario_approved_parameters_audit() {
+  const std::string name = "approved_parameters_audit";
+  const EMSConfig cfg;
+  check(cfg.targetSocPct == 100.0, name, "target SOC default must be 100%");
+  check(cfg.targetMinuteOfDay == 15 * 60 + 30, name,
+        "target time default must be 15:30 (930 min)");
+  check(cfg.anticipationMinutes == 20, name,
+        "operational anticipation default must be 20 min");
+  check(cfg.recoveryMinutes == 60, name,
+        "final recovery window default must be 60 min");
+  check(cfg.chargeEfficiency == 0.90, name,
+        "charge efficiency default must be 0.90");
+  check(cfg.safetyMargin == 1.20, name, "safety margin default must be 1.20");
+  check(cfg.forecastMaximumAgeSeconds == 14 * 60 * 60, name,
+        "forecast maximum age must be 14 hours");
+  check(cfg.weekdayLoadKW == 0.6, name, "weekday load default must be 0.6 kW");
+  check(cfg.weekendLoadKW == 0.9, name, "weekend load default must be 0.9 kW");
+  check(cfg.winterStartMonthDay == 1025, name, "winter start must be Oct 25");
+  check(cfg.winterEndMonthDay == 228, name, "winter end must be Feb 28");
+  check(cfg.tomorrowFavorableKWh == 7.0, name,
+        "tomorrow favorable forecast must be >= 7.0 kWh");
+  check(cfg.tomorrowMinimumSocPct == 30.0, name,
+        "tomorrow minimum SOC must be >= 30%");
+  check(cfg.fullSocCalibrationDurationSeconds == 300, name,
+        "calibration duration must be 5 minutes (300 s)");
+  check(cfg.rampUpWPerCycle == 256.0, name, "ramp up must be 256 W/cycle");
+  check(cfg.rampDownWPerCycle == 410.0, name, "ramp down must be 410 W/cycle");
+  check(cfg.hysteresisW == 100.0, name, "hysteresis must be 100 W");
+  check(!cfg.allowDischarge, name, "allow_discharge must be false by default");
+}
+
+void scenario_operational_anticipation_20min_and_recovery_window() {
+  const std::string name = "operational_anticipation_20min_and_recovery_window";
+  TargetAwareEMS core;
+  EMSInput input = baseline();
+  input.socPct = valid(80.0); // 20% deficit
+
+  // 1. At 14:00 (minute 840): before recovery window (14:30), normal target
+  // charge
+  input.clock.minuteOfDay = 14 * 60;
+  input.socPct = valid(90.0); // 10% deficit is comfortably feasible
+  auto res1 = core.evaluate(input, {}, 1000).recommendation;
+  check(res1.reason == RecommendationReason::TargetCharge, name,
+        "14:00 must be in normal target charge when feasible");
+
+  // 2. At 14:35 (minute 875): inside 60-min recovery window (14:30..15:30),
+  // deficit causes recovery charge
+  input.clock.minuteOfDay = 14 * 60 + 35;
+  auto res2 = core.evaluate(input, {}, 1000).recommendation;
+  check(res2.reason == RecommendationReason::RecoveryCharge, name,
+        "14:35 must trigger recovery charge");
+
+  // 3. At 15:10 (minute 910): anticipation deadline (15:30 - 20m),
+  // remainingHours must be 0
+  input.clock.minuteOfDay = 15 * 60 + 10;
+  auto res3 = core.evaluate(input, {}, 1000).recommendation;
+  check(
+      res3.reason == RecommendationReason::RecoveryCharge, name,
+      "15:10 anticipation deadline with deficit must request recovery charge");
+}
+
+void scenario_invalid_data_never_converted_to_valid_zero() {
+  const std::string name = "invalid_data_never_converted_to_valid_zero";
+  TargetAwareEMS core;
+  EMSInput input = baseline();
+  // Set SOC quality to Invalid, CommError, and Unavailable
+  input.socPct.quality = DataQuality::Invalid;
+  input.socPct.value =
+      0.0; // explicit 0.0 in payload must NOT be trusted as valid
+  auto res = core.evaluate(input, {}, 1000).recommendation;
+  check(res.reason == RecommendationReason::DataInvalid, name,
+        "invalid SOC must yield DataInvalid, never valid 0% evaluation");
+  check(res.feasibility == Feasibility::Unknown, name,
+        "invalid data must not declare Feasible or NotFeasible");
+  check(res.batteryPowerW == 0.0, name,
+        "invalid data must emit 0 W safe advisory power");
+}
+
 } // namespace
 
 int main() {
+  scenario_approved_parameters_audit();
+  scenario_operational_anticipation_20min_and_recovery_window();
+  scenario_invalid_data_never_converted_to_valid_zero();
   scenario_target_reachable_minimum_power();
   scenario_target_not_reachable();
   scenario_low_soc_recovery_window();
@@ -262,6 +343,6 @@ int main() {
     std::cerr << failures << " M4 assertion(s) failed\n";
     return EXIT_FAILURE;
   }
-  std::cout << "PASS: 14 named M4 target-aware EMS scenarios\n";
+  std::cout << "PASS: 17 named M4 target-aware EMS scenarios\n";
   return EXIT_SUCCESS;
 }

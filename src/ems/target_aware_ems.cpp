@@ -49,14 +49,15 @@ double correctedForecastKWh(const EMSInput &input, const EMSConfig &config,
   return result;
 }
 
-void updateCalibration(double socPct, uint64_t nowSeconds, EMSState &state,
+void updateCalibration(double socPct, uint64_t nowSeconds,
+                       uint64_t durationSeconds, EMSState &state,
                        Recommendation &result) {
   if (socPct >= 99.9) {
     if (!state.fullSocTimerActive) {
       state.fullSocTimerActive = true;
       state.fullSocSinceSeconds = nowSeconds;
     } else if (!state.calibrated &&
-               nowSeconds >= state.fullSocSinceSeconds + 300) {
+               nowSeconds >= state.fullSocSinceSeconds + durationSeconds) {
       state.calibrated = true;
       state.calibrationRequested = false;
       result.calibrationCompleted = true;
@@ -204,7 +205,8 @@ Evaluation TargetAwareEMS::evaluate(const EMSInput &input,
   }
 
   const double soc = *input.socPct.value;
-  updateCalibration(soc, nowSeconds, evaluation.nextState, result);
+  updateCalibration(soc, nowSeconds, config_.fullSocCalibrationDurationSeconds,
+                    evaluation.nextState, result);
   evaluation.nextState.fogActive =
       fog_detector::update(input.weather, state.fogActive);
   result.fogActive = evaluation.nextState.fogActive;
@@ -215,9 +217,17 @@ Evaluation TargetAwareEMS::evaluate(const EMSInput &input,
   result.conservativeMode = !forecastValid;
   const double forecastKWh =
       correctedForecastKWh(input, config_, result.fogActive);
+  // Requirement R-TGT-03: Operational anticipation (default 20 min).
+  // Effective target is targetMinuteOfDay - anticipationMinutes (15:30 - 20 min
+  // = 15:10).
+  const uint16_t effectiveTargetMinute =
+      config_.targetMinuteOfDay > config_.anticipationMinutes
+          ? static_cast<uint16_t>(config_.targetMinuteOfDay -
+                                  config_.anticipationMinutes)
+          : config_.targetMinuteOfDay;
   const double remainingHours =
-      input.clock.minuteOfDay < config_.targetMinuteOfDay
-          ? (config_.targetMinuteOfDay - input.clock.minuteOfDay) / 60.0
+      input.clock.minuteOfDay < effectiveTargetMinute
+          ? (effectiveTargetMinute - input.clock.minuteOfDay) / 60.0
           : 0.0;
   const double loadKWh =
       load_profile::estimatedLoadKW(config_, input.clock.dayOfWeek) *
@@ -273,9 +283,17 @@ Evaluation TargetAwareEMS::evaluate(const EMSInput &input,
   double requestedW = 0.0;
   const bool night =
       *input.pvPowerW.value < config_.deadbandW && forecastKWh <= 0.0;
-  const bool inRecovery = input.clock.minuteOfDay < config_.targetMinuteOfDay &&
-                          input.clock.minuteOfDay + config_.recoveryMinutes >=
-                              config_.targetMinuteOfDay;
+  // Requirement R-TGT-04 & R-NRG-06: 60-minute final recovery window
+  // (14:30..15:30) or within anticipation window (15:10..15:30) when target not
+  // yet met.
+  const bool withinRecoveryWindow =
+      input.clock.minuteOfDay < config_.targetMinuteOfDay &&
+      input.clock.minuteOfDay + config_.recoveryMinutes >=
+          config_.targetMinuteOfDay;
+  const bool withinAnticipationBuffer =
+      input.clock.minuteOfDay >= effectiveTargetMinute &&
+      input.clock.minuteOfDay < config_.targetMinuteOfDay;
+  const bool inRecovery = withinRecoveryWindow || withinAnticipationBuffer;
 
   if (input.overrideInput.requestedBatteryPowerW.has_value()) {
     requestedW = *input.overrideInput.requestedBatteryPowerW;

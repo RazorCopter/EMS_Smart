@@ -324,9 +324,9 @@ In strict adherence to project safety rules, no register address or scale factor
 |---|---|---|---|---|
 | `0x022A` | Total PV Power | `uint16`, 1 W | **VERIFIED** | Roadmap Sec. 4, Solarman `afore_AF5K-Sl.yaml`. Sum of string powers. |
 | `0x022D` | PV String 1 Power | `uint16`, 1 W | **VERIFIED** | Roadmap Sec. 4. |
-| `0x0230` | PV String 2 Power | `uint16`, 1 W | **VERIFIED** | Roadmap Sec. 4. |
-| `0x07D2` | Battery SOC | `uint16`, 1 % | **VERIFIED** | Roadmap Sec. 4, Solarman `afore_AF5K-Sl.yaml`. Valid range: 0–100%. |
-| `0x07D0` | Battery Running State | `enum` | **VERIFIED** | Roadmap Sec. 4 (4 = Charge, 5 = Discharge, 6 = Standby). |
+| `0x0230` | PV String 2 Power | `uint16`, 1 W | **PROVISIONAL** | Roadmap Sec. 4. |
+| `0x07D2` | Battery SOC | `uint16`, 1 % | **PROVISIONAL_FIXTURE_VERIFIED** | Roadmap Sec. 4, Solarman `afore_AF5K-Sl.yaml`, test fixture `af5k_sl_sample.json`. Valid range: 0–100%. Pending live empirical read in M7. |
+| `0x07D0` | Battery Running State | `enum` | **PROVISIONAL** | Roadmap Sec. 4 (4 = Charge, 5 = Discharge, 6 = Standby). |
 | `0x07D4` | Battery Voltage | `uint16`, 0.1 V | **VERIFIED** | Roadmap Sec. 4. |
 | `0x07D5` | Battery Current | `int16`, 0.01 A | **VERIFIED** | Roadmap Sec. 4. Sign convention to verify in Phase 0. |
 | `0x07D8` | Battery Power | `int16`, 1 W | **VERIFIED** | Roadmap Sec. 4. Negative observed during charging. |

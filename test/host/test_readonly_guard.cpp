@@ -304,7 +304,7 @@ static void test_K_empty_frame_blocked() {
     FakeLowerTransport* fakePtr = fake.get();
     ReadOnlyGuard guard(std::move(fake), 1);  // M2 FIX-2: mandatory slave ID
     
-    uint8_t empty[] = {};
+    const uint8_t* empty = nullptr;
     if (guard.write(empty, 0) != 0 || !fakePtr->wasNotCalled()) {
         printf("FAIL K: empty frame not blocked\n");
         exit(1);

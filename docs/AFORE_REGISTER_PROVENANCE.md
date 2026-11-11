@@ -1,137 +1,126 @@
 # Afore AF5K-SL — Register Provenance & Phase 0 Conservative Probe Plan
 
-> **STATUS:** Offline Architectural Baseline (Milestone M6).  
-> **EXECUTION CONSTRAINT:** 100% OFFLINE DOCUMENTAL VALIDATION. No serial port access, no physical bus probing, no hardware interrogation. Physical probing is strictly deferred until formal G1/G2 governance approvals.
+> **STATUS:** Baseline Documentale e Architetturale Pre-G1 (Milestone M6 Consolidata).
+> **EXECUTION CONSTRAINT:** 100% OFFLINE DOCUMENTAL VALIDATION. Nessun accesso a porte seriali, nessun probe su bus fisico RS485, nessuna interrogazione hardware. L'interrogazione è formalmente bloccata fino all'approvazione del Gate G1 da parte dell'utente.
 
 ---
 
-## 1. Documental Sources & Baseline Taxonomy
+## 1. Fonti Documentali & Tassonomia dei Registri
 
-The register definitions for the Afore AF5K-SL single-phase hybrid inverter (5 kW) are derived from four documented baselines:
+La provenienza dei registri dell'inverter ibrido monofase Afore AF5K-SL (5 kW) deriva da quattro fonti primarie e da una fixture sintetica di validazione:
 
-1. **Source A1 (Excel Afore v3.4):**  
-   `Doc/艾伏逆变器寄存器参数表（对外）v3.4_20251119_并网机和储能机分类(2).xlsx`  
-   Sheets: `运行信息04` (Read-only dynamic operational telemetry, FC 0x04) and `参数读写03-06-10` (Settings/Parameters, FC 0x03, 0x06, 0x10).
-2. **Source A2 (Document En_240312 External EMS):**  
-   `Doc/外部Ems调度  - En_240312.docx` (External EMS Modbus Protocol Specification).
-3. **Source B (Afore Autonomous EMS V4 Roadmap):**  
-   `Doc/Afore_Autonomous_EMS_V4_Roadmap.md` (Section 4 Telemetry Registers & Section 5 EEPROM Protection).
-4. **Source C (Solarman Production Integration):**  
-   Solarman Home Assistant integration configuration `afore_AF5K-Sl.yaml` (field-deployed operational baseline).
-5. **Reference Validation Fixture:**
-   `test/test_afore/fixtures/af5k_sl_sample.json` (explicitly documented as synthetic test fixture for Phase 0 validation).
-
----
-
-## 2. Evidence Audit & Discrepancy Resolution on Battery SOC (0x07D2)
-
-A rigorous audit of repository history reveals two distinct SOC values referenced across project notes:
-1. **Observed Dashboard Prototyping Value: 27% (raw hex `0x001B`):**
-   - Mentioned in early conversational notes and dashboard summaries during initial project scoping.
-   - **Repository Trace Audit Result:** **NO RAW BUS TRACE OR HARDWARE SERIAL CAPTURE EXISTS IN THE REPOSITORY FOR 27% (`0x001B`).** It is an unverified conversational/dashboard observation without certified physical frame evidence.
-2. **Synthetic Validation Fixture Value: 80% (raw hex `0x0050`):**
-   - Present in `test/test_afore/fixtures/af5k_sl_sample.json` (line 74: `0x0050`, decoded to `80%`).
-   - Line 2 of `af5k_sl_sample.json` states unequivocally:
-     `"description": "Afore AF5K-SL sample telemetry frame — synthetic test fixture for Phase 0 validation"`
-   - This frame is a **synthetic test fixture** engineered to validate byte unpacking, profile decoding, and sign conversion offline without physical hardware.
-
-### Provenance Classification Re-alignment:
-Because no physical RS485 bus trace exists in the repository, register `0x07D2` **CANNOT** be classified as `VERIFIED_EMPIRICALLY`. Claiming empirical hardware verification prior to physical execution would be factually inaccurate.
-Consequently, `0x07D2` is classified as **`PROVISIONAL_FIXTURE_VERIFIED`** (provisional register verified against synthetic offline test fixtures; pending first live empirical read in M7 following G1/G2 approvals).
+1. **Fonte A1 (Foglio Ufficiale Afore v3.4):**
+   `Doc/艾伏逆变器寄存器参数表（对外）v3.4_20251119_并网机和储能机分类(2).xlsx`
+   - Foglio **`运行信息04`** (Operational Telemetry): codificato rigorosamente come **Modbus Function Code 04 (Read Input Registers)**. Include tutti i dati operativi in tempo reale: SOC batteria, tensioni, correnti, potenze FV e di rete, temperature.
+   - Foglio **`参数读写03-06-10`** (Parameters Read/Write): codificato come **FC 0x03, 0x06, 0x10 (Holding Registers)**. Include configurazioni statiche (numero seriale) e parametri protetti su EEPROM non volatile.
+2. **Fonte A2 (Specifica Ufficiale External EMS En_240312):**
+   `Doc/外部Ems调度  - En_240312.docx` (External EMS Modbus Protocol Specification). Definisce i registri di controllo esterno e setpoint attivi (dormienti e interdetti in Phase 0).
+3. **Fonte B (Roadmap Afore Autonomous EMS V4):**
+   `Doc/Afore_Autonomous_EMS_V4_Roadmap.md` (Sezione 4: Telemetria e convenzioni di segno; Sezione 5: Protezione EEPROM).
+4. **Fonte C (Integrazione Solarman Home Assistant su Impianto Reale):**
+   `afore_AF5K-Sl.yaml` (configurazione Solarman di produzione, impiega FC04 per i sensori di telemetria operativa).
+5. **Fixture di Riferimento Sintetica:**
+   `test/test_afore/fixtures/af5k_sl_sample.json` (esplicitamente etichettata come fixture di test sintetica offline, allineata a FC04 / `space: "input"`).
 
 ---
 
-## 3. Formal Classification States (Tassative Assignment)
+## 2. Riconciliazione Conflitto FC03 / FC04 e Audit Discrepanze Valori SOC (0x07D2)
 
-Each register in the system is assigned one of the following five formal states:
+### 2.1 Riconciliazione del Function Code (FC03 vs FC04)
+- **Problema rilevato:** Versioni preliminari indicavano genericamente FC03 ("holding registers") per l'intera mappa.
+- **Risoluzione evidenziale:** L'ispezione analitica riga per riga del documento ufficiale Afore v3.4 dimostra che il registro `0x07D2` (2002 decimale, `电池电量（SOC）`) è posizionato al rigo 163 del foglio **`运行信息04`**, la cui colonna del codice funzione impone inequivocabilmente **Function Code 04 (Read Input Registers)**.
+- **Decisione pre-G1:** La proposta operativa per M7 adotta esclusivamente **FC04**. Il profilo TOML `profiles/afore/af5k_sl.toml` e la fixture sintetica sono stati allineati a `space = "input"` (FC04). Nessuna inferenza generica a FC03 è consentita per i dati di telemetria.
 
-| Formal State | Definition & Boundary Rules | Permitted Phase 0 Action |
-|---|---|---|
-| **`PROVISIONAL_FIXTURE_VERIFIED`** | Documented consensus (A1, B, C) and verified against synthetic decoding fixtures (`af5k_sl_sample.json`). **Pending first live physical read in M7.** | Primary candidate for isolated single-register probe in M7 post-G1. |
-| **`PROVISIONAL`** | Documented coherently across official documentation (Sources A1, A2, B, C) but awaiting live empirical verification across real charge/discharge/grid cycles. | Read single under conservative probe plan post G1/G2. Multi-register block reads prohibited during initial probing. |
-| **`DOCUMENTED_CONFLICTED`** | Conflicting definitions or register overlap between different sources or firmware revisions (e.g. `0x09C4` EMS Mode vs Inverter Running Status). | Read blocked until register semantics and firmware revision disambiguation are established. Writes strictly prohibited. |
-| **`DOCUMENTED_CONTROL_EXCLUDED`** | Documented control/actuation registers for External EMS scheduling (`0x0A08`, `0x0A09-0x0A0A`). Dormant until Phase 6. | Excluded from read and write paths during Phase 0–5. No driver mapping. |
-| **`CONFIGURATION_EXCLUDED`** | Non-volatile configuration registers (`0x0BC1`, `0x0BC2`). Writes trigger EEPROM wear and damage the non-volatile memory cell endurance. | **PERMANENTLY FORBIDDEN** from any write automation. Excluded from dynamic polling. |
-
----
-
-## 4. Register Provenance Matrix
-
-The following table provides the exhaustive provenance and classification for all identified Afore registers:
-
-| Address (HEX) | Address (DEC) | FC | Type | Scale | Unit | Canonical / Documented Name | Sources | Formal Classification State | Notes & Verification Details |
-|---|---|---|---|---|---|---|---|---|---|
-| **`0x07D2`** | 2002 | 03/04 | U16 | 1 | % | Battery State of Charge (`battery.soc`) | A1 (R163), B (§4), C, Sample | **`PROVISIONAL_FIXTURE_VERIFIED`** | Validated against synthetic test fixture (`0x0050` = 80%). Preliminary 27% (`0x001B`) unverified on wire. Pending first live read in M7 post-G1. |
-| **`0x07D8`** | 2008 | 03/04 | S16 | -1 (canonical flip) / 1 (raw) | W | Battery Power (`battery.power`) | A1, B (§4), C, Sample | **`PROVISIONAL`** | Raw value in sample is `0xFF38` (-200 W). Afore uses negative=charging. Scale -1 corrects to canonical Heliograph convention (+200 W). |
-| **`0x07D4`** | 2004 | 03/04 | U16 | 0.1 | V | Battery Voltage (`battery.voltage`) | A1 (R165), B (§4), C, Sample | **`PROVISIONAL`** | Excel `Vbat` U16 0.1V. Sample has `0x0208` = 520 (52.0 V). Matches 48V nominal battery pack. |
-| **`0x07D5`** | 2005 | 03/04 | S16 | 0.01 | A | Battery Current (`battery.current`) | A1 (R166), B (§4), C, Sample | **`PROVISIONAL`** | Excel `Ibat` S16 0.01A ("正表示电池放电 负表示电池充电"). Sample `0xFFC4` = -60 (-0.60 A). Sign direction requires Phase 0 confirmation. |
-| **`0x07D0`** | 2000 | 03/04 | U16 | 1 | enum | Battery Running State (`battery.state`) | A1 (R161), B (§4), Sample | **`PROVISIONAL`** | Enum: 0=No Bat, 1=Fault, 2=Sleep, 3=Start, 4=Charging, 5=Discharge, 6=OFF, 7=Wake Up. Sample has `0x0004` (Charging). |
-| **`0x022A`** | 554 | 03/04 | U16 | 1 | W | Total PV DC Power (`dc.power.total`) | B (§4), C, Sample | **`PROVISIONAL`** | Total PV power sum of strings. Sample `0x04B0` = 1200 W (or canonical balanced 1000 W). |
-| **`0x022D`** | 557 | 03/04 | U16 | 1 | W | PV String 1 Power (`dc.mppt_1.power`) | A1 (R70), B (§4), Sample | **`PROVISIONAL`** | Excel `Ppv1` U16 1W. Sample `0x0320` = 800 W. |
-| **`0x0230`** | 560 | 03/04 | U16 | 1 | W | PV String 2 Power (`dc.mppt_2.power`) | A1 (R73), B (§4), Sample | **`PROVISIONAL`** | Excel `Ppv2` U16 1W. Sample `0x0000` = 0 W. |
-| **`0x0228`** | 552 | 03/04 | U16 | 0.1 | V | PV String 1 Voltage (`dc.mppt_1.voltage`) | A1 (R68 offset 555 in 3P table / 552 in 1P), C | **`PROVISIONAL`** | Single-phase vs 3-phase offset discrepancy documented in GAP_ASSESSMENT.md. Sample `0x0D8C` = 3468 (346.8 V). |
-| **`0x0229`** | 553 | 03/04 | U16 | 0.1 | A | PV String 1 Current (`dc.mppt_1.current`) | A1 (R69), C, Sample | **`PROVISIONAL`** | Sample `0x0019` = 25 (2.5 A). Plausible for 800 W (346.8 V × 2.5 A = 867 W). |
-| **`0x022E`** | 558 | 03/04 | U16 | 0.1 | V | PV String 2 Voltage (`dc.mppt_2.voltage`) | A1 (R71), C, Sample | **`PROVISIONAL`** | Sample `0x0B54` = 2900 (290.0 V). |
-| **`0x022F`** | 559 | 03/04 | U16 | 0.1 | A | PV String 2 Current (`dc.mppt_2.current`) | A1 (R72), C, Sample | **`PROVISIONAL`** | Sample `0x000F` = 15 (1.5 A). |
-| **`0x0212`** | 530 | 03/04 | S16 | 1 | W | Grid Active Power (`grid.power`) | B (§4), C, Sample | **`PROVISIONAL`** | Signed grid power. Sample `0x03E8` (or -200 W in balanced export scenario). Import/export sign to be proven on live hardware. |
-| **`0x0214`** | 532 | 03/04 | S16 | 1 | W | Grid Power Phase S / Alternate Power | A1 (R50), C | **`PROVISIONAL`** | Documented in 3-phase parameter tables; present in some single-phase firmware variations. |
-| **`0x0220`** | 544 | 03/04 | S16 | 1 | W | Grid Total Power (Alternate Table) | A1, C | **`PROVISIONAL`** | Alternate table offset for total active meter power. |
-| **`0x020B`** | 523 | 03/04 | S16 | 1 | W | Inverter AC Active Power (`ac.power.total`) | B (§4), C, Sample | **`PROVISIONAL`** | Physical AC active power output from inverter stage. |
-| **`0x020C`** | 524 | 03/04 | S16 | 0.1 | °C | Inverter Temperature (`inverter.temperature`) | B (§4), C, Sample | **`PROVISIONAL`** | Sample `0x0064` = 100 (10.0 °C / 23.0 °C). |
-| **`0x0200`** | 512 | 03/04 | U16 | 1 | enum | Inverter Running Status (`inverter.status`) | A1 (R44/Status), B (§4), C | **`PROVISIONAL`** | Running status (0=Waiting/Running). Caution: Solarman mappings vary across inverter firmware. |
-| **`0x0203`** | 515 | 03/04 | U16 | 0.1 | V | Grid Voltage L1 (`ac.phase_l1.voltage`) | A1 (R39 / R47), C, Sample | **`PROVISIONAL`** | Sample `0x0138` = 312 (or 231.2 V). Nominal European grid 230 V. |
-| **`0x0205`** | 517 | 03/04 | U16 | 0.01 | Hz | Grid Frequency (`ac.frequency`) | A1 (R45 / R49), C, Sample | **`PROVISIONAL`** | Sample `0x0064` = 5000 (50.00 Hz). Nominal 50 Hz. |
-| **`0x09C4`** | 2500 | 03/06/10 | U16 | 1 | enum | EMS Mode (External Scheduling Mode) | A1 (参数读写 R162), A2 (§2.2), B (§4) | **`DOCUMENTED_CONFLICTED`** | **CRITICAL AMBIGUITY:** Document A2 explicitly uses `0x09C4 = 0x0005` to engage External EMS. However, legacy configurations and certain Solarman YAML files conflated `0x09C4` with Inverter Running Status (`0x0200`). Must remain unwritten and quarantined. |
-| **`0x0A08`** | 2568 | 03/06/10 | U16 / S16 | 1 | enum | External Control Type (`ExtEmsMod`) | A1 (参数读写 R182), A2 (§2.2), B (§4) | **`DOCUMENTED_CONTROL_EXCLUDED`** | Enum: 0=Battery Power, 1=Inverter Power, 2=Grid Power, 3=Off. Excluded from all Phase 0 operations. |
-| **`0x0A09`–`0x0A0A`** | 2569–2570 | 10 | S32 | 1 | W | Active Power Setpoint | A1 (参数读写 R183), A2 (§2.2), B (§4) | **`DOCUMENTED_CONTROL_EXCLUDED`** | Signed 32-bit big-endian watts. Requires Modbus Function Code 10 (FC10). Excluded from Phase 0–5. |
-| **`0x0BC1`** | 3009 | 03/06/10 | U16 | 0.01 | A | Max Charge Current (`CurrMaxChg`) | A1 (参数读写 R196), B (§5) | **`CONFIGURATION_EXCLUDED`** | **EEPROM HAZARD:** Non-volatile parameter (500~50000 = 5.00A~500.00A). Cyclic writes wear out flash/EEPROM cells. Legacy V3.3 automation disabled. Permanently banned from write commands. |
-| **`0x0BC2`** | 3010 | 03/06/10 | U16 | 0.01 | A | Max Discharge Current (`CurrMaxDisChg`) | A1 (参数读写 R197), B (§5) | **`CONFIGURATION_EXCLUDED`** | **EEPROM HAZARD:** Non-volatile parameter. Permanently banned from write commands. |
+### 2.2 Riconciliazione dei Valori SOC (27% vs 80%)
+- L'audit approfondito del repository dimostra che:
+  1. Il valore **27%** (`0x001B`) derivava da osservazioni visive storiche su dashboard Solarman remota, ma **nessun bus trace grezzo o frame seriale reale è stato salvato o trattenuto nel workspace**.
+  2. Il valore **80%** (`0x0050`) proviene dal payload sintetico [`test/test_afore/fixtures/af5k_sl_sample.json`](../test/test_afore/fixtures/af5k_sl_sample.json), creato ad hoc per la validazione offline dell'algoritmo di scaling e delle convenzioni di segno.
+- **Conclusione e Riclassificazione:** Nessuno dei due valori può essere dichiarato come "verificato empiricamente su bus hardware". Di conseguenza, il registro `0x07D2` è formalmente classificato come **`PROVISIONAL_FIXTURE_VERIFIED`** (convalidato su fixture sintetica, in attesa di osservazione empirica reale su bus in M7).
 
 ---
 
-## 4. Phase 0 Conservative Probe Plan
+## 3. Matrice Completa di Provenienza dei Registri (Audit a 7 Colonne)
 
-> **MANDATORY PREREQUISITE:** This probe plan is an architectural blueprint. It **MUST NOT** be executed until formal Governance Gates G1 (Passive Sniffing & Dongle Coexistence) and G2 (Single-Register Probe Authorization) are formally reviewed and approved.
+Di seguito l'audit esaustivo per ogni singolo registro considerato nel piano Afore:
 
-### 4.1 Target Single-Register Probes
-
-Initial probing is strictly restricted to isolated, single-register read requests (`count = 1`). Under no circumstances will multi-register spans or bulk blocks be transmitted on the bus during initial discovery.
-
-| Target Register | Address (PDU) | Target Metric | Polling Interval | Modbus Function | Count |
-|---|---|---|---|---|---|
-| **Probe 1** | `0x07D2` (2002) | Battery State of Charge (SOC) | **15 seconds** | FC 0x03 (Holding) | 1 |
-| **Probe 2** | `0x07D8` (2008) | Battery Power | **10 seconds** | FC 0x03 (Holding) | 1 |
-| **Probe 3** | `0x022A` (554) | Total PV DC Power | **10 seconds** | FC 0x03 (Holding) | 1 |
-| **Probe 4** | `0x0212` (530) | Grid Active Power | **10 seconds** | FC 0x03 (Holding) | 1 |
-
-### 4.2 Bus Timing & Inter-Frame Spacing Rules
-
-To ensure strict zero-disruption coexistence with the existing Solarman datalogger stick on the shared RS485 bus:
-
-1. **Strict Single Transaction Rule:** Only one Modbus RTU transaction (request + response or timeout) may be active at any given millisecond. No pipelining.
-2. **Zero Retries (`Retry = 0`):** In the event of a timeout, checksum failure, or CRC error, the runner drops the frame immediately. Zero immediate retransmissions are permitted to prevent bus contention.
-3. **Inter-Frame Silence Gap (`t_gap >= 200 ms`):** After receiving any frame or encountering a timeout, the serial transport must enforce an idle silence period of at least **200 ms** before asserting the transmitter. This provides a safety margin well beyond the Modbus standard $3.5 \times t_{\text{char}}$ (~3.6 ms at 9600 baud), leaving ample bus availability for the Solarman logger.
-4. **Baud Rate & Frame Format:** 9600 baud, 8 data bits, no parity (`parity = "none"`), 1 stop bit (`stop_bits = 1`).
-
-### 4.3 Emergency Stop Rule (Trip Counter)
-
-The daemon and runner must monitor continuous communication health:
-
-- **Condition:** 3 consecutive communication errors (timeouts, framing errors, or invalid CRC-16 frames).
-- **Automated Action:** Immediate **ABORT**. The polling loop transitions to an error latch state, releases serial bus handles, and ceases all transmission until manual operator intervention.
-
-### 4.4 Isolation Rule (No Continuous Blocks Across Unverified Space)
-
-- **Contiguous Block Reads Prohibited:** No read transaction may span across unverified register offsets (e.g. attempting to read `0x0200` to `0x0230` in a single 49-register block is forbidden during Phase 0 probing).
-- **Isolated Enclaves Only:** If block reads are ever considered in future phases, each block must consist strictly of registers that have previously achieved `VERIFIED_EMPIRICALLY` status individually.
+| Address (Hex / Dec) | Planned Function Code | Documentary Source | Fixture Evidence | Empirical Evidence | Confidence | Final Status | Note Tecniche & Semantica |
+|---|---|---|---|---|---|---|---|
+| **`0x07D2`** (2002) | **FC 0x04** (Input) | A1 (`运行信息04`, R163), B (§4), C | Presente (`af5k_sl_sample.json`, SOC=80%) | Nessun frame bus reale trattenuto (27% da dashboard) | Alta (doc) / Media (hw) | **`PROVISIONAL_FIXTURE_VERIFIED`** | Battery SOC (0–100%, scale 1, U16). Target della singola richiesta bounded one-shot in M7. |
+| **`0x07D0`** (2000) | **FC 0x04** (Input) | A1 (`运行信息04`, R161), B (§4) | Presente (BatState=4, Charge) | Nessun frame bus reale | Media | **`PROVISIONAL`** | Battery Running State enum (4=Charge, 5=Discharge, 6=Standby). U16. |
+| **`0x07D4`** (2004) | **FC 0x04** (Input) | A1 (`运行信息04`, R165), B (§4), C | Presente (Vbat=520 -> 52.0 V) | Nessun frame bus reale | Media | **`PROVISIONAL`** | Battery Voltage (U16, scale 0.1 V). |
+| **`0x07D5`** (2005) | **FC 0x04** (Input) | A1 (`运行信息04`, R166), B (§4), C | Presente (Ibat=-60 -> -0.60 A) | Nessun frame bus reale | Media | **`PROVISIONAL`** | Battery Current (S16, scale 0.01 A, positivo=scarica, negativo=carica). |
+| **`0x07D8`** (2008) | **FC 0x04** (Input) | A1 (`运行信息04`, R168), B (§4), C | Presente (Pbat=-200 W) | Nessun frame bus reale | Media | **`PROVISIONAL`** | Battery Power (S32 high/low in R168, o S16 word). Convenzione di segno da validare post-G2. |
+| **`0x022A`** (554) | **FC 0x04** (Input) | A1 (`运行信息04`), B (§4), C | Presente (Ppv_total=1200 W) | Nessun frame bus reale | Media | **`PROVISIONAL`** | Total PV DC Power (U16, scale 1 W). |
+| **`0x022D`** (557) | **FC 0x04** (Input) | A1 (`运行信息04`, R70), B (§4) | Presente (Ppv1=800 W) | Nessun frame bus reale | Media | **`PROVISIONAL`** | PV String 1 Power (U16, scale 1 W). |
+| **`0x0230`** (560) | **FC 0x04** (Input) | A1 (`运行信息04`, R73), B (§4) | Presente (Ppv2=0 W) | Nessun frame bus reale | Media | **`PROVISIONAL`** | PV String 2 Power (U16, scale 1 W). |
+| **`0x0228`** (552) | **FC 0x04** (Input) | A1 (`运行信息04`, R68), C | Presente (Vpv1=346.8 V) | Nessun frame bus reale | Media | **`PROVISIONAL`** | PV String 1 Voltage (U16, scale 0.1 V). Offset tabella monofase vs trifase. |
+| **`0x0229`** (553) | **FC 0x04** (Input) | A1 (`运行信息04`, R69), C | Presente (Ipv1=2.5 A) | Nessun frame bus reale | Media | **`PROVISIONAL`** | PV String 1 Current (U16, scale 0.1 A). |
+| **`0x022E`** (558) | **FC 0x04** (Input) | A1 (`运行信息04`, R71), C | Presente (Vpv2=290.0 V) | Nessun frame bus reale | Media | **`PROVISIONAL`** | PV String 2 Voltage (U16, scale 0.1 V). |
+| **`0x022F`** (559) | **FC 0x04** (Input) | A1 (`运行信息04`, R72), C | Presente (Ipv2=1.5 A) | Nessun frame bus reale | Media | **`PROVISIONAL`** | PV String 2 Current (U16, scale 0.1 A). |
+| **`0x0212`** (530) | **FC 0x04** (Input) | A1 (`运行信息04`, R55), B (§4), C | Presente (Grid Power) | Nessun frame bus reale | Media | **`PROVISIONAL`** | Grid Active Power (S16/S32, scale 1 W). Segno import/export da confermare post-G2. |
+| **`0x020B`** (523) | **FC 0x04** (Input) | A1 (`运行信息04`, R51), B (§4), C | Presente (Pinv=100 W) | Nessun frame bus reale | Media | **`PROVISIONAL`** | Inverter Output Active Power (S16, scale 1 W). |
+| **`0x0203`** (515) | **FC 0x04** (Input) | A1 (`运行信息04`, R47) | Presente (Vgrid=231.2 V) | Nessun frame bus reale | Bassa | **`PROVISIONAL`** | Grid AC Voltage (U16, scale 0.1 V). |
+| **`0x0205`** (517) | **FC 0x04** (Input) | A1 (`运行信息04`, R49) | Presente (Freq=50.00 Hz) | Nessun frame bus reale | Bassa | **`PROVISIONAL`** | Grid Frequency (U16, scale 0.01 Hz). |
+| **`0x020C`** (524) | **FC 0x04** (Input) | A1 (`运行信息04`), B (§4) | Presente (Temp=10.0 °C) | Nessun frame bus reale | Bassa | **`PROVISIONAL`** | Inverter Internal Temperature (S16, scale 0.1 °C). |
+| **`0x09C4`** (2500) | FC 0x04 / FC 0x03 | A1 (`运行信息04`, R177) vs A2 (§3.1) | Assente | Nessuna evidenza | Bassa | **`DOCUMENTED_CONFLICTED`** | In A1 (FC04) è `RunState` (0..11). In A2 (FC03/FC06) è `EMS Mode` (5=External EMS). Escluso e bloccato. |
+| **`0x0A08`** (2568) | FC 0x03 / FC 0x10 | A2 (§3.2, External EMS) | Assente | Nessuna evidenza | N/A (escluso) | **`DOCUMENTED_CONTROL_EXCLUDED`** | External Control Type. Escluso dal profilo read-only in Phase 0. Nessun probe consentito. |
+| **`0x0A09`–`0x0A0A`** | FC 0x03 / FC 0x10 | A2 (§3.3, External EMS) | Assente | Nessuna evidenza | N/A (escluso) | **`DOCUMENTED_CONTROL_EXCLUDED`** | Active Power Setpoint (S32). Escluso dal profilo read-only. Nessun probe consentito. |
+| **`0x0BC1`** (3009) | FC 0x03 / FC 0x06 | A1 (`参数读写`, R142), B (§5) | Assente | Nessuna evidenza | N/A (hazard) | **`CONFIGURATION_EXCLUDED`** | `CurrMaxChg` — Scrittura su memoria EEPROM non volatile. PERICOLO WEAR-OUT. Bloccato a vita. |
+| **`0x0BC2`** (3010) | FC 0x03 / FC 0x06 | A1 (`参数读写`, R143), B (§5) | Assente | Nessuna evidenza | N/A (hazard) | **`CONFIGURATION_EXCLUDED`** | `CurrMaxDischg` — Scrittura su memoria EEPROM non volatile. PERICOLO WEAR-OUT. Bloccato a vita. |
 
 ---
 
-## 5. Verification Protocol & Sign Convention Summary
+## 4. Separazione Rigorosa Gate G1 e Gate G2: Piano Operativo M7
 
-1. **Battery SOC (`0x07D2`):** Direct scaling ($1.0 \times \text{raw}$). Expected range: $0 \le \text{SOC} \le 100\%$.
-2. **Battery Power (`0x07D8`):** In Afore hardware, charging is reported as negative. The canonical profile enforces $\text{canonical} = -1 \times \text{raw}$, producing positive values during charge and negative values during discharge.
-3. **Grid Power (`0x0212`):** In canonical Heliograph convention, positive represents grid import (consuming power from the grid), while negative represents grid export (feeding excess solar to the grid). Phase 0 live observation will compare daytime excess solar against smart meter readings to confirm sign alignment.
-4. **Power Balance Invariant:** Across all telemetry snapshots:
-   $$P_{\text{PV}} = P_{\text{Battery\_Charge}} + P_{\text{Inverter\_AC}} + P_{\text{Grid\_Export}} \pm \epsilon$$
-   Tolerance $\epsilon \le 2\%$ of nominal inverter capacity (100 W).
+### 4.1 Rimozione Totale dei Comportamenti Post-G2 da M7
+In conformità alle direttive di sicurezza, **tutti i comportamenti ricorrenti, di loop e di endurance sono stati formalmente rimossi dal perimetro pre-G2/M7**:
+- ❌ **CANCELLATO:** Polling SOC ogni 15 secondi.
+- ❌ **CANCELLATO:** Polling potenze ogni 10 secondi.
+- ❌ **CANCELLATO:** Loop continuativi o schedulati.
+- ❌ **CANCELLATO:** Ritrasmissioni automatiche (retries).
+- ❌ **CANCELLATO:** Test di endurance e prove di carico sul bus.
+
+Tali funzionalità appartengono esclusivamente alla fase **post-G2** (Supervisione Continua e Monitoraggio Ciclico).
+
+### 4.2 Specifica Esatta della Singola Richiesta Bounded One-Shot in M7
+La Milestone M7 è autorizzata ad eseguire **una ed una sola** transazione Modbus RTU per validare la presenza hardware dell'inverter:
+
+- **Target Dispositivo:** Inverter Afore AF5K-SL
+- **Slave ID:** `0x01` (1)
+- **Modbus Function Code:** **`0x04`** (`Read Input Registers`, conforme a Fonte A1 foglio `运行信息04`)
+- **Start Address:** `0x07D2` (2002 decimale, Battery SOC)
+- **Quantity of Registers:** `0x0001` (1 registro = 2 byte)
+- **Frame Trasmesso (TX Payload Esatto, 8 byte inclusivo di CRC16 Modbus):**
+  ```
+  01 04 07 D2 00 01 90 87
+  ```
+  *(Dettaglio: `0x01` Slave, `0x04` FC, `0x07 0xD2` Addr, `0x00 0x01` Count, `0x90` CRC Low, `0x87` CRC High)*
+- **Risposta Attesa (RX Payload Esatto, 7 byte):**
+  ```
+  01 04 02 [VALUE_HI] [VALUE_LO] [CRC_LO] [CRC_HI]
+  ```
+- **Validazione CRC:** Calcolo obbligatorio del CRC-16 Modbus (polinomio `0xA001`, init `0xFFFF`). Se il CRC non coincide, il pacchetto viene scartato istantaneamente.
+- **Timeout Transazione:** **<= 1000 ms**. Trascorso 1 secondo senza risposta completa, la transazione viene abortita.
+- **Politica di Errore:** **Abort Immediato (Zero Retries).** Nessun tentativo ripetuto o iterativo.
+- **Verifica Lockout Scritture:**
+  - Controllo pre-trasmissione: interrogazione del `ReadOnlyGuard` a livello 3 per verificare che la trasmissione sia esclusivamente FC04 e non broadcast (`slave != 0`).
+  - Controllo post-ricezione: verifica che nessun byte di scrittura sia mai transitato sul bus.
+
+---
+
+## 5. Regole di Convivenza Bus RS485 & Solarman Stick
+
+1. **Assenza di Conflitti:** Esecuzione di una singola query one-shot con gap di silenzio minimo `t_gap >= 200 ms` pre e post esecuzione.
+2. **Formato Seriale:** 9600 baud, 8 bit dati, nessuna parità (`parity = "none"`), 1 stop bit (`stop_bits = 1`).
+3. **Trip Counter di Sicurezza:** In caso di errore o timeout sulla singola lettura, il runner si arresta immediatamente senza tentare ulteriori operazioni.
+
+---
+
+## 6. Riepilogo Evidenze Pre-G1
+
+- [x] Conflitto FC03/FC04 risolto documentalmente a favore di FC04 (fonte Excel Afore v3.4 foglio `运行信息04`).
+- [x] Profilo `profiles/afore/af5k_sl.toml` allineato a `space = "input"` (FC04).
+- [x] Fixture sintetica `af5k_sl_sample.json` allineata a FC04 / `space: "input"`.
+- [x] Rimozione totale di loop, polling periodico (10s/15s) e prove di endurance da M7.
+- [x] Definizione esatta del frame Modbus one-shot TX `01 04 07 D2 00 01 90 87`.
+- [x] Arresto formale del sistema in attesa della decisione di Gate G1.

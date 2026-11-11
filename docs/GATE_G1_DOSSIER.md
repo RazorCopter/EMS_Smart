@@ -27,12 +27,25 @@ Tutte le componenti sono state verificate al **100% in modalità offline**, senz
 - **Tracciabilità 1:1:** Matrice documentata in [`docs/M4_REQUIREMENTS_AUDIT.md`](M4_REQUIREMENTS_AUDIT.md) per tutti i 59 requisiti approvati.
 - **Test Suite:** 17 scenari CTest implementati in [`test/test_target_aware_ems/test_main.cpp`](../test/test_target_aware_ems/test_main.cpp) con esito **17/17 PASS**.
 
-### Verifica 2: Risoluzione Discrepanze Registri (0x07D2 SOC)
-- **Riconciliazione Documentale:**
-  - Valore 27% (`0x001B`): emerso durante note preliminari qualitative di setup da dashboard, **nessun frame binario hardware esiste nel repository**.
-  - Valore 80% (`0x0050`): presente in [`test/test_afore/fixtures/af5k_sl_sample.json`](../test/test_afore/fixtures/af5k_sl_sample.json), formalmente dichiarata come *"synthetic test fixture for Phase 0 validation"*.
-- **Classificazione Corretta:** Riclassificato da improprio `VERIFIED_EMPIRICALLY` a rigoroso **`PROVISIONAL_FIXTURE_VERIFIED`** in [`docs/AFORE_REGISTER_PROVENANCE.md`](AFORE_REGISTER_PROVENANCE.md), [`docs/GAP_ASSESSMENT.md`](GAP_ASSESSMENT.md) e [`docs/PHASE0_PROGRESS_REPORT.md`](PHASE0_PROGRESS_REPORT.md).
-- **Probe Plan Phase 0 Confermato:** Solo query FC03 a singolo registro su `0x07D2` dopo G1/G2, inter-frame gap >= 200 ms, timeout 1000 ms, zero retry, stop al 3° errore. Registri pericolosi o EEPROM (`0x0BC1`, `0x0BC2`, `0x0A08`) rigorosamente esclusi.
+### Verifica 2: Risoluzione Conflitto FC03/FC04 e Discrepanze Registri (0x07D2 SOC)
+- **Risoluzione Documentale del Function Code (FC03 vs FC04):**
+  - L'audit riga per riga del documento ufficiale Afore v3.4 (`艾伏逆变器寄存器参数表（对外）v3.4_20251119_并网机和储能机分类(2).xlsx`) certifica che il registro dinamico `0x07D2` (2002 decimale, `电池电量（SOC）`) risiede al rigo 163 del foglio **`运行信息04`** ed è codificato come **Function Code 04 (Read Input Registers)**.
+  - Nessuna inferenza generica a FC03 è ammessa. Il profilo [`profiles/afore/af5k_sl.toml`](../profiles/afore/af5k_sl.toml), la fixture sintetica e la documentazione di provenienza sono stati tutti allineati su **FC 0x04** (`space = "input"`).
+- **Riconciliazione Valori SOC (27% vs 80%):**
+  - Valore 27% (`0x001B`): lettura qualitativa da interfaccia cloud Solarman, **nessun frame binario seriale reale è mai stato archiviato**.
+  - Valore 80% (`0x0050`): presente nella fixture sintetica [`test/test_afore/fixtures/af5k_sl_sample.json`](../test/test_afore/fixtures/af5k_sl_sample.json).
+  - Classificazione formale: **`PROVISIONAL_FIXTURE_VERIFIED`** in [`docs/AFORE_REGISTER_PROVENANCE.md`](AFORE_REGISTER_PROVENANCE.md) con tabella a 7 colonne per tutti i registri.
+- **Separazione Rigorosa G1 / G2 e Piano Operativo M7:**
+  - **Eliminati da M7:** Polling periodico SOC ogni 15s, polling potenze ogni 10s, loop ricorrenti, ritrasmissioni automatiche ed endurance (interamente posticipati a post-G2).
+  - **Unico Probe M7 Bounded One-Shot autorizzato:**
+    * Target: Inverter Afore AF5K-SL, Slave ID: 1
+    * Modbus Function: **FC 0x04** (Read Input Registers)
+    * Start Address: `0x07D2` (2002), Quantità: 1 registro
+    * Frame TX esatto (8 byte): `01 04 07 D2 00 01 90 87`
+    * Risposta attesa: 7 byte esatti (`01 04 02 [val_hi] [val_lo] [crc_lo] [crc_hi]`)
+    * Validazione CRC-16 Modbus obbligatoria
+    * Timeout <= 1000 ms, zero retry, interruzione immediata su errore
+    * Lockout scritture verificato con ReadOnlyGuard prima e dopo la richiesta.
 
 ### Verifica 3: Audit Dati Storici Home Assistant (M5 Replay)
 - **Stato Dati Reali:** Confermato che nel workspace locale non risiedono dump CSV/database reali della produzione HA per il periodo 29/10–09/11. Nessun dato reale è stato falsificato o inventato.
@@ -45,11 +58,36 @@ Tutte le componenti sono state verificate al **100% in modalità offline**, senz
 - **Trasparenza Hardware:** Poiché il container di sviluppo non include il cross-compiler ARM64 (`NO_AARCH64_CROSS`), l'esecuzione su silicio Raspberry Pi nativo (Debian 13 trixie aarch64 / GCC 14.2.0) è registrata come **Verifica Pendente Pre-Esecuzione Fisica**.
 - **Automazione:** Script one-liner creato in [`scripts/verify_arm64.sh`](../scripts/verify_arm64.sh). Documentazione completa in [`docs/ARM64_PORTABILITY_ASSESSMENT.md`](ARM64_PORTABILITY_ASSESSMENT.md).
 
-### Verifica 5: Audit di Sicurezza e Confini Read-Only
-- **Livello Read-Only:** Livello 3 attivo e incondizionato sotto macro `AFORE_SHADOW_BUILD=ON` in [`src/transport/readonly_guard.cpp`](../src/transport/readonly_guard.cpp).
-- **Filtro Scritture:** FC06, FC16, broadcast slave ID 0 categoricamente rifiutati con 0 byte trasmessi.
-- **Profili TOML:** [`profiles/afore_af5k_sl.toml`](../profiles/afore_af5k_sl.toml) non contiene registri di scrittura, né mapping per EEPROM.
-- **Rapporto di Audit:** Certificato in [`docs/SECURITY_AUDIT_REPORT.md`](SECURITY_AUDIT_REPORT.md).
+### Verifica 5: Audit di Sicurezza e Confini ReadOnlyGuard Completi
+- **Politica di Autorizzazione Rigorosa (Allowlist Stretta):**
+  Il runtime e il guard `ReadOnlyGuard` sotto `AFORE_SHADOW_BUILD=ON` consentono unicamente ed esclusivamente:
+  - **FC 0x03** (Read Holding Registers);
+  - **FC 0x04** (Read Input Registers).
+- **Blocco Tassativo e Verificato da Test Automatizzati (Matrice Test Host A-Y):**
+  Il guard analizza semanticamente il frame Modbus RTU prima di qualsiasi scrittura su filo seriale ed intercetta con `0 byte trasmessi`:
+  - **FC 0x01** (Read Coils) -> BLOCKED (`FUNCTION_NOT_ALLOWED`, Test C);
+  - **FC 0x02** (Read Discrete Inputs) -> BLOCKED (`FUNCTION_NOT_ALLOWED`, Test D);
+  - **FC 0x05** (Write Single Coil) -> BLOCKED (`FUNCTION_NOT_ALLOWED`, Test E);
+  - **FC 0x06** (Write Single Register) -> BLOCKED (`FUNCTION_NOT_ALLOWED`, Test F);
+  - **FC 0x0F** (Write Multiple Coils) -> BLOCKED (`FUNCTION_NOT_ALLOWED`, Test G);
+  - **FC 0x10** (Write Multiple Registers) -> BLOCKED (`FUNCTION_NOT_ALLOWED`, Test H);
+  - **FC 0x17** (Read/Write Multiple Registers) -> BLOCKED (`FUNCTION_NOT_ALLOWED`, Test I);
+  - **Function Codes sconosciuti** (es. `0x99`) -> BLOCKED (`FUNCTION_NOT_ALLOWED`, Test J);
+  - **Slave 0 (Broadcast Modbus)** -> BLOCKED (`BROADCAST_NOT_ALLOWED`, Test N);
+  - **Slave ID non corrispondente** -> BLOCKED (`SLAVE_NOT_ALLOWED`, Test O);
+  - **Frame vuoti (`len == 0`)** -> BLOCKED (`EMPTY_FRAME`, Test K);
+  - **Frame corti (`len < 8`)** -> BLOCKED (`SHORT_FRAME`, Test L);
+  - **Frame con byte spuri / trailing bytes (`len != 8`)** -> BLOCKED (`INVALID_LENGTH`, Test R);
+  - **CRC-16 Modbus non valido** -> BLOCKED (`INVALID_CRC`, Test M);
+  - **CRC byte order errato** -> BLOCKED (`INVALID_CRC`, Test Y);
+  - **Quantità zero (`quantity == 0`)** -> BLOCKED (`QUANTITY_ZERO`, Test P);
+  - **Quantità fuori limite Modbus RTU (`quantity > 125`)** -> BLOCKED (`QUANTITY_OUT_OF_RANGE`, Test Q);
+  - **Overflow spazio indirizzi (`start_address + quantity > 0x10000`)** -> BLOCKED (`ADDRESS_OUT_OF_RANGE`, Test T).
+- **Immutabilità Compile-Time (Negative Compile Test Superato):**
+  Sotto `-DAFORE_SHADOW_BUILD=1`, il metodo `setForceReadOnly()` non è presente nella classe (racchiuso in `#if !defined(AFORE_SHADOW_BUILD)`). Qualsiasi tentativo di compilare codice che tenti di disattivare il guard fallisce tassativamente a compile-time (verificato via script ed esecuzione del compilatore GCC).
+- **Profili TOML & Assenza Rischi EEPROM:**
+  [`profiles/afore/af5k_sl.toml`](../profiles/afore/af5k_sl.toml) non espone alcuna capability di scrittura (`write.none()`). Registri di controllo esterno e registri su EEPROM (`0x0BC1`, `0x0BC2`) sono completamente omessi.
+- **Rapporto di Audit Completo:** Certificato in [`docs/SECURITY_AUDIT_REPORT.md`](SECURITY_AUDIT_REPORT.md).
 
 ---
 

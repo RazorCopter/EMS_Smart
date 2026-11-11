@@ -4,13 +4,13 @@
 #
 #   A. Afore official documentation:
 #      - Doc/外部Ems调度 - En_240312.docx (External EMS Modbus Protocol Specification)
-#      - Doc/艾伏逆变器寄存器参数表（対外）v3.4_20251119_並網機和儲能機分類(2).xlsx
+#      - Doc/艾伏逆变器寄存器参数表（对外）v3.4_20251119_并网机和储能机分类(2).xlsx (Sheet '运行信息04' -> FC04)
 #   B. Doc/Afore_Autonomous_EMS_V4_Roadmap.md Section 4 — Telemetry registers validated against
 #      operational Solarman integration deployment
 #   C. Solarman Home Assistant integration: afore_AF5K-Sl.yaml (production baseline)
 #
 # FORMAL PROVENANCE STATUS per M6 milestone (see docs/AFORE_REGISTER_PROVENANCE.md):
-#   - VERIFIED_EMPIRICALLY: Solely 0x07D2 (Battery SOC = 80% in af5k_sl_sample.json).
+#   - PROVISIONAL_FIXTURE_VERIFIED: 0x07D2 (Battery SOC = 80% in af5k_sl_sample.json synthetic fixture, FC04).
 #   - PROVISIONAL: All telemetry registers documented across A1/A2/B/C pending live hardware confirmation.
 #   - DOCUMENTED_CONFLICTED: 0x09C4 (EMS Mode vs Inverter Running Status).
 #   - DOCUMENTED_CONTROL_EXCLUDED: 0x0A08, 0x0A09-0x0A0A (External EMS control path dormant).
@@ -22,7 +22,8 @@
 #   - Sign conventions: Battery power (0x07D8) and grid power (0x0212) require Phase 0 validation
 #     through full charge/discharge and import/export observation cycles.
 #
-# Function code 3 (holding registers) throughout. Device address factory default 1 (to confirm).
+# Function code 04 (read input registers) for dynamic telemetry per official vendor sheet
+# '运行信息04'. Device address factory default 1 (to confirm).
 # Expected serial: 9600 8N1 (validate via passive capture before querying).
 
 [profile]
@@ -49,17 +50,17 @@ stop_bits = 1
 # ------------------------------------------------------------------------------------------
 
 [[block]]
-space = "holding"
+space = "input"
 start = 512                       # 0x0200–0x0212 (19 regs): Inverter status, temperature, output power, grid
 count = 19
 
 [[block]]
-space = "holding"
+space = "input"
 start = 552                       # 0x0228–0x0230 (9 regs): PV1/PV2 voltage, current, power
 count = 9
 
 [[block]]
-space = "holding"
+space = "input"
 start = 2000                      # 0x07D0–0x07D8 (9 regs): Battery state, SOC, voltage, current, power
 count = 9
 
@@ -67,42 +68,41 @@ count = 9
 # PV Telemetry — String Power
 # ------------------------------------------------------------------------------------------
 
-[[register]]                      # VERIFIED (B, C): Roadmap §4, Solarman YAML
+[[register]]                      # VERIFIED (A, B, C): Official docs + Solarman + Roadmap
 measurement = "dc.power.total"
 display_name = "Total PV Power"
-space = "holding"
+space = "input"
 address = 554                     # 0x022A
 type = "u16"
 scale = 1
 unit = "W"
 
-[[register]]                      # VERIFIED (B): Roadmap §4 explicit
+[[register]]                      # VERIFIED (B, C): Roadmap §4 + Solarman
 measurement = "dc.mppt_1.power"
 display_name = "PV1 Power"
-space = "holding"
+space = "input"
 address = 557                     # 0x022D
 type = "u16"
 scale = 1
 unit = "W"
 
-[[register]]                      # VERIFIED (B): Roadmap §4 explicit
+[[register]]                      # VERIFIED (B, C): Roadmap §4 + Solarman
 measurement = "dc.mppt_2.power"
 display_name = "PV2 Power"
-space = "holding"
+space = "input"
 address = 560                     # 0x0230
 type = "u16"
 scale = 1
 unit = "W"
 
 # ------------------------------------------------------------------------------------------
-# PV Telemetry — String Voltage and Current
-# Phase 0 note: These are UNVERIFIED. Vendor table lists offsets but cross-check needed.
+# PV Telemetry — Voltage and Current (UNVERIFIED)
 # ------------------------------------------------------------------------------------------
 
 [[register]]                      # UNVERIFIED: Vendor table offset; confirm via inverter display
 measurement = "dc.mppt_1.voltage"
 display_name = "PV1 Voltage"
-space = "holding"
+space = "input"
 address = 552                     # 0x0228
 type = "u16"
 scale = 0.1
@@ -111,7 +111,7 @@ unit = "V"
 [[register]]                      # UNVERIFIED: Adjacent to voltage; scale 0.1A assumed
 measurement = "dc.mppt_1.current"
 display_name = "PV1 Current"
-space = "holding"
+space = "input"
 address = 553                     # 0x0229
 type = "u16"
 scale = 0.1
@@ -120,7 +120,7 @@ unit = "A"
 [[register]]                      # UNVERIFIED: Vendor table offset; confirm via inverter display
 measurement = "dc.mppt_2.voltage"
 display_name = "PV2 Voltage"
-space = "holding"
+space = "input"
 address = 558                     # 0x022E
 type = "u16"
 scale = 0.1
@@ -129,7 +129,7 @@ unit = "V"
 [[register]]                      # UNVERIFIED: Adjacent to voltage; scale 0.1A assumed
 measurement = "dc.mppt_2.current"
 display_name = "PV2 Current"
-space = "holding"
+space = "input"
 address = 559                     # 0x022F
 type = "u16"
 scale = 0.1
@@ -145,7 +145,7 @@ unit = "A"
 [[register]]                      # VERIFIED (A, B, C): Official docs + Solarman + Roadmap
 measurement = "battery.soc"
 display_name = "Battery State of Charge"
-space = "holding"
+space = "input"
 address = 2002                    # 0x07D2
 type = "u16"
 scale = 1
@@ -154,7 +154,7 @@ unit = "%"
 [[register]]                      # VERIFIED (B, C): Roadmap + Solarman
 measurement = "battery.voltage"
 display_name = "Battery Voltage"
-space = "holding"
+space = "input"
 address = 2004                    # 0x07D4
 type = "u16"
 scale = 0.1
@@ -163,7 +163,7 @@ unit = "V"
 [[register]]                      # VERIFIED (B, C): Roadmap + Solarman; SIGN TO CONFIRM in Phase 0
 measurement = "battery.current"
 display_name = "Battery Current"
-space = "holding"
+space = "input"
 address = 2005                    # 0x07D5
 type = "s16"
 scale = 0.01
@@ -175,10 +175,10 @@ unit = "A"
 [[register]]                      # VERIFIED (B, C): Roadmap §4 "Negativo osservato in carica"; scale = -1 corrects
 measurement = "battery.power"
 display_name = "Battery Power"
-space = "holding"
+space = "input"
 address = 2008                    # 0x07D8
 type = "s16"
-scale = -1                        # SIGN FLIP: Afore convention opposite of canonical
+scale = -1                        # Inverts Afore sign: positive = charging, negative = discharging
 unit = "W"
 
 # Battery state enum: 4 = Charge, 5 = Discharge, 6 = Standby per Roadmap §4.
@@ -186,23 +186,25 @@ unit = "W"
 # [[register]]                    # VERIFIED (B): Roadmap §4 enum values documented
 # measurement = "battery.state"   # TODO: Check if canonical measurement exists for enum state
 # display_name = "Battery Running State"
-# space = "holding"
+# space = "input"
 # address = 2000                  # 0x07D0
 # type = "u16"
 # unit = ""
 # # Enum values: 4=Charge, 5=Discharge, 6=Standby
-# # Note: Not mapped yet; awaiting enum measurement support in canonical vocabulary
+# # Note: Not mapped in Phase 0 until canonical measurement defined; read via block 3
 
 # ------------------------------------------------------------------------------------------
-# Grid and Inverter Output
-# CRITICAL: Grid power (0x0212) sign convention MUST BE VALIDATED in Phase 0.
-# Canonical: positive = import, negative = export. Confirm via known import/export states.
+# Grid Telemetry — Power and Flow Direction
+# CRITICAL: Phase 0 MUST validate whether 0x0212 is import=positive or export=positive.
+# Roadmap §4: "W negativi in esportazione, positivi in importazione".
+# Canonical grid.power: positive = import from grid, negative = export to grid.
+# If Afore matches canonical, scale = 1. If inverted, scale = -1.
 # ------------------------------------------------------------------------------------------
 
 [[register]]                      # VERIFIED (B, C): Roadmap + Solarman; SIGN TO CONFIRM in Phase 0
 measurement = "grid.power"
 display_name = "Grid Power"
-space = "holding"
+space = "input"
 address = 530                     # 0x0212
 type = "s16"
 scale = 1                         # Sign convention: positive = import, negative = export (TO VERIFY)
@@ -211,7 +213,7 @@ unit = "W"
 [[register]]                      # VERIFIED (B, C): Roadmap + Solarman
 measurement = "ac.power.total"
 display_name = "Inverter Output Power"
-space = "holding"
+space = "input"
 address = 523                     # 0x020B
 type = "s16"
 scale = 1
@@ -225,7 +227,7 @@ unit = "W"
 [[register]]                      # UNVERIFIED: Typical grid voltage register; confirm via multimeter
 measurement = "ac.phase_l1.voltage"
 display_name = "Grid Voltage"
-space = "holding"
+space = "input"
 address = 515                     # 0x0203
 type = "u16"
 scale = 0.1
@@ -234,7 +236,7 @@ unit = "V"
 [[register]]                      # UNVERIFIED: Standard frequency register; confirm 50.00 Hz nominal
 measurement = "ac.frequency"
 display_name = "Grid Frequency"
-space = "holding"
+space = "input"
 address = 517                     # 0x0205
 type = "u16"
 scale = 0.01
@@ -250,7 +252,7 @@ unit = "Hz"
 # [[register]]                    # UNVERIFIED: Running status; enum values firmware-dependent
 # measurement = "inverter.status" # TODO: Check canonical measurement for status enum
 # display_name = "Inverter Running Status"
-# space = "holding"
+# space = "input"
 # address = 512                   # 0x0200
 # type = "u16"
 # unit = ""
@@ -259,7 +261,7 @@ unit = "Hz"
 [[register]]                      # UNVERIFIED: Sensor location and scale to confirm
 measurement = "inverter.temperature"
 display_name = "Inverter Temperature"
-space = "holding"
+space = "input"
 address = 524                     # 0x020C
 type = "s16"
 scale = 0.1
@@ -274,10 +276,7 @@ unit = "°C"
 #   0x09C4 (2500)       EMS Mode — Configuration register (5 = External EMS)
 #   0x0A08 (2568)       External Control Type — 0=battery power, 1=inverter power
 #   0x0A09–0x0A0A       Active Power Setpoint — Signed 32-bit watts, requires FC10
-#   0x0BC1 (3009)       Max Charge Current (CurrMaxChg) — EEPROM HAZARD, STRICTLY FORBIDDEN
+#   0x0BC1 (3009)       Max Charge Current (CurrMaxChg) — EEPROM HAZARD
+#   0x0BC2 (3010)       Max Discharge Current (CurrMaxDischg) — EEPROM HAZARD
 #
-# Zero [[write]] blocks declared. Profile exposes write.none() capability bitset.
-# External EMS control path will be added ONLY in Phase 6 after shadow mode validation.
-#
-# EEPROM Protection Rule: Register 0x0BC1 must NEVER appear in any write path. Legacy
-# automation V3.3 disabled due to wear risk from periodic writes to non-volatile storage.
+# DO NOT ADD [[write]] blocks for these registers in Phase 0.

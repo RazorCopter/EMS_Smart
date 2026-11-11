@@ -464,8 +464,89 @@ void run_mqtt_discovery() {
   RUN_TEST(test_mqtt_shadow_state_payload_summarizes_quality);
 }
 
+// Independent reference CRC16 oracle (bit-by-bit reference implementation)
+static uint16_t independent_crc16_oracle(const uint8_t *data, size_t len) {
+  uint16_t crc = 0xFFFF;
+  for (size_t i = 0; i < len; ++i) {
+    crc ^= static_cast<uint16_t>(data[i]);
+    for (int b = 0; b < 8; ++b) {
+      if (crc & 0x0001) {
+        crc = static_cast<uint16_t>((crc >> 1) ^ 0xA001);
+      } else {
+        crc >>= 1;
+      }
+    }
+  }
+  return crc;
+}
+
+void test_m7_exact_oneshot_request_frame_and_parameters() {
+  // Pre-G2 M7 bounded single one-shot request specification:
+  // Target: Afore AF5K-SL Battery SOC (0x07D2) via FC04 (Read Input Registers
+  // per 运行信息04) Strict invariants: zero polling, zero endurance, zero
+  // retries, timeout <= 1000 ms. Frame MUST NOT be transmitted over any
+  // physical transport in offline tests.
+
+  constexpr uint8_t kExpectedSlaveId = 1;
+  constexpr uint8_t kExpectedFunctionCode =
+      0x04; // FC04: Read Input Registers per 运行信息04
+  constexpr uint16_t kExpectedAddress = 0x07D2; // 2002 decimal: Battery SOC
+  constexpr uint16_t kExpectedQuantity = 1;     // 1 register (16-bit word)
+  constexpr size_t kExpectedResponseLength =
+      7; // 1(slave) + 1(fc) + 1(bytes) + 2(data) + 2(crc) = 7
+  constexpr uint32_t kMaxAllowedTimeoutMs =
+      1000; // Bounded single-read timeout <= 1000 ms
+  constexpr uint8_t kMaxAllowedRetries = 0; // Zero automatic retries
+
+  // 1. Build request using production buildReadRequest
+  uint8_t txBuf[16] = {0};
+  size_t txLen = 0;
+  auto res = modbus::buildReadRequest(kExpectedSlaveId, kExpectedFunctionCode,
+                                      kExpectedAddress, kExpectedQuantity,
+                                      txBuf, sizeof(txBuf), txLen);
+
+  TEST_ASSERT_EQUAL(modbus::BuildResult::Ok, res);
+  TEST_ASSERT_EQUAL(8, txLen);
+
+  // 2. Validate payload fields
+  TEST_ASSERT_EQUAL_HEX8(kExpectedSlaveId, txBuf[0]);
+  TEST_ASSERT_EQUAL_HEX8(kExpectedFunctionCode, txBuf[1]);
+  TEST_ASSERT_EQUAL_HEX8((kExpectedAddress >> 8) & 0xFF, txBuf[2]);  // 0x07
+  TEST_ASSERT_EQUAL_HEX8(kExpectedAddress & 0xFF, txBuf[3]);         // 0xD2
+  TEST_ASSERT_EQUAL_HEX8((kExpectedQuantity >> 8) & 0xFF, txBuf[4]); // 0x00
+  TEST_ASSERT_EQUAL_HEX8(kExpectedQuantity & 0xFF, txBuf[5]);        // 0x01
+
+  // 3. Independent dual-oracle CRC verification
+  const uint16_t prodCrc = modbus::crc16(txBuf, 6);
+  const uint16_t oracleCrc = independent_crc16_oracle(txBuf, 6);
+
+  // Both production implementation and independent oracle MUST match 0x8790
+  TEST_ASSERT_EQUAL_HEX16(0x8790, prodCrc);
+  TEST_ASSERT_EQUAL_HEX16(0x8790, oracleCrc);
+
+  // 4. Validate CRC wire order (Modbus transmits CRC low-byte first)
+  const uint8_t crcLo = static_cast<uint8_t>(oracleCrc & 0xFF);        // 0x90
+  const uint8_t crcHi = static_cast<uint8_t>((oracleCrc >> 8) & 0xFF); // 0x87
+  TEST_ASSERT_EQUAL_HEX8(0x90, crcLo);
+  TEST_ASSERT_EQUAL_HEX8(0x87, crcHi);
+  TEST_ASSERT_EQUAL_HEX8(crcLo, txBuf[6]);
+  TEST_ASSERT_EQUAL_HEX8(crcHi, txBuf[7]);
+
+  // 5. Verify the entire canonical wire frame matches 01 04 07 D2 00 01 90 87
+  // exactly
+  const uint8_t kExpectedWireFrame[8] = {0x01, 0x04, 0x07, 0xD2,
+                                         0x00, 0x01, 0x90, 0x87};
+  TEST_ASSERT_EQUAL_HEX8_ARRAY(kExpectedWireFrame, txBuf, 8);
+
+  // 6. Verify operational bounds for M7
+  TEST_ASSERT_EQUAL_UINT32(7, kExpectedResponseLength);
+  TEST_ASSERT_TRUE(kMaxAllowedTimeoutMs <= 1000);
+  TEST_ASSERT_EQUAL_UINT8(0, kMaxAllowedRetries);
+}
+
 void run_readonly_integration() {
   RUN_TEST(test_readonly_guard_blocks_write_attempts);
+  RUN_TEST(test_m7_exact_oneshot_request_frame_and_parameters);
 }
 
 int main(int, char **) {

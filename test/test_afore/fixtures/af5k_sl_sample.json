@@ -12,13 +12,13 @@
         "baud": 9600,
         "parity": "none",
         "stop_bits": 1,
-        "function_code": 3
+        "function_code": 4
     },
     "registers": {
         "blocks": [
             {
                 "comment": "Block 1: Inverter status, output power, grid power (0x0200-0x0212, 19 regs)",
-                "space": "holding",
+                "space": "input",
                 "start_address": 512,
                 "count": 19,
                 "raw_hex": "0000 000A 00E6 0138 1388 0064 01F4 0000 0000 0000 0000 0000 0064 FF38 0000 0000 0000 0000 03E8",
@@ -46,7 +46,7 @@
             },
             {
                 "comment": "Block 2: PV1/PV2 voltage, current, power (0x0228-0x0230, 9 regs)",
-                "space": "holding",
+                "space": "input",
                 "start_address": 552,
                 "count": 9,
                 "raw_hex": "0D8C 0019 04B0 0B54 000F 0320 0000 0000 0000",
@@ -64,7 +64,7 @@
             },
             {
                 "comment": "Block 3: Battery state, SOC, voltage, current, power (0x07D0-0x07D8, 9 regs)",
-                "space": "holding",
+                "space": "input",
                 "start_address": 2000,
                 "count": 9,
                 "raw_hex": "0004 0000 0050 0208 FFC4 0000 0000 0000 FF38",

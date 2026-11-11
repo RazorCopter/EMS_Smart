@@ -14,15 +14,39 @@ add_compile_options(
     $<$<CONFIG:Release>:-O2>
 )
 
-# Find ArduinoJson (header-only library, should be available via system package or FetchContent)
-# For now, assume it's available via PlatformIO's libdeps or system install
-# TODO: Add proper find_package or FetchContent for ArduinoJson if building standalone
+# Reproducible dependency management (ArduinoJson, Unity)
+# See cmake/dependencies.cmake for pinned versions matching platformio.ini
+include(cmake/dependencies.cmake)
 
 # Include directories
 include_directories(
     ${CMAKE_SOURCE_DIR}/src
     ${CMAKE_SOURCE_DIR}/test
 )
+
+# Device profiles are generated as part of every CMake build, just as they are
+# in PlatformIO. A clean checkout therefore never depends on a manual generator
+# invocation or on a stale generated table.
+find_package(Python3 3.11 REQUIRED COMPONENTS Interpreter)
+file(GLOB_RECURSE DEVICE_PROFILE_INPUTS CONFIGURE_DEPENDS
+    ${CMAKE_SOURCE_DIR}/profiles/*.toml
+)
+set(GENERATED_PROFILES_CPP
+    ${CMAKE_SOURCE_DIR}/src/drivers/modbus_profile/profiles_generated.cpp
+)
+add_custom_command(
+    OUTPUT ${GENERATED_PROFILES_CPP}
+    COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tools/gen_profiles.py
+    DEPENDS
+        ${CMAKE_SOURCE_DIR}/tools/gen_profiles.py
+        ${CMAKE_SOURCE_DIR}/src/device/measurement.h
+        ${CMAKE_SOURCE_DIR}/src/device/command.h
+        ${DEVICE_PROFILE_INPUTS}
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+    COMMENT "Validating and generating Modbus device profiles"
+    VERBATIM
+)
+add_custom_target(generate-profiles DEPENDS ${GENERATED_PROFILES_CPP})
 
 # M2: Conditional compilation for Afore Shadow read-only build
 # When AFORE_SHADOW_BUILD=1, exclude all write-capable sources to enforce
@@ -44,11 +68,42 @@ set(COMMON_SOURCES
     src/config/host_config_backend.cpp
     src/protocols/modbus/modbus_rtu.cpp
     src/protocols/modbus/modbus_client.cpp
+    src/protocols/pmu/pmu_protocol.cpp
+    src/protocols/pmu/pmu_transaction.cpp
+    src/drivers/driver_registry.cpp
+    src/drivers/discovery_engine.cpp
+    src/drivers/modbus_profile/descriptor.cpp
+    src/drivers/modbus_profile/modbus_profile_driver.cpp
+    src/drivers/modbus_profile/profile_tables.cpp
+    ${GENERATED_PROFILES_CPP}
+    src/drivers/modbus_profile/register_dump.cpp
+    src/diagnostics/breadcrumbs.cpp
+    src/diagnostics/bus_tap.cpp
+    src/diagnostics/coredump.cpp
+    src/diagnostics/diagnostics.cpp
+    src/diagnostics/frame_capture.cpp
+    src/diagnostics/logger.cpp
+    src/diagnostics/log_timestamp.cpp
+    src/diagnostics/log_buffer.cpp
+    src/network/ipv4.cpp
+    src/relays/drm.cpp
     src/app/afore_telemetry_engine.cpp
     src/app/afore_v4_mqtt.cpp
     src/ems/shadow_ems_types.cpp
     src/ems/shadow_ems_controller.cpp
 )
+
+# Static check: reject dummy stub implementations
+foreach(SOURCE_FILE ${COMMON_SOURCES})
+    if(SOURCE_FILE MATCHES "net_stubs\\.cpp")
+        message(FATAL_ERROR "COMMON_SOURCES contains net_stubs.cpp - use real implementations from src/network/ipv4.cpp and src/relays/drm.cpp instead")
+    endif()
+endforeach()
+
+# M2: Afore Shadow build option - pass AFORE_SHADOW_BUILD to code if enabled
+# Usage: cmake -DAFORE_SHADOW_BUILD=ON ..
+# Default: OFF (standard build with all capabilities)
+option(AFORE_SHADOW_BUILD "Build Afore Shadow read-only daemon (M2 hardening)" OFF)
 
 # M2: Sources excluded from AFORE_SHADOW_BUILD (write-capable components)
 # These files enable write operations and are physically excluded when building
@@ -57,7 +112,6 @@ if(NOT AFORE_SHADOW_BUILD)
     list(APPEND COMMON_SOURCES
         src/commands/command_dispatcher.cpp
         src/commands/command_queue.cpp
-        src/relays/drm.cpp
         src/relays/relay_controller.cpp
         src/status/boot_button.cpp
         src/status/status_led.cpp
@@ -70,16 +124,9 @@ add_executable(heliograph-daemon
     ${COMMON_SOURCES}
 )
 
-# M2: Afore Shadow build option - pass AFORE_SHADOW_BUILD to code if enabled
-# Usage: cmake -DAFORE_SHADOW_BUILD=ON ..
-# Default: OFF (standard build with all capabilities)
-option(AFORE_SHADOW_BUILD "Build Afore Shadow read-only daemon (M2 hardening)" OFF)
-
+add_dependencies(heliograph-daemon generate-profiles)
 target_compile_definitions(heliograph-daemon PRIVATE
     ENABLE_DRIVER_MODBUS_PROFILE=1
-    ENABLE_DRIVER_SUNSPEC=1
-    ENABLE_DRIVER_SOLARMAX=1
-    ENABLE_DRIVER_MOCK=1
 )
 
 if(AFORE_SHADOW_BUILD)
@@ -87,77 +134,75 @@ if(AFORE_SHADOW_BUILD)
     message(STATUS "M2: Building Afore Shadow read-only daemon (write sources excluded)")
 endif()
 
-# Link pthread for std::mutex and std::timed_mutex
-target_link_libraries(heliograph-daemon pthread)
+# Link pthread for std::mutex and std::timed_mutex, and ArduinoJson for JSON parsing
+target_link_libraries(heliograph-daemon PRIVATE pthread ArduinoJson)
 
-# Unit tests executable
-enable_testing()
+if(BUILD_TESTING)
+    enable_testing()
 
-add_executable(heliograph-tests
-    test/host/test_posix_serial.cpp
-    test/host/test_readonly_guard.cpp
-    test/host/test_host_config.cpp
-    ${COMMON_SOURCES}
-)
+    # Each host source owns main(), so each is a separate executable.
+    add_executable(heliograph-tests
+        test/host/test_readonly_guard.cpp
+        src/drivers/mock/mock_driver.cpp
+        ${COMMON_SOURCES}
+    )
+    target_compile_definitions(heliograph-tests PRIVATE
+        ENABLE_DRIVER_MODBUS_PROFILE=1
+        ENABLE_DRIVER_MOCK=1
+    )
+    add_dependencies(heliograph-tests generate-profiles)
+    target_include_directories(heliograph-tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+    target_link_libraries(heliograph-tests PRIVATE pthread ArduinoJson)
+    add_test(NAME readonly-guard-tests COMMAND heliograph-tests)
 
-target_compile_definitions(heliograph-tests PRIVATE
-    ENABLE_DRIVER_MODBUS_PROFILE=1
-    ENABLE_DRIVER_MOCK=1
-    UNITY_INCLUDE_DOUBLE=1
-    UNITY_DOUBLE_PRECISION=1e-12
-)
+    add_executable(test-posix-serial
+        test/host/test_posix_serial.cpp
+        ${COMMON_SOURCES}
+    )
+    add_dependencies(test-posix-serial generate-profiles)
+    target_compile_definitions(test-posix-serial PRIVATE ENABLE_DRIVER_MODBUS_PROFILE=1)
+    target_link_libraries(test-posix-serial PRIVATE pthread ArduinoJson)
+    add_test(NAME posix-serial-tests COMMAND test-posix-serial)
 
-target_link_libraries(heliograph-tests pthread)
+    add_executable(test-host-config
+        test/host/test_host_config.cpp
+        ${COMMON_SOURCES}
+    )
+    add_dependencies(test-host-config generate-profiles)
+    target_compile_definitions(test-host-config PRIVATE ENABLE_DRIVER_MODBUS_PROFILE=1)
+    target_link_libraries(test-host-config PRIVATE pthread ArduinoJson)
+    add_test(NAME host-config-tests COMMAND test-host-config)
 
-add_test(NAME heliograph-unit-tests COMMAND heliograph-tests)
+    # Afore CP3 Telemetry Engine tests
+    add_executable(test-afore-telemetry
+        test/test_afore_telemetry/test_main.cpp
+        ${COMMON_SOURCES}
+    )
+    add_dependencies(test-afore-telemetry generate-profiles)
+    target_compile_definitions(test-afore-telemetry PRIVATE
+        ENABLE_DRIVER_MODBUS_PROFILE=1
+        UNITY_INCLUDE_DOUBLE=1
+        UNITY_DOUBLE_PRECISION=1e-12
+    )
+    target_include_directories(test-afore-telemetry PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+    target_link_libraries(test-afore-telemetry PRIVATE pthread ArduinoJson unity)
+    add_test(NAME afore-telemetry-tests COMMAND test-afore-telemetry)
 
-# Afore AF5K-SL profile tests (Phase 0 CP2)
-add_executable(test-afore
-    test/test_afore/test_main.cpp
-    ${COMMON_SOURCES}
-)
-
-target_compile_definitions(test-afore PRIVATE
-    ENABLE_DRIVER_MODBUS_PROFILE=1
-    UNITY_INCLUDE_DOUBLE=1
-    UNITY_DOUBLE_PRECISION=1e-12
-)
-
-target_link_libraries(test-afore pthread)
-
-add_test(NAME afore-profile-tests COMMAND test-afore)
-
-# Afore CP3 Telemetry Engine tests
-add_executable(test-afore-telemetry
-    test/test_afore_telemetry/test_main.cpp
-    ${COMMON_SOURCES}
-)
-
-target_compile_definitions(test-afore-telemetry PRIVATE
-    ENABLE_DRIVER_MODBUS_PROFILE=1
-    UNITY_INCLUDE_DOUBLE=1
-    UNITY_DOUBLE_PRECISION=1e-12
-)
-
-target_link_libraries(test-afore-telemetry pthread)
-
-add_test(NAME afore-telemetry-tests COMMAND test-afore-telemetry)
-
-# Shadow EMS CP4 tests
-add_executable(test-shadow-ems
-    test/test_shadow_ems/test_main.cpp
-    ${COMMON_SOURCES}
-)
-
-target_compile_definitions(test-shadow-ems PRIVATE
-    ENABLE_DRIVER_MODBUS_PROFILE=1
-    UNITY_INCLUDE_DOUBLE=1
-    UNITY_DOUBLE_PRECISION=1e-12
-)
-
-target_link_libraries(test-shadow-ems pthread)
-
-add_test(NAME shadow-ems-tests COMMAND test-shadow-ems)
+    # Shadow EMS CP4 tests
+    add_executable(test-shadow-ems
+        test/test_shadow_ems/test_main.cpp
+        ${COMMON_SOURCES}
+    )
+    add_dependencies(test-shadow-ems generate-profiles)
+    target_compile_definitions(test-shadow-ems PRIVATE
+        ENABLE_DRIVER_MODBUS_PROFILE=1
+        UNITY_INCLUDE_DOUBLE=1
+        UNITY_DOUBLE_PRECISION=1e-12
+    )
+    target_include_directories(test-shadow-ems PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+    target_link_libraries(test-shadow-ems PRIVATE pthread ArduinoJson unity)
+    add_test(NAME shadow-ems-tests COMMAND test-shadow-ems)
+endif()
 
 # Install targets
 install(TARGETS heliograph-daemon DESTINATION bin)

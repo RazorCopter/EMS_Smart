@@ -1,0 +1,68 @@
+# M3B Development Environment - Ubuntu 24.04 LTS
+# Purpose: Isolated, reproducible build environment for heliograph-daemon
+# Architecture: x86_64
+# Target: Docker Desktop on Windows workstation
+#
+# Usage:
+#   docker build -t afore-m3b-dev:latest -f Dockerfile.m3b-dev .
+#   docker run --rm -v afore-m3b-src:/workspace afore-m3b-dev:latest
+
+FROM ubuntu:24.04
+
+LABEL maintainer="M3B Build Environment"
+LABEL description="Ubuntu 24.04 development container for Afore Shadow Daemon"
+LABEL version="1.0"
+
+# Prevent interactive prompts during package installation
+ENV DEBIAN_FRONTEND=noninteractive
+ENV TZ=UTC
+
+# Install complete development toolchain
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    # Build essentials
+    build-essential \
+    cmake \
+    ninja-build \
+    pkg-config \
+    \
+    # Version control
+    git \
+    ca-certificates \
+    \
+    # Python for build scripts
+    python3 \
+    python3-pip \
+    \
+    # Binary analysis tools
+    binutils \
+    strace \
+    file \
+    \
+    # Clang toolchain (alternative compiler, formatters, analyzers)
+    clang \
+    clang-format \
+    clang-tidy \
+    \
+    # Additional utilities
+    vim \
+    less \
+    curl \
+    wget \
+    && rm -rf /var/lib/apt/lists/*
+
+# Verify toolchain versions
+RUN echo "=== M3B Development Environment ===" && \
+    uname -a && \
+    echo "---" && \
+    g++ --version | head -n1 && \
+    cmake --version | head -n1 && \
+    ninja --version && \
+    python3 --version && \
+    git --version && \
+    echo "==================================="
+
+# Set working directory
+WORKDIR /workspace
+
+# Default command: print environment info
+CMD ["bash", "-c", "echo 'M3B Dev Container Ready' && uname -a && g++ --version | head -n1 && exec bash"]

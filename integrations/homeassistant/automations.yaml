@@ -1,0 +1,33 @@
+# SPDX-License-Identifier: MIT
+# Home Assistant Automation Templates for Afore AF5K-SL
+# Milestone M10: Home Assistant Integration Package
+
+- id: afore_communication_fault_alert
+  alias: "Afore Inverter: Allerta Interruzione Comunicazione RS485"
+  description: "Notifica immediata se il polling engine apre il circuit breaker per fallimenti multipli"
+  trigger:
+    - platform: state
+      entity_id: binary_sensor.afore_polling_circuit_breaker_open
+      to: "on"
+      for:
+        seconds: 10
+  action:
+    - service: persistent_notification.create
+      data:
+        title: "Allarme Bus Afore RS485"
+        message: "Il circuito di polling seriale è entrato in stato OPEN dopo 5 tentativi consecutivi falliti. Verificare cablaggio fisico RS485 o alimentazione inverter."
+
+- id: afore_power_balance_discrepancy_alert
+  alias: "Afore Inverter: Allerta Sbilancio Energetico"
+  description: "Notifica se la discrepanza del bilancio di potenza supera i 250W per più di 1 minuto"
+  trigger:
+    - platform: numeric_state
+      entity_id: sensor.afore_power_balance_discrepancy
+      above: 250
+      for:
+        minutes: 1
+  action:
+    - service: persistent_notification.create
+      data:
+        title: "Allerta Bilancio Potenza Inverter"
+        message: "Rilevata discrepanza nel bilancio delle potenze ({{ states('sensor.afore_power_balance_discrepancy') }} W). Possibile errore di convenzione segni o campionamento asincrono."

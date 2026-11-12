@@ -1,0 +1,89 @@
+# SPDX-License-Identifier: MIT
+# Home Assistant Lovelace Dashboard for Afore AF5K-SL Hybrid Inverter
+# Milestone M10: Lovelace UI Package
+#
+# Import this file as a manual Lovelace dashboard view or copy cards into your dashboard.
+
+title: "Afore Energy Management (Shadow Mode)"
+path: afore-ems
+icon: mdi:solar-power
+cards:
+  # Header: Status overview
+  - type: horizontal-stack
+    cards:
+      - type: entity
+        entity: binary_sensor.afore_power_balance_valid
+        name: "Power Balance"
+        icon: mdi:scale-balance
+      - type: entity
+        entity: binary_sensor.afore_polling_circuit_breaker_open
+        name: "Circuit Breaker"
+        icon: mdi:transit-connection-variant
+      - type: entity
+        entity: sensor.afore_telemetry_success_rate
+        name: "Poll Success Rate"
+        icon: mdi:check-network
+
+  # Power Flow Card
+  - type: custom:power-flow-card-plus
+    title: "Real-time Power Distribution"
+    entities:
+      battery:
+        entity: sensor.afore_battery_power
+        state_of_charge: sensor.afore_battery_soc
+      grid:
+        entity: sensor.afore_grid_power
+      solar:
+        entity: sensor.afore_solar_dc_power_total
+      home:
+        entity: sensor.afore_ac_active_power
+    clickable_entities: true
+    display_zero_lines: true
+    use_new_flow_rate_model: true
+
+  # Battery Gauge & Telemetry Quality
+  - type: vertical-stack
+    cards:
+      - type: gauge
+        entity: sensor.afore_battery_soc
+        name: "Battery State of Charge"
+        unit: "%"
+        min: 0
+        max: 100
+        severity:
+          red: 15
+          yellow: 30
+          green: 60
+        needle: true
+
+      - type: entities
+        title: "Inverter Power Channels"
+        entities:
+          - entity: sensor.afore_solar_dc_power_total
+            name: "PV Total Power"
+          - entity: sensor.afore_mppt_1_power
+            name: "MPPT 1 Power"
+          - entity: sensor.afore_mppt_2_power
+            name: "MPPT 2 Power"
+          - entity: sensor.afore_battery_power
+            name: "Battery Power (Chg - / Dischg +)"
+          - entity: sensor.afore_grid_power
+            name: "Grid Power (Import + / Export -)"
+          - entity: sensor.afore_ac_active_power
+            name: "Inverter AC Output"
+          - entity: sensor.afore_power_balance_discrepancy
+            name: "Balance Discrepancy"
+
+  # Diagnostic & Quality Card
+  - type: entities
+    title: "Telemetry & Communication Quality"
+    show_header_toggle: false
+    entities:
+      - entity: sensor.afore_telemetry_consecutive_errors
+        name: "Consecutive Bus Errors"
+      - entity: sensor.afore_telemetry_success_rate
+        name: "Bus Success Rate"
+      - entity: binary_sensor.afore_polling_circuit_breaker_open
+        name: "RS485 Circuit Status"
+      - entity: sensor.afore_battery_voltage
+        name: "Battery Voltage"

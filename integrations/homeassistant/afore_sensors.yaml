@@ -1,0 +1,165 @@
+# SPDX-License-Identifier: MIT
+# Home Assistant MQTT Sensor Configuration for Afore AF5K-SL Hybrid Inverter
+# Milestone M10: Package di integrazione per Home Assistant
+#
+# Include this file in your configuration.yaml:
+#   mqtt: !include integrations/homeassistant/afore_sensors.yaml
+# (Or merge under the `mqtt:` key)
+
+sensor:
+  # --- Active Power & Control ---
+  - name: "Afore AC Active Power"
+    unique_id: "afore_v4_ac_power_total"
+    state_topic: "heliograph/afore_shadow/telemetry/ac_power_total"
+    value_template: "{{ value_json.value }}"
+    unit_of_measurement: "W"
+    device_class: "power"
+    state_class: "measurement"
+    json_attributes_topic: "heliograph/afore_shadow/telemetry/ac_power_total"
+    json_attributes_template: "{{ {'quality': value_json.quality, 'age_ms': value_json.age_ms} | tojson }}"
+    availability_topic: "heliograph/afore_shadow/availability"
+    device:
+      identifiers: ["heliograph_afore_v4"]
+      name: "Afore AF5K-SL Inverter"
+      manufacturer: "Afore"
+      model: "AF5K-SL (Shadow Mode)"
+
+  - name: "Afore Grid Power"
+    unique_id: "afore_v4_grid_power"
+    state_topic: "heliograph/afore_shadow/telemetry/grid_power"
+    value_template: "{{ value_json.value }}"
+    unit_of_measurement: "W"
+    device_class: "power"
+    state_class: "measurement"
+    json_attributes_topic: "heliograph/afore_shadow/telemetry/grid_power"
+    json_attributes_template: "{{ {'quality': value_json.quality, 'age_ms': value_json.age_ms} | tojson }}"
+    availability_topic: "heliograph/afore_shadow/availability"
+    device:
+      identifiers: ["heliograph_afore_v4"]
+
+  - name: "Afore Solar DC Power Total"
+    unique_id: "afore_v4_dc_power_total"
+    state_topic: "heliograph/afore_shadow/telemetry/dc_power_total"
+    value_template: "{{ value_json.value }}"
+    unit_of_measurement: "W"
+    device_class: "power"
+    state_class: "measurement"
+    json_attributes_topic: "heliograph/afore_shadow/telemetry/dc_power_total"
+    availability_topic: "heliograph/afore_shadow/availability"
+    device:
+      identifiers: ["heliograph_afore_v4"]
+
+  - name: "Afore MPPT 1 Power"
+    unique_id: "afore_v4_dc_mppt1_power"
+    state_topic: "heliograph/afore_shadow/telemetry/dc_mppt1_power"
+    value_template: "{{ value_json.value }}"
+    unit_of_measurement: "W"
+    device_class: "power"
+    state_class: "measurement"
+    availability_topic: "heliograph/afore_shadow/availability"
+    device:
+      identifiers: ["heliograph_afore_v4"]
+
+  - name: "Afore MPPT 2 Power"
+    unique_id: "afore_v4_dc_mppt2_power"
+    state_topic: "heliograph/afore_shadow/telemetry/dc_mppt2_power"
+    value_template: "{{ value_json.value }}"
+    unit_of_measurement: "W"
+    device_class: "power"
+    state_class: "measurement"
+    availability_topic: "heliograph/afore_shadow/availability"
+    device:
+      identifiers: ["heliograph_afore_v4"]
+
+  # --- Battery Storage ---
+  - name: "Afore Battery SOC"
+    unique_id: "afore_v4_battery_soc"
+    state_topic: "heliograph/afore_shadow/telemetry/battery_soc"
+    value_template: "{{ value_json.value }}"
+    unit_of_measurement: "%"
+    device_class: "battery"
+    state_class: "measurement"
+    json_attributes_topic: "heliograph/afore_shadow/telemetry/battery_soc"
+    json_attributes_template: "{{ {'quality': value_json.quality, 'age_ms': value_json.age_ms} | tojson }}"
+    availability_topic: "heliograph/afore_shadow/availability"
+    device:
+      identifiers: ["heliograph_afore_v4"]
+
+  - name: "Afore Battery Power"
+    unique_id: "afore_v4_battery_power"
+    state_topic: "heliograph/afore_shadow/telemetry/battery_power"
+    value_template: "{{ value_json.value }}"
+    unit_of_measurement: "W"
+    device_class: "power"
+    state_class: "measurement"
+    availability_topic: "heliograph/afore_shadow/availability"
+    device:
+      identifiers: ["heliograph_afore_v4"]
+
+  - name: "Afore Battery Voltage"
+    unique_id: "afore_v4_battery_voltage"
+    state_topic: "heliograph/afore_shadow/telemetry/battery_voltage"
+    value_template: "{{ value_json.value }}"
+    unit_of_measurement: "V"
+    device_class: "voltage"
+    state_class: "measurement"
+    availability_topic: "heliograph/afore_shadow/availability"
+    device:
+      identifiers: ["heliograph_afore_v4"]
+
+  # --- Power Balance & Discrepancy (M8) ---
+  - name: "Afore Power Balance Discrepancy"
+    unique_id: "afore_v4_power_balance_discrepancy"
+    state_topic: "heliograph/afore_shadow/power_balance"
+    value_template: "{{ value_json.discrepancy_w }}"
+    unit_of_measurement: "W"
+    device_class: "power"
+    state_class: "measurement"
+    availability_topic: "heliograph/afore_shadow/availability"
+    device:
+      identifiers: ["heliograph_afore_v4"]
+
+  # --- Diagnostics & Health (M9) ---
+  - name: "Afore Telemetry Consecutive Errors"
+    unique_id: "afore_v4_consecutive_errors"
+    state_topic: "heliograph/afore_shadow/diagnostics"
+    value_template: "{{ value_json.consecutive_errors }}"
+    state_class: "measurement"
+    icon: "mdi:alert-circle-outline"
+    availability_topic: "heliograph/afore_shadow/availability"
+    device:
+      identifiers: ["heliograph_afore_v4"]
+
+  - name: "Afore Telemetry Success Rate"
+    unique_id: "afore_v4_success_rate"
+    state_topic: "heliograph/afore_shadow/diagnostics"
+    value_template: "{{ value_json.success_rate | round(1) }}"
+    unit_of_measurement: "%"
+    state_class: "measurement"
+    icon: "mdi:chart-arc"
+    availability_topic: "heliograph/afore_shadow/availability"
+    device:
+      identifiers: ["heliograph_afore_v4"]
+
+binary_sensor:
+  - name: "Afore Power Balance Valid"
+    unique_id: "afore_v4_power_balance_valid"
+    state_topic: "heliograph/afore_shadow/power_balance"
+    value_template: "{{ 'ON' if value_json.is_balanced else 'OFF' }}"
+    device_class: "problem"
+    payload_on: "OFF"
+    payload_off: "ON"
+    availability_topic: "heliograph/afore_shadow/availability"
+    device:
+      identifiers: ["heliograph_afore_v4"]
+
+  - name: "Afore Polling Circuit Breaker Open"
+    unique_id: "afore_v4_circuit_open"
+    state_topic: "heliograph/afore_shadow/diagnostics"
+    value_template: "{{ 'ON' if value_json.circuit_open else 'OFF' }}"
+    device_class: "problem"
+    payload_on: "ON"
+    payload_off: "OFF"
+    availability_topic: "heliograph/afore_shadow/availability"
+    device:
+      identifiers: ["heliograph_afore_v4"]

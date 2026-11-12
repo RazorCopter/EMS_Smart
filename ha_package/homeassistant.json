@@ -1,0 +1,194 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "Home Assistant MQTT Discovery Payloads for Afore AF5K-SL Shadow Mode",
+    "description": "Auto-discovery sensor definitions published by Heliograph firmware in read-only shadow monitoring mode.",
+    "entities": [
+        {
+            "component": "sensor",
+            "object_id": "afore_v4_battery_soc",
+            "discovery_topic": "homeassistant/sensor/afore_v4/battery_soc/config",
+            "payload": {
+                "name": "Battery SoC",
+                "unique_id": "afore_v4_battery_soc",
+                "state_topic": "heliograph/afore_shadow/telemetry",
+                "value_template": "{{ value_json.battery_soc }}",
+                "unit_of_measurement": "%",
+                "device_class": "battery",
+                "state_class": "measurement",
+                "availability_topic": "heliograph/afore_shadow/status",
+                "payload_available": "online",
+                "payload_not_available": "offline",
+                "json_attributes_topic": "heliograph/afore_shadow/telemetry",
+                "json_attributes_template": "{{ {'quality': value_json.quality_battery_soc, 'age_ms': value_json.age_battery_soc_ms} | tojson }}",
+                "device": {
+                    "identifiers": [
+                        "heliograph_afore_v4"
+                    ],
+                    "name": "Afore AF5K-SL Inverter",
+                    "model": "AF5K-SL (Shadow Mode)",
+                    "manufacturer": "Afore",
+                    "sw_version": "1.0.0-shadow-g2"
+                }
+            }
+        },
+        {
+            "component": "sensor",
+            "object_id": "afore_v4_grid_power",
+            "discovery_topic": "homeassistant/sensor/afore_v4/grid_power/config",
+            "payload": {
+                "name": "Grid Power",
+                "unique_id": "afore_v4_grid_power",
+                "state_topic": "heliograph/afore_shadow/telemetry",
+                "value_template": "{{ value_json.grid_power_w }}",
+                "unit_of_measurement": "W",
+                "device_class": "power",
+                "state_class": "measurement",
+                "availability_topic": "heliograph/afore_shadow/status",
+                "payload_available": "online",
+                "payload_not_available": "offline",
+                "device": {
+                    "identifiers": [
+                        "heliograph_afore_v4"
+                    ],
+                    "name": "Afore AF5K-SL Inverter"
+                }
+            }
+        },
+        {
+            "component": "sensor",
+            "object_id": "afore_v4_battery_power",
+            "discovery_topic": "homeassistant/sensor/afore_v4/battery_power/config",
+            "payload": {
+                "name": "Battery Power",
+                "unique_id": "afore_v4_battery_power",
+                "state_topic": "heliograph/afore_shadow/telemetry",
+                "value_template": "{{ value_json.battery_power_w }}",
+                "unit_of_measurement": "W",
+                "device_class": "power",
+                "state_class": "measurement",
+                "availability_topic": "heliograph/afore_shadow/status",
+                "payload_available": "online",
+                "payload_not_available": "offline",
+                "device": {
+                    "identifiers": [
+                        "heliograph_afore_v4"
+                    ],
+                    "name": "Afore AF5K-SL Inverter"
+                }
+            }
+        },
+        {
+            "component": "sensor",
+            "object_id": "afore_v4_pv1_power",
+            "discovery_topic": "homeassistant/sensor/afore_v4/pv1_power/config",
+            "payload": {
+                "name": "PV1 Power",
+                "unique_id": "afore_v4_pv1_power",
+                "state_topic": "heliograph/afore_shadow/telemetry",
+                "value_template": "{{ value_json.pv1_power_w }}",
+                "unit_of_measurement": "W",
+                "device_class": "power",
+                "state_class": "measurement",
+                "availability_topic": "heliograph/afore_shadow/status",
+                "payload_available": "online",
+                "payload_not_available": "offline",
+                "device": {
+                    "identifiers": [
+                        "heliograph_afore_v4"
+                    ],
+                    "name": "Afore AF5K-SL Inverter"
+                }
+            }
+        },
+        {
+            "component": "sensor",
+            "object_id": "afore_v4_pv2_power",
+            "discovery_topic": "homeassistant/sensor/afore_v4/pv2_power/config",
+            "payload": {
+                "name": "PV2 Power",
+                "unique_id": "afore_v4_pv2_power",
+                "state_topic": "heliograph/afore_shadow/telemetry",
+                "value_template": "{{ value_json.pv2_power_w }}",
+                "unit_of_measurement": "W",
+                "device_class": "power",
+                "state_class": "measurement",
+                "availability_topic": "heliograph/afore_shadow/status",
+                "payload_available": "online",
+                "payload_not_available": "offline",
+                "device": {
+                    "identifiers": [
+                        "heliograph_afore_v4"
+                    ],
+                    "name": "Afore AF5K-SL Inverter"
+                }
+            }
+        },
+        {
+            "component": "sensor",
+            "object_id": "afore_v4_inverter_temperature",
+            "discovery_topic": "homeassistant/sensor/afore_v4/inverter_temperature/config",
+            "payload": {
+                "name": "Inverter Temperature",
+                "unique_id": "afore_v4_inverter_temperature",
+                "state_topic": "heliograph/afore_shadow/telemetry",
+                "value_template": "{{ value_json.inverter_temperature_c }}",
+                "unit_of_measurement": "°C",
+                "device_class": "temperature",
+                "state_class": "measurement",
+                "availability_topic": "heliograph/afore_shadow/status",
+                "payload_available": "online",
+                "payload_not_available": "offline",
+                "device": {
+                    "identifiers": [
+                        "heliograph_afore_v4"
+                    ],
+                    "name": "Afore AF5K-SL Inverter"
+                }
+            }
+        },
+        {
+            "component": "sensor",
+            "object_id": "afore_v4_energy_total_yield",
+            "discovery_topic": "homeassistant/sensor/afore_v4/energy_total_yield/config",
+            "payload": {
+                "name": "Total PV Yield",
+                "unique_id": "afore_v4_energy_total_yield",
+                "state_topic": "heliograph/afore_shadow/telemetry",
+                "value_template": "{{ value_json.total_yield_kwh }}",
+                "unit_of_measurement": "kWh",
+                "device_class": "energy",
+                "state_class": "total_increasing",
+                "availability_topic": "heliograph/afore_shadow/status",
+                "payload_available": "online",
+                "payload_not_available": "offline",
+                "device": {
+                    "identifiers": [
+                        "heliograph_afore_v4"
+                    ],
+                    "name": "Afore AF5K-SL Inverter"
+                }
+            }
+        },
+        {
+            "component": "sensor",
+            "object_id": "afore_v4_shadow_quality_summary",
+            "discovery_topic": "homeassistant/sensor/afore_v4/shadow_quality_summary/config",
+            "payload": {
+                "name": "Telemetry Quality Summary",
+                "unique_id": "afore_v4_shadow_quality_summary",
+                "state_topic": "heliograph/afore_shadow/shadow_state",
+                "value_template": "{{ value_json.quality_summary }}",
+                "entity_category": "diagnostic",
+                "availability_topic": "heliograph/afore_shadow/status",
+                "payload_available": "online",
+                "payload_not_available": "offline",
+                "device": {
+                    "identifiers": [
+                        "heliograph_afore_v4"
+                    ],
+                    "name": "Afore AF5K-SL Inverter"
+                }
+            }
+        }
+    ]
+}

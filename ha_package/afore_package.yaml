@@ -1,0 +1,104 @@
+# Home Assistant Package: Afore AF5K-SL Shadow EMS Integration
+# Configuration package for Home Assistant (place in packages/ or include in configuration.yaml)
+#
+# IMPORTANT: Shadow mode is READ-ONLY. No actuation or switch entities are exposed to HA.
+
+homeassistant:
+  customize:
+    sensor.afore_v4_battery_soc:
+      icon: mdi:battery-high
+    sensor.afore_v4_grid_power:
+      icon: mdi:transmission-tower
+    sensor.afore_v4_battery_power:
+      icon: mdi:battery-charging
+    sensor.afore_v4_pv1_power:
+      icon: mdi:solar-panel
+    sensor.afore_v4_pv2_power:
+      icon: mdi:solar-panel-large
+
+template:
+  - sensor:
+      # Grid Import Power (Positive W when importing from grid)
+      - name: "Afore Grid Import Power"
+        unique_id: afore_grid_import_power
+        unit_of_measurement: "W"
+        device_class: power
+        state_class: measurement
+        state: >
+          {% set p = states('sensor.afore_v4_grid_power') | float(0) %}
+          {{ p if p > 0 else 0 }}
+
+      # Grid Export Power (Positive W when feeding into grid)
+      - name: "Afore Grid Export Power"
+        unique_id: afore_grid_export_power
+        unit_of_measurement: "W"
+        device_class: power
+        state_class: measurement
+        state: >
+          {% set p = states('sensor.afore_v4_grid_power') | float(0) %}
+          {{ (-p) if p < 0 else 0 }}
+
+      # Battery Charging Power (Positive W when charging)
+      - name: "Afore Battery Charge Power"
+        unique_id: afore_battery_charge_power
+        unit_of_measurement: "W"
+        device_class: power
+        state_class: measurement
+        state: >
+          {% set p = states('sensor.afore_v4_battery_power') | float(0) %}
+          {{ p if p > 0 else 0 }}
+
+      # Battery Discharging Power (Positive W when discharging to loads/grid)
+      - name: "Afore Battery Discharge Power"
+        unique_id: afore_battery_discharge_power
+        unit_of_measurement: "W"
+        device_class: power
+        state_class: measurement
+        state: >
+          {% set p = states('sensor.afore_v4_battery_power') | float(0) %}
+          {{ (-p) if p < 0 else 0 }}
+
+      # Total PV Power Combined (PV1 + PV2)
+      - name: "Afore Total PV Power"
+        unique_id: afore_total_pv_power
+        unit_of_measurement: "W"
+        device_class: power
+        state_class: measurement
+        state: >
+          {% set pv1 = states('sensor.afore_v4_pv1_power') | float(0) %}
+          {% set pv2 = states('sensor.afore_v4_pv2_power') | float(0) %}
+          {{ (pv1 + pv2) | round(1) }}
+
+# Riemann Sum Integral sensors for Energy Dashboard integration (kWh)
+sensor:
+  - platform: integration
+    source: sensor.afore_grid_import_power
+    name: "Afore Grid Import Energy"
+    unique_id: afore_grid_import_energy
+    unit_prefix: k
+    round: 3
+    method: left
+
+  - platform: integration
+    source: sensor.afore_grid_export_power
+    name: "Afore Grid Export Energy"
+    unique_id: afore_grid_export_energy
+    unit_prefix: k
+    round: 3
+    method: left
+
+  - platform: integration
+    source: sensor.afore_battery_charge_power
+    name: "Afore Battery Charge Energy"
+    unique_id: afore_battery_charge_energy
+    unit_prefix: k
+    round: 3
+    method: left
+
+  - platform: integration
+    source: sensor.afore_battery_discharge_power
+    name: "Afore Battery Discharge Energy"
+    unique_id: afore_battery_discharge_energy
+    unit_prefix: k
+    round: 3
+    method: left

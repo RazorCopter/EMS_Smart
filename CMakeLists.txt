@@ -268,6 +268,14 @@ if(BUILD_TESTING)
     )
     target_include_directories(test-power-balance PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
     add_test(NAME power-balance-tests COMMAND test-power-balance)
+
+    # Secure Provisioning tests
+    add_executable(test-secure-provisioning
+        test/test_secure_provisioning/test_main.cpp
+    )
+    target_include_directories(test-secure-provisioning PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+    target_link_libraries(test-secure-provisioning PRIVATE unity pthread)
+    add_test(NAME secure-provisioning-tests COMMAND test-secure-provisioning)
 endif()
 
 # Install targets

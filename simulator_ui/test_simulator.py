@@ -6,9 +6,12 @@ Verifies register calculation, Modbus frame responses, API state transitions,
 and fault injection scenarios. Pure Python standard library (no external dependencies).
 """
 
+import io
+import json
 import struct
 import unittest
 from server import (
+    SimulatorHttpHandler,
     calculate_modbus_crc,
     get_registers_for_range,
     handle_modbus_rtu_frame,
@@ -112,6 +115,26 @@ class TestAforeSimulator(unittest.TestCase):
 
         regs = get_registers_for_range(512, 19)
         self.assertEqual(regs, [65535] * 19)
+
+    def test_provision_endpoint(self):
+        h = SimulatorHttpHandler.__new__(SimulatorHttpHandler)
+        h.path = "/api/provision"
+        body = json.dumps({
+            "wifi": {"ssid": "SecureSolarAP", "password": "SafePassword123"},
+            "mqtt": {"enabled": True, "host": "192.168.1.100"}
+        }).encode("utf-8")
+        h.headers = {"Content-Length": str(len(body))}
+        h.rfile = io.BytesIO(body)
+        h.wfile = io.BytesIO()
+        h.send_response = lambda code: setattr(h, "resp_code", code)
+        h.send_header = lambda k, v: None
+        h.end_headers = lambda: None
+        h.do_POST()
+        self.assertEqual(h.resp_code, 200)
+        resp = json.loads(h.wfile.getvalue().decode("utf-8"))
+        self.assertEqual(resp["status"], "success")
+        self.assertIn("[REDACTED]", resp["safe_summary"])
+        self.assertNotIn("SafePassword123", str(h.wfile.getvalue()))
 
 if __name__ == "__main__":
     unittest.main()

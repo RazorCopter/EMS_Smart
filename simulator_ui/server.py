@@ -210,6 +210,30 @@ class SimulatorHttpHandler(http.server.SimpleHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(json.dumps({"status": "ok"}).encode("utf-8"))
             return
+        elif self.path == "/api/provision":
+            length = int(self.headers.get("Content-Length", 0))
+            body = self.rfile.read(length).decode("utf-8")
+            data = json.loads(body)
+            # Validate input syntax
+            ssid = data.get("wifi", {}).get("ssid", "")
+            if not ssid or len(ssid) > 32:
+                self.send_response(400)
+                self.send_header("Content-Type", "application/json")
+                self.end_headers()
+                self.wfile.write(json.dumps({"error": "invalid_ssid", "message": "SSID length must be 1-32 chars"}).encode("utf-8"))
+                return
+            # Redact password in echo
+            res = {
+                "status": "success",
+                "message": f"Provisioned WiFi SSID '{ssid}' successfully (dry-run)",
+                "mqtt_enabled": data.get("mqtt", {}).get("enabled", False),
+                "safe_summary": f"SSID: {ssid}, Password: [REDACTED]"
+            }
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(json.dumps(res).encode("utf-8"))
+            return
         self.send_error(404)
 
 def run_servers(http_port=8080, modbus_port=5020):

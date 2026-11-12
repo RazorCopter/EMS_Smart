@@ -2,8 +2,8 @@
 
 **Progetto:** Heliograph / Afore Autonomous EMS  
 **Branch:** `g1-readiness-consolidated`  
-**Data di Emissione:** 2026-11-11  
-**Stato Gate:** **PRONTO PER REVISIONE GOVERNANCE G1 — LAVORO OFFLINE CONCLUSA CON SUCCESSO**  
+**Data di Emissione:** 2026-11-12
+**Stato Gate:** **G1 PRONTO PER REVISIONE GOVERNANCE; G2/G3 NON APERTI**
 **Direttiva di Arresto:** **FORMAL HALT BEFORE MILESTONE M7 (NO PHYSICAL RS485 PROBING PERMITTED)**
 
 ---
@@ -107,7 +107,19 @@ Tutte le componenti sono state verificate al **100% in modalità offline**, senz
 
 ---
 
-## 4. Certificazione di Qualificazione Multi-Piattaforma Pre-G1
+## 4. Matrice onesta dei gate
+
+| Gate | Stato al 2026-11-12 | Evidenza disponibile | Blocco residuo |
+|---|---|---|---|
+| **G1 — offline/read-only** | **Pronto per revisione governance** | Pipeline offline 5/5 PASS, CTest 10/10 PASS, test nativi PlatformIO in esecuzione, compile ARM64 `ELF 64-bit ... ARM aarch64`, build ESP32-S3 e manifest SHA-256 | Approvazione formale governance |
+| **G2 — collegamento fisico read-only** | **BLOCCATO / non iniziato** | Nessun probing RS485 fisico eseguito | Approvazione G1, verifica cablaggio/pinout sul lotto hardware reale, piano di osservazione controllato |
+| **G3 — controllo attivo** | **BLOCCATO / fuori ambito corrente** | Guard read-only e negative compile confermano l'assenza della superficie di disabilitazione | Evidenze hardware G2, analisi rischio separata e approvazione esplicita; nessuna scrittura autorizzata |
+
+La compatibilità ARM64 osservata comprende esecuzione Docker emulata `aarch64` e cross-compilazione del guard read-only. Non equivale ancora a una prova nativa completa su Raspberry Pi fisico; tale verifica resta esplicitamente pendente.
+
+---
+
+## 5. Certificazione di Qualificazione Multi-Piattaforma Pre-G1
 
 ### 4.1 Qualificazione Host Linux x86_64 con ASAN/UBSAN (Dev Container Docker)
 - **Toolchain:** `gcc (Ubuntu 14.2.0-4ubuntu2~24.04) 14.2.0`, `CMake 3.28.3`, `Ninja 1.11.1`.

@@ -25,7 +25,7 @@ Verificare in modo indipendente e categorico che l'intero codebase `afore-autono
   Il core M4 non include header di rete, non include file descrittori seriali, non invoca primitive I/O. L'output `Recommendation` è un oggetto immutabile in memoria contenente unicamente raccomandazioni consultive (`advisory`). `allowDischarge` è forzato a `false`.
 
 ### Livello 2: Profili Dichiarativi TOML
-- **Implementazione:** [`profiles/afore_af5k_sl.toml`](../profiles/afore_af5k_sl.toml).
+- **Implementazione:** [`profiles/afore/af5k_sl.toml`](../profiles/afore/af5k_sl.toml).
 - **Esito Audit:** **CONFORME.**  
   Nessuna sezione `[[write]]` presente. Tutti i punti di telemetria sono configurati con `function_code = 3` o `function_code = 4`. I registri critici EEPROM (`0x0BC1`, `0x0BC2`) e di controllo esterno (`0x0A08`, `0x09C4`) sono categoricamente omessi dalla mappatura.
 

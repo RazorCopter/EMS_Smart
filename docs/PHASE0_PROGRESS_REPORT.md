@@ -344,7 +344,7 @@ Funzioni:
 - `isPublishable()`: quality non Invalid
 
 ##### 2. Afore Telemetry Engine (372 righe)
-**File**: [`src/app/afore_telemetry_engine.{h,cpp}`](../src/app/afore_telemetry_engine.h)
+**File**: [`src/drivers/afore/afore_telemetry_engine.{h,cpp}`](../src/drivers/afore/afore_telemetry_engine.h)
 
 Polling scheduler a cadenza differenziata:
 
@@ -379,7 +379,7 @@ Polling scheduler a cadenza differenziata:
 - Last success/attempt timestamp
 
 ##### 3. MQTT Discovery Afore V4 (259 righe)
-**File**: [`src/app/afore_v4_mqtt.{h,cpp}`](../src/app/afore_v4_mqtt.h)
+**File**: [`src/drivers/afore/afore_v4_mqtt.{h,cpp}`](../src/drivers/afore/afore_v4_mqtt.h)
 
 Home Assistant MQTT Discovery con prefisso `homeassistant/sensor/afore_v4_*`:
 

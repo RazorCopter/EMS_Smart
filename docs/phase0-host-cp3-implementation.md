@@ -28,7 +28,7 @@ Implementare telemetria con qualità (Good/Degraded/Stale/Invalid), polling sche
   - `publishable()`: sample pubblicabile come numero (non Invalid)
 
 ### 2. **Afore Telemetry Engine**
-- **File**: [`src/app/afore_telemetry_engine.{h,cpp}`](../src/app/afore_telemetry_engine.h)
+- **File**: [`src/drivers/afore/afore_telemetry_engine.{h,cpp}`](../src/drivers/afore/afore_telemetry_engine.h)
 - **Polling a Cadenza Differenziata**:
   - **Fast block** (1s): potenza, corrente, tensione — misure critiche per controllo
   - **Medium block** (5s): SOC, stato batteria, rete — stato a variazione lenta
@@ -45,7 +45,7 @@ Implementare telemetria con qualità (Good/Degraded/Stale/Invalid), polling sche
 - **Statistiche Comunicazione**: totalPolls, successfulPolls, crcErrors, timeouts, exceptions, successRate
 
 ### 3. **MQTT Discovery per Afore V4**
-- **File**: [`src/app/afore_v4_mqtt.{h,cpp}`](../src/app/afore_v4_mqtt.h)
+- **File**: [`src/drivers/afore/afore_v4_mqtt.{h,cpp}`](../src/drivers/afore/afore_v4_mqtt.h)
 - **Device Info HA**:
   - Identifiers: `["afore_v4"]` (node ID configurabile)
   - Name: "Afore AF5K-SL (Shadow)"

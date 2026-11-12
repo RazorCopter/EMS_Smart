@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Afore AF5K-SL Local Simulator</title>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --card-bg: #1e293b;
+      --accent: #38bdf8;
+      --text: #f8fafc;
+      --text-muted: #94a3b8;
+      --border: #334155;
+      --danger: #ef4444;
+      --success: #22c55e;
+      --warning: #f59e0b;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    body { background: var(--bg); color: var(--text); padding: 24px; }
+    header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); padding-bottom: 16px; margin-bottom: 24px; }
+    h1 { font-size: 1.5rem; display: flex; align-items: center; gap: 8px; }
+    .badge { background: #0369a1; padding: 4px 8px; border-radius: 4px; font-size: 0.75rem; text-transform: uppercase; font-weight: bold; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 20px; }
+    .card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 8px; padding: 20px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.2); }
+    .card h2 { font-size: 1.1rem; margin-bottom: 16px; color: var(--accent); border-bottom: 1px solid var(--border); padding-bottom: 8px; }
+    .control-row { margin-bottom: 16px; }
+    .control-row label { display: flex; justify-content: space-between; font-size: 0.875rem; margin-bottom: 6px; color: var(--text-muted); }
+    .control-row span.val { color: var(--text); font-weight: bold; font-family: monospace; }
+    input[type=range] { width: 100%; accent-color: var(--accent); cursor: pointer; }
+    .fault-toggle { display: flex; justify-content: space-between; align-items: center; padding: 10px; background: rgba(0,0,0,0.2); border-radius: 6px; margin-bottom: 10px; }
+    .fault-toggle span { font-size: 0.875rem; font-weight: 500; }
+    input[type=checkbox] { width: 20px; height: 20px; cursor: pointer; accent-color: var(--danger); }
+    pre { background: #0b0f19; padding: 12px; border-radius: 6px; font-size: 0.75rem; overflow-x: auto; color: #38bdf8; max-height: 200px; border: 1px solid var(--border); }
+    .status-pill { display: inline-block; padding: 2px 6px; border-radius: 4px; font-size: 0.75rem; font-weight: bold; }
+    .status-pill.active { background: var(--danger); color: white; }
+    .status-pill.inactive { background: #334155; color: var(--text-muted); }
+  </style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>Afore AF5K-SL Local GUI Simulator</h1>
+    <p style="color: var(--text-muted); font-size: 0.85rem;">Stand-alone Modbus RTU / TCP Inverter Register Emulator</p>
+  </div>
+  <div>
+    <span class="badge">Offline Verified</span>
+  </div>
+</header>
+
+<div class="grid">
+  <!-- Solar Generation -->
+  <div class="card">
+    <h2>PV Solar Strings</h2>
+    <div class="control-row">
+      <label>PV1 Power: <span class="val" id="val_pv1_power">1800 W</span></label>
+      <input type="range" id="rng_pv1_power" min="0" max="3000" step="50" value="1800">
+    </div>
+    <div class="control-row">
+      <label>PV1 Voltage: <span class="val" id="val_pv1_voltage">320.0 V</span></label>
+      <input type="range" id="rng_pv1_voltage" min="0" max="500" step="1" value="320">
+    </div>
+    <div class="control-row">
+      <label>PV2 Power: <span class="val" id="val_pv2_power">1200 W</span></label>
+      <input type="range" id="rng_pv2_power" min="0" max="3000" step="50" value="1200">
+    </div>
+    <div class="control-row">
+      <label>PV2 Voltage: <span class="val" id="val_pv2_voltage">315.0 V</span></label>
+      <input type="range" id="rng_pv2_voltage" min="0" max="500" step="1" value="315">
+    </div>
+  </div>
+
+  <!-- Battery & Storage -->
+  <div class="card">
+    <h2>Battery Storage</h2>
+    <div class="control-row">
+      <label>State of Charge (SoC): <span class="val" id="val_battery_soc">78 %</span></label>
+      <input type="range" id="rng_battery_soc" min="0" max="100" step="1" value="78">
+    </div>
+    <div class="control-row">
+      <label>Battery Power (-Charge / +Discharge): <span class="val" id="val_battery_power">-650 W</span></label>
+      <input type="range" id="rng_battery_power" min="-3000" max="3000" step="50" value="-650">
+    </div>
+    <div class="control-row">
+      <label>Battery Voltage: <span class="val" id="val_battery_voltage">51.8 V</span></label>
+      <input type="range" id="rng_battery_voltage" min="40" max="60" step="0.1" value="51.8">
+    </div>
+  </div>
+
+  <!-- Grid & Inverter -->
+  <div class="card">
+    <h2>Grid & Environment</h2>
+    <div class="control-row">
+      <label>Grid Active Power (+Import / -Export): <span class="val" id="val_grid_power">1250 W</span></label>
+      <input type="range" id="rng_grid_power" min="-5000" max="5000" step="50" value="1250">
+    </div>
+    <div class="control-row">
+      <label>Grid Voltage: <span class="val" id="val_grid_voltage">230.2 V</span></label>
+      <input type="range" id="rng_grid_voltage" min="180" max="260" step="0.5" value="230.2">
+    </div>
+    <div class="control-row">
+      <label>Inverter Temperature: <span class="val" id="val_inverter_temp">38.5 °C</span></label>
+      <input type="range" id="rng_inverter_temp" min="10" max="85" step="0.5" value="38.5">
+    </div>
+  </div>
+
+  <!-- Fault & Edge Case Injection -->
+  <div class="card">
+    <h2>Fault Injection Matrix</h2>
+    <div class="fault-toggle">
+      <span>Simulate Bus Timeout (Silence / Disconnect)</span>
+      <input type="checkbox" id="chk_fault_timeout">
+    </div>
+    <div class="fault-toggle">
+      <span>Corrupt Modbus CRC Checksum</span>
+      <input type="checkbox" id="chk_fault_crc">
+    </div>
+    <div class="fault-toggle">
+      <span>Inject Truncated / Partial Frames</span>
+      <input type="checkbox" id="chk_fault_partial">
+    </div>
+    <div class="fault-toggle">
+      <span>Telemetry Out of Range (0xFFFF saturation)</span>
+      <input type="checkbox" id="chk_fault_out_of_range">
+    </div>
+  </div>
+</div>
+
+<div class="card" style="margin-top: 20px;">
+  <h2>Live Simulator ASCII Terminal Render</h2>
+  <pre id="preview_output">Loading preview...</pre>
+</div>
+
+<script>
+  const fields = [
+    { id: 'pv1_power', key: 'pv1_power_w', unit: ' W' },
+    { id: 'pv1_voltage', key: 'pv1_voltage_v', unit: ' V' },
+    { id: 'pv2_power', key: 'pv2_power_w', unit: ' W' },
+    { id: 'pv2_voltage', key: 'pv2_voltage_v', unit: ' V' },
+    { id: 'battery_soc', key: 'battery_soc', unit: ' %' },
+    { id: 'battery_power', key: 'battery_power_w', unit: ' W' },
+    { id: 'battery_voltage', key: 'battery_voltage_v', unit: ' V' },
+    { id: 'grid_power', key: 'grid_power_w', unit: ' W' },
+    { id: 'grid_voltage', key: 'grid_voltage_v', unit: ' V' },
+    { id: 'inverter_temp', key: 'inverter_temp_c', unit: ' °C' }
+  ];
+
+  const faults = [
+    { id: 'chk_fault_timeout', key: 'fault_timeout' },
+    { id: 'chk_fault_crc', key: 'fault_crc' },
+    { id: 'chk_fault_partial', key: 'fault_partial_frame' },
+    { id: 'chk_fault_out_of_range', key: 'fault_out_of_range' }
+  ];
+
+  function updateServer(data) {
+    fetch('/api/state', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+  }
+
+  fields.forEach(f => {
+    const rng = document.getElementById('rng_' + f.id);
+    const val = document.getElementById('val_' + f.id);
+    rng.addEventListener('input', () => {
+      val.textContent = rng.value + f.unit;
+      updateServer({ [f.key]: parseFloat(rng.value) });
+    });
+  });
+
+  faults.forEach(flt => {
+    const chk = document.getElementById(flt.id);
+    chk.addEventListener('change', () => {
+      updateServer({ [flt.key]: chk.checked });
+    });
+  });
+
+  function refreshPreview() {
+    fetch('/api/preview')
+      .then(r => r.text())
+      .then(t => { document.getElementById('preview_output').textContent = t; });
+  }
+
+  setInterval(refreshPreview, 1000);
+  refreshPreview();
+</script>
+
+</body>
+</html>

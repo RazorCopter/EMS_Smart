@@ -1,0 +1,38 @@
+========================================================================================
+                      AFORE AF5K-SL HYBRID INVERTER SIMULATOR
+========================================================================================
+
+  [ Web UI: http://127.0.0.1:8080/ ]            [ Modbus TCP Service: 127.0.0.1:5020 ]
+  [ Mode: Standalone Offline Simulation ]        [ Inverter Model: Afore AF5K-SL ]
+
+----------------------------------------------------------------------------------------
+  LIVE TELEMETRY GAUGES & CHANNELS
+----------------------------------------------------------------------------------------
+  [ SOLAR ARRAYS ]
+    PV1 String:        [||||||||||||||||....]  1800 W  |  320.0 V  |   5.6 A
+    PV2 String:        [||||||||||||........]  1200 W  |  315.0 V  |   3.8 A
+    Combined Solar:    [|||||||||||||||.....]  3000 W
+
+  [ GRID INTERFACE ]
+    Grid Power:        [||||||||||||........] +1250 W (Importing from Grid)
+    Grid Voltage:      [||||||||||||||||||..]  230.2 V  (50.0 Hz)
+    Inverter Temp:     [||||||||............]  38.5 °C
+
+  [ BATTERY STORAGE (High Voltage LiFePO4) ]
+    State of Charge:   [|||||||||||||||.....]   78 %
+    Battery Power:     [|||||||.............]  -650 W (CHARGING into Battery)
+    Battery Voltage:   [|||||||||||||||.....]  51.8 V
+
+  [ CUMULATIVE METRICS ]
+    Total PV Yield:    1420.5 kWh
+    Operating Status:  0x0001 (Normal Operating Mode)
+
+----------------------------------------------------------------------------------------
+  FAULT & EDGE-CASE INJECTION PANEL (Interactive Controls)
+----------------------------------------------------------------------------------------
+  [ ] Simulate Bus Timeout (Drop responses / Inverter Disconnected)
+  [ ] Corrupt Modbus CRC16 Checksum (Bitflips / Cable interference)
+  [ ] Inject Truncated / Partial Frames (Split packets / Baudrate mismatch)
+  [ ] Out of Range Saturated Registers (0xFFFF fault code injection)
+
+========================================================================================

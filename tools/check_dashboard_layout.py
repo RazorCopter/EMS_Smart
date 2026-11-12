@@ -889,6 +889,8 @@ def render(chrome: str, page: str, width: int, scratch: str, tag: str) -> str:
             path.as_uri(),
         ],
         capture_output=True,
+        encoding="utf-8",
+        errors="replace",
         text=True,
         timeout=120,
         check=False,

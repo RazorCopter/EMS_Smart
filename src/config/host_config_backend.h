@@ -48,6 +48,11 @@ public:
   /// required fields.
   bool loadFromFile(const std::string &path, Configuration &config);
 
+  /// Persists the complete configuration with secrets using a same-directory
+  /// temporary file followed by an atomic rename. The old file remains intact
+  /// if serialization or writing fails.
+  bool saveToFileAtomic(const std::string &path, const Configuration &config);
+
   /// Loads configuration from environment variables.
   /// Useful for containerized deployments where file-based config is
   /// inconvenient.

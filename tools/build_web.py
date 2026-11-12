@@ -63,10 +63,19 @@ def find_chrome() -> str | None:
         "google-chrome-stable",
         "chromium",
         "chromium-browser",
+        "msedge",
     ):
         found = shutil.which(name)
         if found:
             return found
+    for win_path in (
+        r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe",
+        r"C:\Program Files\Microsoft\Edge\Application\msedge.exe",
+        r"C:\Program Files\Google\Chrome\Application\chrome.exe",
+        r"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe",
+    ):
+        if pathlib.Path(win_path).exists():
+            return win_path
     mac = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
     return mac if pathlib.Path(mac).exists() else None
 

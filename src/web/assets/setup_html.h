@@ -2,9 +2,9 @@
 //
 // The setup portal, served on the Heliograph-Setup-XXXX access point.
 //
-// Separate from index.html on purpose: at this point there is no network, no device and no
-// data -- showing a dashboard full of dashes would only confuse. This page has exactly one
-// job, and it says so.
+// Separate from index.html on purpose: at this point there is no network, no
+// device and no data -- showing a dashboard full of dashes would only confuse.
+// This page has exactly one job, and it says so.
 
 #pragma once
 
@@ -106,6 +106,27 @@ tr:last-child td{border-bottom:0}
     to erase the configuration and start over.</div>
   </div>
 
+  <div style="margin-top:16px;border-top:1px solid var(--line);padding-top:12px">
+    <label style="cursor:pointer;display:flex;align-items:center;font-weight:600">
+      <input id="mq_en" type="checkbox" style="width:auto;margin:0 8px 0 0">Setup MQTT & Home Assistant (optional)
+    </label>
+    <div id="mq_fields" style="display:none;margin-top:8px">
+      <label for="mq_h">Broker host</label>
+      <input id="mq_h" placeholder="e.g. 192.168.1.100 or homeassistant.local" autocomplete="off" spellcheck="false">
+      <label for="mq_p">Broker port</label>
+      <input id="mq_p" type="number" value="1883" min="1" max="65535">
+      <label for="mq_u">Broker username (optional)</label>
+      <input id="mq_u" autocomplete="off" spellcheck="false">
+      <label for="mq_pw">Broker password (optional)</label>
+      <input id="mq_pw" type="password" autocomplete="off">
+      <label for="mq_bt">Base topic</label>
+      <input id="mq_bt" value="heliograph" autocomplete="off" spellcheck="false">
+      <label style="cursor:pointer;display:flex;align-items:center;margin-top:8px">
+        <input id="mq_ha" type="checkbox" checked style="width:auto;margin:0 8px 0 0">Enable Home Assistant Discovery
+      </label>
+    </div>
+  </div>
+
   <button id="b" type="submit">Save and restart</button>
   <div id="m" class="msg"></div>
 </form>
@@ -170,6 +191,17 @@ const setupReady=fetch('/api/v1/config').then(r=>r.json()).then(c=>{
   const sec=(c&&c.security)||{};
   reauth=!!sec.password_set;
   modeKnown=true;
+  if(c&&c.mqtt){
+    if(c.mqtt.enabled){
+      $('mq_en').checked=true;
+      $('mq_fields').style.display='block';
+    }
+    if(c.mqtt.host)$('mq_h').value=c.mqtt.host;
+    if(c.mqtt.port)$('mq_p').value=c.mqtt.port;
+    if(c.mqtt.username)$('mq_u').value=c.mqtt.username;
+    if(c.mqtt.base_topic)$('mq_bt').value=c.mqtt.base_topic;
+    if(c.mqtt.discovery_enabled!==undefined)$('mq_ha').checked=c.mqtt.discovery_enabled;
+  }
   if(reauth){
     $('pwhint').style.display='block';
     $('reauth').style.display='block';
@@ -252,6 +284,21 @@ $('f').onsubmit=async e=>{
       headers['Authorization']=basicAuthHeader();
     }else{
       body.security={admin_password:$('admin').value};
+    }
+    if($('mq_en').checked){
+      const mqHost=$('mq_h').value.trim();
+      if(!mqHost){refuse('Enter the MQTT broker host.');return}
+      body.mqtt={
+        enabled:true,
+        host:mqHost,
+        port:parseInt($('mq_p').value||'1883',10),
+        username:$('mq_u').value.trim(),
+        base_topic:$('mq_bt').value.trim()||'heliograph',
+        discovery_enabled:$('mq_ha').checked
+      };
+      if($('mq_pw').value!==''){
+        body.mqtt.password=$('mq_pw').value;
+      }
     }
     const r=await fetch('/api/v1/provision',{method:'POST',headers,body:JSON.stringify(body)});
     if(r.status===401){
@@ -365,4 +412,4 @@ async function applyRestore(){
 }
 </script></body></html>)HTML";
 
-}  // namespace heliograph::web
+} // namespace heliograph::web

@@ -65,6 +65,7 @@ set(COMMON_SOURCES
     src/transport/readonly_guard.cpp
     src/state/state_store.cpp
     src/config/configuration.cpp
+    src/config/configuration_store.cpp
     src/config/host_config_backend.cpp
     src/protocols/modbus/modbus_rtu.cpp
     src/protocols/modbus/modbus_client.cpp

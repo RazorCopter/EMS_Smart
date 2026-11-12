@@ -9,6 +9,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <fstream>
+#include <string>
 
 using namespace heliograph;
 
@@ -27,6 +28,46 @@ static void test_load_from_nonexistent_file_fails() {
     exit(1);
   }
 
+  printf("OK\n");
+}
+
+static void test_atomic_round_trip_preserves_credentials() {
+  const char *path = "/tmp/heliograph_atomic_config.json";
+  std::remove(path);
+  std::remove("/tmp/heliograph_atomic_config.json.tmp");
+
+  Configuration original;
+  original.wifi.ssid = "PlantNet";
+  original.wifi.password = "WifiSecret123";
+  original.security.adminPassword = "AdminSecret123";
+  original.mqtt.enabled = true;
+  original.mqtt.host = "broker.local";
+  original.mqtt.username = "heliograph";
+  original.mqtt.password = "MqttSecret123";
+
+  HostConfigBackend backend;
+  if (!backend.saveToFileAtomic(path, original)) {
+    printf("FAIL: atomic save failed: %s\n", backend.lastError().c_str());
+    exit(1);
+  }
+  Configuration loaded;
+  if (!backend.loadFromFile(path, loaded)) {
+    printf("FAIL: persisted load failed: %s\n", backend.lastError().c_str());
+    exit(1);
+  }
+  if (loaded.wifi.ssid != original.wifi.ssid ||
+      loaded.wifi.password != original.wifi.password ||
+      loaded.security.adminPassword != original.security.adminPassword ||
+      loaded.mqtt.password != original.mqtt.password) {
+    printf("FAIL: atomic round trip lost configuration or credentials\n");
+    exit(1);
+  }
+  std::ifstream temporary("/tmp/heliograph_atomic_config.json.tmp");
+  if (temporary.good()) {
+    printf("FAIL: temporary file remains after atomic save\n");
+    exit(1);
+  }
+  std::remove(path);
   printf("OK\n");
 }
 
@@ -172,6 +213,8 @@ int main() {
   printf("==> test_production_driver_selection: ");
   test_production_driver_selection();
 
+  printf("==> test_atomic_round_trip_preserves_credentials: ");
+  test_atomic_round_trip_preserves_credentials();
   printf("\nAll HostConfigBackend tests passed.\n");
   return 0;
 }

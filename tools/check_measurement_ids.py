@@ -15,7 +15,7 @@ import sys
 
 def main() -> int:
     root = pathlib.Path(__file__).resolve().parent.parent
-    text = (root / "src/device/measurement.h").read_text()
+    text = (root / "src/device/measurement.h").read_text(encoding="utf-8")
     block = re.search(
         r"namespace measurement_id \{(.*?)\}\s*//\s*namespace measurement_id",
         text,
@@ -64,7 +64,7 @@ def check_dashboard_labels(root: pathlib.Path, body: str) -> int:
     # there is nothing for the dashboard to show and a row here would be a promise of a tile
     # that can never appear.
     ids = {i for i in ids if not i.startswith("control.")}
-    page = (root / "src/web/assets/index_html.h").read_text()
+    page = (root / "src/web/assets/index_html.h").read_text(encoding="utf-8")
     table = re.search(r"const MEAS=\[(.*?)\n\];", page, re.DOTALL)
     if not table:
         print("FAIL: the dashboard's MEAS table was not found")
@@ -97,7 +97,7 @@ def check_prometheus_gauges(root: pathlib.Path, declared: set[str]) -> int:
     can be cleared, and no driver reports them as a reading.
     """
     wanted = {c for c in declared if not c.startswith("kActivePowerLimit")}
-    metrics = (root / "src/outputs/prometheus/prometheus_metrics.cpp").read_text()
+    metrics = (root / "src/outputs/prometheus/prometheus_metrics.cpp").read_text(encoding="utf-8")
     table = re.search(r"kInverterGauges\[\] = \{(.*?)\n\};", metrics, re.DOTALL)
     if not table:
         print("FAIL: the Prometheus gauge table was not found")

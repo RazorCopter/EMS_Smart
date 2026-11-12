@@ -439,20 +439,26 @@ def main() -> int:
 
     with socketserver.TCPServer(("127.0.0.1", 0), Handler) as server:
         port = server.server_address[1]
-        threading.Thread(target=server.serve_forever, daemon=True).start()
-        for tab, filename in TABS.items():
-            target = out_dir / filename
-            size = shoot(
-                chrome,
-                f"http://127.0.0.1:{port}/?tab={tab}",
-                target,
-                args.width,
-                args.height,
-            )
-            print(f"  {filename:18s} {size // 1024:4d} KB")
-            if size == 0:
-                print("    (empty -- the page did not render)")
-                return 1
+        th = threading.Thread(target=server.serve_forever)
+        th.daemon = True
+        th.start()
+        try:
+            for tab, filename in TABS.items():
+                target = out_dir / filename
+                size = shoot(
+                    chrome,
+                    f"http://127.0.0.1:{port}/?tab={tab}",
+                    target,
+                    args.width,
+                    args.height,
+                )
+                print(f"  {filename:18s} {size // 1024:4d} KB")
+                if size == 0:
+                    print("    (empty -- the page did not render)")
+                    return 1
+        finally:
+            server.shutdown()
+            server.server_close()
     return 0
 
 

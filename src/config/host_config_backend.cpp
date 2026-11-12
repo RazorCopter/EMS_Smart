@@ -4,14 +4,27 @@
 
 #if !defined(ESP32)
 
+#include <cerrno>
+#include <cstdio>
 #include <cstdlib>
 #include <fstream>
 #include <sstream>
 
+#if defined(_WIN32)
+#include <io.h>
+#else
+#include <fcntl.h>
+#include <unistd.h>
+#endif
+
 // ArduinoJson is already used by env:native and is pure C++, no Arduino
 // dependency
 #include <ArduinoJson.h>
+#if defined(_WIN32)
+#include <windows.h>
+#endif
 
+#include "config/configuration_store.h"
 #include "diagnostics/logger.h"
 #include "drivers/driver_descriptor.h"
 #include "drivers/modbus_profile/modbus_profile_driver.h"
@@ -83,7 +96,20 @@ bool HostConfigBackend::loadFromFile(const std::string &path,
   buffer << file.rdbuf();
   std::string content = buffer.str();
 
-  // Parse JSON
+  // Prefer the canonical persisted schema. This preserves every field and all
+  // credentials written by saveToFileAtomic(), including future migrations.
+  Configuration persisted;
+  const LoadResult persistedResult =
+      deserializeConfigFromStorage(content, persisted);
+  if (persistedResult == LoadResult::Ok ||
+      persistedResult == LoadResult::Migrated) {
+    config = std::move(persisted);
+    log::info("host_config: loaded persisted configuration from %s",
+              path.c_str());
+    return true;
+  }
+
+  // Parse the legacy host-daemon schema for backwards compatibility.
   JsonDocument doc;
   DeserializationError error = deserializeJson(doc, content);
   if (error) {
@@ -157,6 +183,58 @@ bool HostConfigBackend::loadFromFile(const std::string &path,
   }
 
   log::info("host_config: loaded from %s", path.c_str());
+  return true;
+}
+
+bool HostConfigBackend::saveToFileAtomic(const std::string &path,
+                                         const Configuration &config) {
+  lastError_.clear();
+  std::string content;
+  if (!serializeConfigForStorage(config, content)) {
+    lastError_ = "failed to serialize configuration";
+    return false;
+  }
+
+  const std::string temporary = path + ".tmp";
+  FILE *file = std::fopen(temporary.c_str(), "wb");
+  if (file == nullptr) {
+    lastError_ = "failed to open temporary config file";
+    return false;
+  }
+  const bool written =
+      std::fwrite(content.data(), 1, content.size(), file) == content.size();
+  bool durable = written && std::fflush(file) == 0;
+#if defined(_WIN32)
+  if (durable)
+    durable = _commit(_fileno(file)) == 0;
+#else
+  if (durable)
+    durable = fsync(fileno(file)) == 0;
+#endif
+  if (std::fclose(file) != 0)
+    durable = false;
+  if (!durable) {
+    std::remove(temporary.c_str());
+    lastError_ = "failed to durably write temporary config file";
+    return false;
+  }
+#if defined(_WIN32)
+  // Windows rename does not replace an existing destination. Keep this
+  // backend's production contract explicit rather than silently deleting the
+  // old file.
+  if (!MoveFileExA(temporary.c_str(), path.c_str(),
+                   MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH)) {
+    std::remove(temporary.c_str());
+    lastError_ = "failed to atomically replace config file";
+    return false;
+  }
+#else
+  if (std::rename(temporary.c_str(), path.c_str()) != 0) {
+    std::remove(temporary.c_str());
+    lastError_ = "failed to atomically replace config file";
+    return false;
+  }
+#endif
   return true;
 }
 

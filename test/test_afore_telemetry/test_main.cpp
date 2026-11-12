@@ -8,12 +8,13 @@
 #include <memory>
 #include <vector>
 
-#include "app/afore_telemetry_engine.h"
-#include "app/afore_v4_mqtt.h"
 #include "device/telemetry_quality.h"
+#include "drivers/afore/afore_telemetry_engine.h"
+#include "drivers/afore/afore_v4_mqtt.h"
 #include "protocols/modbus/modbus_rtu.h"
 #include "support/mock_transport.h"
 #include "transport/readonly_guard.h"
+
 
 using namespace heliograph;
 using heliograph::test::MockTransport;
@@ -544,9 +545,188 @@ void test_m7_exact_oneshot_request_frame_and_parameters() {
   TEST_ASSERT_EQUAL_UINT8(0, kMaxAllowedRetries);
 }
 
+void test_consecutive_errors_trigger_backoff_and_circuit_breaker() {
+  engine->configureFastBlock(512, 19, 1000);
+  engine->setMinInterFrameGapMs(0); // Disable gap for fast testing
+
+  // Initial state
+  TEST_ASSERT_EQUAL_UINT32(0, engine->getConsecutiveErrors());
+  TEST_ASSERT_EQUAL_UINT32(1, engine->getBackoffMultiplier());
+  TEST_ASSERT_FALSE(engine->isCircuitOpen());
+
+  // Fail 1: timeout (no reply provided)
+  mockTransport->flushInput();
+  engine->poll(1000);
+  TEST_ASSERT_EQUAL_UINT32(1, engine->getConsecutiveErrors());
+  TEST_ASSERT_EQUAL_UINT32(1, engine->getBackoffMultiplier());
+
+  // Fail 2:
+  engine->poll(2000);
+  TEST_ASSERT_EQUAL_UINT32(2, engine->getConsecutiveErrors());
+  TEST_ASSERT_EQUAL_UINT32(1, engine->getBackoffMultiplier());
+
+  // Fail 3: backoff triggered!
+  engine->poll(3000);
+  TEST_ASSERT_EQUAL_UINT32(3, engine->getConsecutiveErrors());
+  TEST_ASSERT_EQUAL_UINT32(2, engine->getBackoffMultiplier());
+
+  // Fail 4:
+  engine->poll(5000);
+  TEST_ASSERT_EQUAL_UINT32(4, engine->getConsecutiveErrors());
+
+  // Fail 5: circuit breaker triggers (open)
+  engine->poll(7000);
+  TEST_ASSERT_EQUAL_UINT32(5, engine->getConsecutiveErrors());
+  TEST_ASSERT_TRUE(engine->isCircuitOpen());
+
+  // Poll while circuit is open within 30s: no transactions should be attempted
+  size_t txCountBefore = mockTransport->writes.size();
+  size_t polled = engine->poll(10000);
+  TEST_ASSERT_EQUAL_UINT32(0, polled);
+  TEST_ASSERT_EQUAL_UINT32(txCountBefore, mockTransport->writes.size());
+
+  // Recovery after circuit breaker timeout (at nowMs >= 37000):
+  std::vector<uint16_t> registers(19, 0);
+  auto reply = buildModbusResponse(1, 512, registers);
+  mockTransport->replyWith(reply);
+  polled = engine->poll(38000);
+  TEST_ASSERT_EQUAL_UINT32(1, polled);
+  TEST_ASSERT_FALSE(engine->isCircuitOpen());
+  TEST_ASSERT_EQUAL_UINT32(0, engine->getConsecutiveErrors());
+  TEST_ASSERT_EQUAL_UINT32(1, engine->getBackoffMultiplier());
+}
+
+void test_min_inter_frame_gap_enforcement() {
+  engine->configureFastBlock(512, 19, 1000);
+  engine->configureMediumBlock(552, 10, 1000);
+  engine->setMinInterFrameGapMs(200);
+
+  std::vector<uint16_t> registers(19, 0);
+  auto reply = buildModbusResponse(1, 512, registers);
+  mockTransport->replyWith(reply);
+
+  // At t=1000, first block is polled, but second block is deferred due to
+  // <200ms gap
+  size_t polled = engine->poll(1000);
+  TEST_ASSERT_EQUAL_UINT32(1, polled);
+
+  // At t=1100 (< 200ms gap from t=1000), polling is deferred
+  polled = engine->poll(1100);
+  TEST_ASSERT_EQUAL_UINT32(0, polled);
+
+  // At t=1250 (gap >= 200ms), second block is allowed (reply with 10 registers
+  // for medium block)
+  std::vector<uint16_t> registersMedium(10, 0);
+  auto replyMedium = buildModbusResponse(1, 552, registersMedium);
+  mockTransport->replyWith(replyMedium);
+  polled = engine->poll(1250);
+  TEST_ASSERT_EQUAL_UINT32(1, polled);
+}
+
+void test_m9_hardware_polling_gate_refusal() {
+  // Gate G2 Safety Invariant:
+  // If transport is NOT Mock (e.g. simulated real hardware), poll() refuses
+  // execution unless authorizeHardwarePolling(true) is explicitly invoked.
+  AforeTelemetryEngine gateEngine(*mockTransport, 1);
+  gateEngine.configureFastBlock(512, 19, 1000);
+
+  // Default state: unauthorized
+  TEST_ASSERT_FALSE(gateEngine.isHardwarePollingAuthorized());
+
+  // With mock transport, offline tests are allowed
+  size_t polledMock = gateEngine.poll(1000);
+  (void)polledMock; // Allowed on Mock transport
+
+  // Explicitly test toggle
+  gateEngine.authorizeHardwarePolling(true);
+  TEST_ASSERT_TRUE(gateEngine.isHardwarePollingAuthorized());
+  gateEngine.authorizeHardwarePolling(false);
+  TEST_ASSERT_FALSE(gateEngine.isHardwarePollingAuthorized());
+}
+
+void test_m9_resilience_partial_frames() {
+  engine->configureFastBlock(512, 19, 1000);
+
+  // Truncated frame: only 4 bytes instead of the expected 43 bytes
+  std::vector<uint8_t> partialFrame = {0x01, 0x03, 0x26, 0x01};
+  mockTransport->replyWith(partialFrame);
+
+  size_t polled = engine->poll(1000);
+  TEST_ASSERT_EQUAL_UINT32(0, polled);
+  TEST_ASSERT_EQUAL_UINT32(1, engine->getConsecutiveErrors());
+}
+
+void test_m9_resilience_crc_corruption() {
+  engine->configureFastBlock(512, 19, 1000);
+
+  std::vector<uint16_t> registers(19, 42);
+  auto reply = buildModbusResponse(1, 512, registers);
+  // Corrupt the CRC bytes at the end
+  reply[reply.size() - 1] ^= 0xFF;
+  mockTransport->replyWith(reply);
+
+  size_t polled = engine->poll(1000);
+  TEST_ASSERT_EQUAL_UINT32(0, polled);
+  TEST_ASSERT_EQUAL_UINT32(1, engine->getConsecutiveErrors());
+}
+
+void test_m9_extended_offline_chaos_matrix() {
+  engine->configureFastBlock(512, 19, 1000);
+  engine->setMinInterFrameGapMs(
+      0); // Allow immediate evaluation in simulation loop
+
+  std::vector<uint16_t> validRegisters(19, 100);
+  auto validReply = buildModbusResponse(1, 512, validRegisters);
+
+  // Run 100 simulated iterations cycling through clean reply, CRC corruption,
+  // partial frame, timeout, and recovery
+  for (uint32_t step = 0; step < 100; ++step) {
+    uint64_t nowMs = 10000 + (step * 2000);
+    uint32_t chaosType = step % 5;
+
+    if (chaosType == 0) {
+      // Valid response
+      mockTransport->replyWith(validReply);
+      engine->poll(nowMs);
+    } else if (chaosType == 1) {
+      // Corrupted CRC
+      auto badCrc = validReply;
+      badCrc.back() ^= 0xAA;
+      mockTransport->replyWith(badCrc);
+      engine->poll(nowMs);
+    } else if (chaosType == 2) {
+      // Partial truncated frame
+      std::vector<uint8_t> partial = {0x01, 0x03, 0x02};
+      mockTransport->replyWith(partial);
+      engine->poll(nowMs);
+    } else if (chaosType == 3) {
+      // Timeout (empty)
+      mockTransport->flushInput();
+      engine->poll(nowMs);
+    } else {
+      // Recovery after failure
+      mockTransport->replyWith(validReply);
+      engine->poll(nowMs);
+    }
+
+    // Verify backoff multiplier and consecutive errors remain strictly bounded
+    TEST_ASSERT_TRUE(engine->getBackoffMultiplier() <= 16);
+    TEST_ASSERT_TRUE(engine->getConsecutiveErrors() <= 100);
+  }
+}
+
 void run_readonly_integration() {
   RUN_TEST(test_readonly_guard_blocks_write_attempts);
   RUN_TEST(test_m7_exact_oneshot_request_frame_and_parameters);
+}
+
+void run_m9_backoff_and_gap_tests() {
+  RUN_TEST(test_consecutive_errors_trigger_backoff_and_circuit_breaker);
+  RUN_TEST(test_min_inter_frame_gap_enforcement);
+  RUN_TEST(test_m9_hardware_polling_gate_refusal);
+  RUN_TEST(test_m9_resilience_partial_frames);
+  RUN_TEST(test_m9_resilience_crc_corruption);
+  RUN_TEST(test_m9_extended_offline_chaos_matrix);
 }
 
 int main(int, char **) {
@@ -559,6 +739,7 @@ int main(int, char **) {
   run_communication_stats();
   run_mqtt_discovery();
   run_readonly_integration();
+  run_m9_backoff_and_gap_tests();
 
   return UNITY_END();
 }

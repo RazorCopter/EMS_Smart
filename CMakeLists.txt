@@ -87,10 +87,11 @@ set(COMMON_SOURCES
     src/diagnostics/log_buffer.cpp
     src/network/ipv4.cpp
     src/relays/drm.cpp
-    src/app/afore_telemetry_engine.cpp
-    src/app/afore_v4_mqtt.cpp
+    src/drivers/afore/afore_telemetry_engine.cpp
+    src/drivers/afore/afore_v4_mqtt.cpp
     src/ems/shadow_ems_types.cpp
     src/ems/shadow_ems_controller.cpp
+    src/ems/power_balance_evaluator.cpp
 )
 
 # Static check: reject dummy stub implementations
@@ -188,6 +189,37 @@ if(BUILD_TESTING)
     target_link_libraries(test-afore-telemetry PRIVATE pthread ArduinoJson unity)
     add_test(NAME afore-telemetry-tests COMMAND test-afore-telemetry)
 
+    # Milestone M11: 7-Day Endurance Simulation test
+    add_executable(test-endurance-7d
+        test/test_endurance_7d/test_main.cpp
+        src/ems/power_balance_evaluator.cpp
+        ${COMMON_SOURCES}
+    )
+    add_dependencies(test-endurance-7d generate-profiles)
+    target_compile_definitions(test-endurance-7d PRIVATE
+        ENABLE_DRIVER_MODBUS_PROFILE=1
+        UNITY_INCLUDE_DOUBLE=1
+        UNITY_DOUBLE_PRECISION=1e-12
+    )
+    target_include_directories(test-endurance-7d PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+    target_link_libraries(test-endurance-7d PRIVATE pthread ArduinoJson unity)
+    add_test(NAME endurance-7d-tests COMMAND test-endurance-7d)
+
+    # Milestone M12: Waveshare ESP32-S3-RS485-CAN HAL test
+    add_executable(test-waveshare-hal
+        test/test_waveshare_hal/test_main.cpp
+        ${COMMON_SOURCES}
+    )
+    add_dependencies(test-waveshare-hal generate-profiles)
+    target_compile_definitions(test-waveshare-hal PRIVATE
+        HELIOGRAPH_BOARD_RS485_CAN=1
+        UNITY_INCLUDE_DOUBLE=1
+        UNITY_DOUBLE_PRECISION=1e-12
+    )
+    target_include_directories(test-waveshare-hal PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+    target_link_libraries(test-waveshare-hal PRIVATE pthread ArduinoJson unity)
+    add_test(NAME waveshare-hal-tests COMMAND test-waveshare-hal)
+
     # M4 pure target-aware EMS core: intentionally isolated from COMMON_SOURCES so
     # this target cannot acquire transport, network, serial, protocol, or driver I/O.
     add_library(target-aware-ems-core STATIC
@@ -228,6 +260,14 @@ if(BUILD_TESTING)
     target_include_directories(test-shadow-ems PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
     target_link_libraries(test-shadow-ems PRIVATE pthread ArduinoJson unity)
     add_test(NAME shadow-ems-tests COMMAND test-shadow-ems)
+
+    # Power Balance & Sign Convention M8 tests
+    add_executable(test-power-balance
+        test/test_power_balance/test_main.cpp
+        src/ems/power_balance_evaluator.cpp
+    )
+    target_include_directories(test-power-balance PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+    add_test(NAME power-balance-tests COMMAND test-power-balance)
 endif()
 
 # Install targets

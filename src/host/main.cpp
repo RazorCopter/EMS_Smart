@@ -7,10 +7,11 @@
 // and host configuration. Full daemon implementation (polling loop, MQTT, REST
 // API) is scaffolded for future phases.
 
+#include <cstdio>
+
 #if !defined(ESP32)
 
 #include <csignal>
-#include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <memory>

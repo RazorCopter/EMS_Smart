@@ -29,9 +29,16 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     git \
     ca-certificates \
     \
-    # Python for build scripts
+    # Python and virtual environments
     python3 \
     python3-pip \
+    python3.12-venv \
+    \
+    # Code quality, static analysis and linters
+    cppcheck \
+    shellcheck \
+    nodejs \
+    npm \
     \
     # Binary analysis tools
     binutils \
@@ -49,6 +56,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     wget \
     && rm -rf /var/lib/apt/lists/*
+
+# Install PlatformIO and testing tools
+RUN pip install --break-system-packages platformio pytest
 
 # Verify toolchain versions
 RUN echo "=== M3B Development Environment ===" && \

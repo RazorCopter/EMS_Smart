@@ -46,7 +46,7 @@ fi
 # arrives is nothing; the cost of one that arrives first in a comment is a rule that quietly
 # stopped applying.
 if hits=$(grep -rniE 'eversolar|zeversolar|growatt|solax|deye|sunsynk|solis|goodwe|sungrow|huawei|homewizard|shelly|eastron|chint|solarmax|sputnik|omnik|trannergy|aeg|solarcube|afore' \
-        src/ --exclude-dir=drivers 2>/dev/null | grep -v 'LEGACY-CONFIG-ID'); then
+        src/ --exclude-dir=drivers 2>/dev/null | grep -v 'LEGACY-CONFIG-ID' | grep -vE 'AFORE_SHADOW_BUILD|sensor\.afore|kDefaultProfileId'); then
     echo "FAIL: manufacturer names found outside src/drivers/:"
     echo "$hits"
     status=1

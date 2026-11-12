@@ -59,11 +59,36 @@ void AforeTelemetryEngine::configureSlowBlock(uint16_t start, uint16_t count,
 size_t AforeTelemetryEngine::poll(uint64_t nowMs) {
   size_t polled = 0;
 
-  // Poll all due blocks
+  // Milestone M9 Safety Invariant: Hardware polling is strictly forbidden until
+  // Gate G2. Polling against physical hardware (RS485 or POSIX serial)
+  // unconditionally refuses execution unless explicit Gate G2 authorization has
+  // been granted.
+  if (transport_.type() != TransportType::Mock && !hardwarePollingAuthorized_) {
+    return 0;
+  }
+
+  // Check if circuit breaker is open (Milestone M9)
+  if (circuitOpen_) {
+    if (nowMs < circuitOpenUntilMs_) {
+      // Still in cooldown period, avoid polluting the bus
+      return 0;
+    }
+    // Cooldown elapsed: try probing again
+    circuitOpen_ = false;
+  }
+
+  // Poll all due blocks respecting backoff and minInterFrameGapMs_
   for (auto &[name, block] : blocks_) {
-    if (block.isDue(nowMs)) {
-      pollBlock(name, block, nowMs);
-      polled++;
+    if (block.isDue(nowMs, backoffMultiplier_)) {
+      if (lastTransactionMs_ > 0 &&
+          (nowMs - lastTransactionMs_ < minInterFrameGapMs_)) {
+        // Enforce conservative inter-frame gap: defer to next cycle
+        continue;
+      }
+      if (pollBlock(name, block, nowMs)) {
+        polled++;
+      }
+      lastTransactionMs_ = nowMs;
     }
   }
 
@@ -82,7 +107,7 @@ size_t AforeTelemetryEngine::poll(uint64_t nowMs) {
   return polled;
 }
 
-void AforeTelemetryEngine::pollBlock(const std::string &blockName,
+bool AforeTelemetryEngine::pollBlock(const std::string &blockName,
                                      PollingBlock &block, uint64_t nowMs) {
   (void)blockName; // Reserved for future logging/diagnostics
   stats_.totalPolls++;
@@ -97,6 +122,8 @@ void AforeTelemetryEngine::pollBlock(const std::string &blockName,
     stats_.successfulPolls++;
     stats_.lastSuccessMs = nowMs;
     block.lastPollMs = nowMs;
+    consecutiveErrors_ = 0;
+    backoffMultiplier_ = 1;
 
     // Decode based on block address range
     if (block.startAddress == 512) { // 0x0200: Power/Grid block
@@ -106,8 +133,20 @@ void AforeTelemetryEngine::pollBlock(const std::string &blockName,
     } else if (block.startAddress == 2000) { // 0x07D0: Battery block
       decodeBatteryBlock(data, nowMs);
     }
+    return true;
 
   } else {
+    consecutiveErrors_++;
+    // Backoff logic: at 3 consecutive errors increase cadence; at 5 open
+    // circuit
+    if (consecutiveErrors_ >= 3 && backoffMultiplier_ < 8) {
+      backoffMultiplier_ *= 2;
+    }
+    if (consecutiveErrors_ >= 5) {
+      circuitOpen_ = true;
+      circuitOpenUntilMs_ = nowMs + 30000; // 30s silence window
+    }
+
     // Classify error type
     switch (outcome.status) {
     case modbus::ReadStatus::Crc:
@@ -122,6 +161,7 @@ void AforeTelemetryEngine::pollBlock(const std::string &blockName,
     default:
       break;
     }
+    return false;
   }
 }
 

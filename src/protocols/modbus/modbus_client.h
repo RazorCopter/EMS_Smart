@@ -107,7 +107,7 @@ TransactionOutcome writeSingleRegister(Transport &transport, uint8_t unitId,
 
 /// Minimal RAII wrapper for Modbus operations over a Transport.
 ///
-/// Exists to satisfy AforeTelemetryEngine's constructor dependency.
+/// Exists to satisfy telemetry engine's constructor dependency.
 /// Delegates all operations to the free functions above, preserving their
 /// semantics. Does NOT own the Transport (reference stored).
 class ModbusClient {

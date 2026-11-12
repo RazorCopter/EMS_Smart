@@ -34,8 +34,9 @@ struct PollingBlock {
   bool enabled = true;
 
   /// Whether this block is due for polling now.
-  bool isDue(uint64_t nowMs) const {
-    return enabled && (nowMs - lastPollMs >= intervalMs);
+  bool isDue(uint64_t nowMs, uint32_t backoffMultiplier = 1) const {
+    uint32_t effectiveInterval = intervalMs * backoffMultiplier;
+    return enabled && (nowMs - lastPollMs >= effectiveInterval);
   }
 };
 
@@ -69,10 +70,29 @@ public:
   /// Default: 15 seconds (3× fast block interval for tolerance).
   void setMaxAge(uint32_t maxAgeMs) { maxAgeMs_ = maxAgeMs; }
 
+  /// Real hardware polling gate enforcement (Milestone M9 safety invariant).
+  /// Real polling against physical inverters is STRICTLY FORBIDDEN until Gate
+  /// G2 approval. When bound to physical hardware (e.g. RS485 or POSIX serial),
+  /// poll() unconditionally refuses execution unless hardwarePollingAuthorized_
+  /// has been explicitly set to true. Simulated accelerated cadence is allowed
+  /// ONLY on Mock/Fake transports during tests.
+  void authorizeHardwarePolling(bool authorized) {
+    hardwarePollingAuthorized_ = authorized;
+  }
+  bool isHardwarePollingAuthorized() const {
+    return hardwarePollingAuthorized_;
+  }
+
   /// Polls all due blocks and updates telemetry samples with quality metadata.
   /// Non-blocking: returns immediately after polling due blocks.
   /// Returns number of blocks successfully polled this cycle.
   size_t poll(uint64_t nowMs);
+
+  /// Backoff and error handling accessors (Milestone M9)
+  uint32_t getConsecutiveErrors() const { return consecutiveErrors_; }
+  bool isCircuitOpen() const { return circuitOpen_; }
+  uint32_t getBackoffMultiplier() const { return backoffMultiplier_; }
+  void setMinInterFrameGapMs(uint32_t gapMs) { minInterFrameGapMs_ = gapMs; }
 
   /// Retrieves current telemetry samples with quality metadata.
   /// Map keyed by canonical measurement ID (e.g. "battery.soc").
@@ -102,7 +122,7 @@ public:
   void resetStats() { stats_ = Stats{}; }
 
 private:
-  void pollBlock(const std::string &blockName, PollingBlock &block,
+  bool pollBlock(const std::string &blockName, PollingBlock &block,
                  uint64_t nowMs);
   void updateSampleQuality(TelemetrySample &sample, uint64_t nowMs,
                            bool verified);
@@ -113,6 +133,15 @@ private:
   Transport &transport_;
   uint8_t slaveId_;
   uint32_t maxAgeMs_ = 15000; ///< Default 15s staleness threshold
+
+  bool hardwarePollingAuthorized_ =
+      false; ///< Gate G2 authorization required for real hardware
+  uint32_t consecutiveErrors_ = 0;
+  uint32_t backoffMultiplier_ = 1;
+  bool circuitOpen_ = false;
+  uint64_t circuitOpenUntilMs_ = 0;
+  uint64_t lastTransactionMs_ = 0;
+  uint32_t minInterFrameGapMs_ = 200;
 
   std::map<std::string, PollingBlock> blocks_;
   std::map<std::string, TelemetrySample> samples_;

@@ -1,0 +1,15 @@
+{
+  "serial_port": "/dev/ttyUSB0",
+  "baud_rate": 9600,
+  "slave_id": 1,
+  "poll_interval_ms": 1000,
+  "mqtt": {
+    "enabled": false,
+    "host": "localhost",
+    "port": 1883,
+    "topic_prefix": "afore"
+  },
+  "logging": {
+    "level": "INFO"
+  }
+}

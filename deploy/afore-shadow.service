@@ -1,0 +1,27 @@
+[Unit]
+Description=Afore Autonomous EMS (Shadow Read-Only Daemon)
+Documentation=https://github.com/gianv/afore-autonomous-ems
+After=network.target
+
+[Service]
+Type=simple
+User=pi
+Group=dialout
+WorkingDirectory=/opt/afore-ems
+ExecStart=/opt/afore-ems/heliograph-daemon --config /etc/afore-ems/config.json --port /dev/ttyUSB0 --baud 9600
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+AmbientCapabilities=
+CapabilityBoundingSet=
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/var/log/afore-ems
+ProtectKernelTunables=true
+ProtectControlGroups=true
+RestrictRealtime=true
+
+[Install]
+WantedBy=multi-user.target

@@ -44,6 +44,11 @@ mkdir -p /var/log/afore-ems
 cp "${BUILD_DIR}/heliograph-daemon" /opt/afore-ems/heliograph-daemon
 chmod +x /opt/afore-ems/heliograph-daemon
 
+cp "${REPO_ROOT}/deploy/web_ui.py" /opt/afore-ems/web_ui.py
+chmod +x /opt/afore-ems/web_ui.py
+mkdir -p /opt/afore-ems/src/web/assets
+cp -r "${REPO_ROOT}/src/web/assets"/* /opt/afore-ems/src/web/assets/
+
 if [ ! -f /etc/afore-ems/config.json ]; then
     cp "${REPO_ROOT}/deploy/config.json.example" /etc/afore-ems/config.json
     echo "Created default /etc/afore-ems/config.json"
@@ -62,8 +67,12 @@ echo ""
 echo "=========================================================="
 echo "Installation complete!"
 echo ""
-echo "To start the service now:"
+echo "To start the service and web UI now:"
 echo "    sudo systemctl enable --now afore-shadow.service"
+echo ""
+echo "Web interface will be available at:"
+echo "    http://<RASPBERRY-IP>:8080/       (Live Dashboard)"
+echo "    http://<RASPBERRY-IP>:8080/setup  (Setup Wizard)"
 echo ""
 echo "To inspect live logs:"
 echo "    sudo journalctl -u afore-shadow.service -f"

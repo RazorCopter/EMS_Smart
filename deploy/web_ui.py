@@ -19,6 +19,7 @@ import pathlib
 import socketserver
 import sys
 import threading
+import time
 from http.server import SimpleHTTPRequestHandler
 
 BASE_DIR = pathlib.Path(__file__).resolve().parent
@@ -161,6 +162,22 @@ class EmsWebHandler(SimpleHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(payload)
 
+    def get_standard_measurements(self):
+        return {
+            "ac.power.total": {"value": 2450.0, "unit": "W", "valid": True, "stale": False},
+            "ac.phase_l1.voltage": {"value": 230.2, "unit": "V", "valid": True, "stale": False},
+            "ac.phase_l1.current": {"value": 10.6, "unit": "A", "valid": True, "stale": False},
+            "ac.phase_l1.power": {"value": 2450.0, "unit": "W", "valid": True, "stale": False},
+            "ac.frequency": {"value": 50.0, "unit": "Hz", "valid": True, "stale": False},
+            "dc.mppt_1.voltage": {"value": 340.5, "unit": "V", "valid": True, "stale": False},
+            "dc.mppt_1.current": {"value": 7.2, "unit": "A", "valid": True, "stale": False},
+            "dc.mppt_1.power": {"value": 2451.6, "unit": "W", "valid": True, "stale": False},
+            "dc.power.total": {"value": 2451.6, "unit": "W", "valid": True, "stale": False},
+            "inverter.temperature": {"value": 38.5, "unit": "°C", "valid": True, "stale": False},
+            "energy.today": {"value": 12.4, "unit": "kWh", "valid": True, "stale": False},
+            "energy.total": {"value": 4580.0, "unit": "kWh", "valid": True, "stale": False}
+        }
+
     def serve_status(self):
         status = {
             "bridge": {
@@ -169,6 +186,11 @@ class EmsWebHandler(SimpleHTTPRequestHandler):
                 "firmware_version": "1.0.0",
                 "board_id": "raspberry-pi",
                 "ip_mode": "dhcp",
+                "wifi_connected": True,
+                "wifi_rssi_dbm": -42,
+                "mqtt_connected": False,
+                "modbus_listening": True,
+                "modbus_clients": 0,
                 "max_devices": 8,
                 "devices_configured": 1,
                 "devices_started": 1,
@@ -188,25 +210,25 @@ class EmsWebHandler(SimpleHTTPRequestHandler):
                 "consecutive_poll_failures": 0,
                 "last_successful_poll_seconds_ago": 2
             },
-            "measurements": {
-                "ac.power.total": {"v": 2450.0, "u": "W", "q": "good"},
-                "ac.l1.voltage": {"v": 230.2, "u": "V", "q": "good"},
-                "ac.l1.current": {"v": 10.6, "u": "A", "q": "good"},
-                "ac.frequency": {"v": 50.0, "u": "Hz", "q": "good"},
-                "dc.mppt1.voltage": {"v": 340.5, "u": "V", "q": "good"},
-                "dc.mppt1.current": {"v": 7.2, "u": "A", "q": "good"},
-                "dc.mppt1.power": {"v": 2451.6, "u": "W", "q": "good"},
-                "inverter.temperature": {"v": 38.5, "u": "°C", "q": "good"},
-                "energy.today": {"v": 12.4, "u": "kWh", "q": "good"},
-                "energy.total": {"v": 4580.0, "u": "kWh", "q": "good"}
-            },
+            "measurements": self.get_standard_measurements(),
             "totals": {
                 "ac_power_w": 2450.0,
                 "energy_today_kwh": 12.4,
                 "devices_polled": 1,
                 "devices_answering": 1
             },
-            "devices": ["inverter_1"]
+            "devices": [
+                {
+                    "id": "inverter_1",
+                    "label": "Afore Inverter 1",
+                    "online": True,
+                    "data_valid": True,
+                    "data_stale": False,
+                    "ac_power_w": 2450.0,
+                    "energy_today_kwh": 12.4,
+                    "last_successful_poll_seconds_ago": 2
+                }
+            ]
         }
         payload = json.dumps(status).encode("utf-8")
         self.send_response(200)
@@ -225,14 +247,7 @@ class EmsWebHandler(SimpleHTTPRequestHandler):
 
     def serve_device_detail(self, url):
         if url.endswith("/measurements"):
-            meas = {
-                "measurements": {
-                    "ac.power.total": {"v": 2450.0, "u": "W", "q": "good"},
-                    "ac.l1.voltage": {"v": 230.2, "u": "V", "q": "good"},
-                    "ac.l1.current": {"v": 10.6, "u": "A", "q": "good"},
-                    "energy.today": {"v": 12.4, "u": "kWh", "q": "good"}
-                }
-            }
+            meas = {"measurements": self.get_standard_measurements()}
             payload = json.dumps(meas).encode("utf-8")
         elif url.endswith("/capabilities"):
             caps = {"readable": True, "writable": False, "controls": []}
@@ -303,11 +318,25 @@ class EmsWebHandler(SimpleHTTPRequestHandler):
         self.send_header("Cache-Control", "no-cache")
         self.send_header("Connection", "keep-alive")
         self.end_headers()
-        self.wfile.write(b"data: {\"status\":\"connected\"}\n\n")
+        try:
+            poll_cnt = 1
+            while True:
+                msg = f"event: state\ndata: {json.dumps({'polls': poll_cnt})}\n\n"
+                self.wfile.write(msg.encode("utf-8"))
+                self.wfile.flush()
+                poll_cnt += 1
+                time.sleep(3)
+        except Exception:
+            pass
+
+
+class ThreadedHTTPServer(socketserver.ThreadingMixIn, socketserver.TCPServer):
+    allow_reuse_address = True
+    daemon_threads = True
 
 
 def run(host="0.0.0.0", port=8080):
-    server = socketserver.TCPServer((host, port), EmsWebHandler)
+    server = ThreadedHTTPServer((host, port), EmsWebHandler)
     server.allow_reuse_address = True
     print(f"===========================================================")
     print(f"  Afore Autonomous EMS - Web UI Ready                      ")

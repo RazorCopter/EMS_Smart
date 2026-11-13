@@ -244,6 +244,10 @@ $('ssid').onchange=e=>{
   $('ssid2l').style.display=other?'block':'none';
 };
 
+$('mq_en').onchange=e=>{
+  $('mq_fields').style.display=e.target.checked?'block':'none';
+};
+
 $('f').onsubmit=async e=>{
   e.preventDefault();
   // Disabled first, before any await: two quick taps while the mode lookup is still in flight

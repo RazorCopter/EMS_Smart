@@ -63,6 +63,14 @@ class EmsWebHandler(SimpleHTTPRequestHandler):
             self.serve_config()
         elif url == "/api/v1/status":
             self.serve_status()
+        elif url == "/api/v1/devices":
+            self.serve_devices()
+        elif url.startswith("/api/v1/devices/"):
+            self.serve_device_detail(url)
+        elif url == "/api/v1/diagnostics":
+            self.serve_diagnostics()
+        elif url == "/api/v1/drivers":
+            self.serve_drivers()
         elif url == "/api/v1/wifi/scan":
             self.serve_wifi_scan()
         elif url == "/api/v1/events":
@@ -106,11 +114,21 @@ class EmsWebHandler(SimpleHTTPRequestHandler):
             self.send_error(500, f"Asset header not found: {header_filename}")
             return
         content = path.read_text(encoding="utf-8")
-        # Extract the raw HTML literal between R"rawliteral( and )rawliteral";
-        start = content.find('R"rawliteral(')
-        end = content.rfind(')rawliteral";')
-        if start != -1 and end != -1:
-            raw_html = content[start + len('R"rawliteral('):end]
+        # Extract the raw HTML literal between R"HTML( or R"rawliteral( and )HTML"; / )rawliteral";
+        start = content.find('R"HTML(')
+        delimiter = 'R"HTML('
+        end_delimiter = ')HTML";'
+        if start == -1:
+            start = content.find('R"rawliteral(')
+            delimiter = 'R"rawliteral('
+            end_delimiter = ')rawliteral";'
+
+        if start != -1:
+            end = content.rfind(end_delimiter)
+            if end != -1:
+                raw_html = content[start + len(delimiter):end]
+            else:
+                raw_html = content
         else:
             raw_html = content
 
@@ -145,12 +163,126 @@ class EmsWebHandler(SimpleHTTPRequestHandler):
 
     def serve_status(self):
         status = {
-            "version": "1.0.0",
-            "mode": "shadow_readonly",
-            "daemon_running": True,
-            "system": "Linux / Raspberry Pi"
+            "bridge": {
+                "id": "afore-m3",
+                "name": "Afore M3 Pi Gateway",
+                "firmware_version": "1.0.0",
+                "board_id": "raspberry-pi",
+                "ip_mode": "dhcp",
+                "max_devices": 8,
+                "devices_configured": 1,
+                "devices_started": 1,
+                "device_problems": []
+            },
+            "device": {
+                "id": "inverter_1",
+                "label": "Afore Inverter 1",
+                "driver_id": "afore_sun",
+                "support_level": "production",
+                "manufacturer": "Afore",
+                "model": "HNS-3000TL",
+                "serial_number": "AFORE-20240901",
+                "online": True,
+                "data_valid": True,
+                "data_stale": False,
+                "consecutive_poll_failures": 0,
+                "last_successful_poll_seconds_ago": 2
+            },
+            "measurements": {
+                "ac.power.total": {"v": 2450.0, "u": "W", "q": "good"},
+                "ac.l1.voltage": {"v": 230.2, "u": "V", "q": "good"},
+                "ac.l1.current": {"v": 10.6, "u": "A", "q": "good"},
+                "ac.frequency": {"v": 50.0, "u": "Hz", "q": "good"},
+                "dc.mppt1.voltage": {"v": 340.5, "u": "V", "q": "good"},
+                "dc.mppt1.current": {"v": 7.2, "u": "A", "q": "good"},
+                "dc.mppt1.power": {"v": 2451.6, "u": "W", "q": "good"},
+                "inverter.temperature": {"v": 38.5, "u": "°C", "q": "good"},
+                "energy.today": {"v": 12.4, "u": "kWh", "q": "good"},
+                "energy.total": {"v": 4580.0, "u": "kWh", "q": "good"}
+            },
+            "totals": {
+                "ac_power_w": 2450.0,
+                "energy_today_kwh": 12.4,
+                "devices_polled": 1,
+                "devices_answering": 1
+            },
+            "devices": ["inverter_1"]
         }
         payload = json.dumps(status).encode("utf-8")
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(payload)))
+        self.end_headers()
+        self.wfile.write(payload)
+
+    def serve_devices(self):
+        payload = json.dumps({"devices": ["inverter_1"]}).encode("utf-8")
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(payload)))
+        self.end_headers()
+        self.wfile.write(payload)
+
+    def serve_device_detail(self, url):
+        if url.endswith("/measurements"):
+            meas = {
+                "measurements": {
+                    "ac.power.total": {"v": 2450.0, "u": "W", "q": "good"},
+                    "ac.l1.voltage": {"v": 230.2, "u": "V", "q": "good"},
+                    "ac.l1.current": {"v": 10.6, "u": "A", "q": "good"},
+                    "energy.today": {"v": 12.4, "u": "kWh", "q": "good"}
+                }
+            }
+            payload = json.dumps(meas).encode("utf-8")
+        elif url.endswith("/capabilities"):
+            caps = {"readable": True, "writable": False, "controls": []}
+            payload = json.dumps(caps).encode("utf-8")
+        else:
+            dev = {
+                "id": "inverter_1",
+                "label": "Afore Inverter 1",
+                "driver_id": "afore_sun",
+                "support_level": "production",
+                "manufacturer": "Afore",
+                "model": "HNS-3000TL",
+                "serial_number": "AFORE-20240901",
+                "online": True,
+                "data_valid": True,
+                "data_stale": False,
+                "consecutive_poll_failures": 0,
+                "last_successful_poll_seconds_ago": 2
+            }
+            payload = json.dumps(dev).encode("utf-8")
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(payload)))
+        self.end_headers()
+        self.wfile.write(payload)
+
+    def serve_diagnostics(self):
+        diag = {
+            "uptime_seconds": 12450,
+            "heap_free_bytes": 104857600,
+            "poll_cycles_total": 2490,
+            "poll_cycles_failed": 0,
+            "last_reset_reason": "power_on"
+        }
+        payload = json.dumps(diag).encode("utf-8")
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(payload)))
+        self.end_headers()
+        self.wfile.write(payload)
+
+    def serve_drivers(self):
+        drivers = {
+            "drivers": [
+                {"id": "afore_sun", "name": "Afore HNS / BNT Series", "support_level": "production"},
+                {"id": "modbus_sunspec", "name": "SunSpec Modbus Inverter", "support_level": "production"},
+                {"id": "sungrow_sh", "name": "Sungrow SH Hybrid Series", "support_level": "production"}
+            ]
+        }
+        payload = json.dumps(drivers).encode("utf-8")
         self.send_response(200)
         self.send_header("Content-Type", "application/json")
         self.send_header("Content-Length", str(len(payload)))

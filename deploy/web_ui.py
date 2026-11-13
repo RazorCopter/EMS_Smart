@@ -21,9 +21,9 @@ import sys
 import threading
 from http.server import SimpleHTTPRequestHandler
 
-REPO_ROOT = pathlib.Path(__file__).resolve().parent.parent
+BASE_DIR = pathlib.Path(__file__).resolve().parent
 CONFIG_PATH = pathlib.Path("/etc/afore-ems/config.json")
-LOCAL_CONFIG = REPO_ROOT / "deploy" / "config.json"
+LOCAL_CONFIG = BASE_DIR / "config.json"
 
 
 def get_active_config_path() -> pathlib.Path:
@@ -43,6 +43,16 @@ class EmsWebHandler(SimpleHTTPRequestHandler):
         self.send_response(204)
         self.end_headers()
 
+    def do_HEAD(self):
+        url = self.path.split("?")[0]
+        if url in ("/", "/index.html", "/setup", "/setup.html"):
+            self.send_response(200)
+            self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.end_headers()
+        else:
+            self.send_response(200)
+            self.end_headers()
+
     def do_GET(self):
         url = self.path.split("?")[0]
         if url in ("/", "/index.html"):
@@ -53,8 +63,13 @@ class EmsWebHandler(SimpleHTTPRequestHandler):
             self.serve_config()
         elif url == "/api/v1/status":
             self.serve_status()
+        elif url == "/api/v1/wifi/scan":
+            self.serve_wifi_scan()
         elif url == "/api/v1/events":
             self.serve_sse()
+        elif url == "/favicon.ico":
+            self.send_response(204)
+            self.end_headers()
         else:
             self.send_error(404, "Not Found")
 
@@ -83,7 +98,10 @@ class EmsWebHandler(SimpleHTTPRequestHandler):
             self.send_error(404, "Not Found")
 
     def serve_asset(self, header_filename: str, content_type: str):
-        path = REPO_ROOT / "src" / "web" / "assets" / header_filename
+        # Support both repository layout (/src/web/assets) and deployment layout (/opt/afore-ems/src/web/assets)
+        candidate1 = BASE_DIR / "src" / "web" / "assets" / header_filename
+        candidate2 = BASE_DIR.parent / "src" / "web" / "assets" / header_filename
+        path = candidate1 if candidate1.exists() else candidate2
         if not path.exists():
             self.send_error(500, f"Asset header not found: {header_filename}")
             return
@@ -133,6 +151,14 @@ class EmsWebHandler(SimpleHTTPRequestHandler):
             "system": "Linux / Raspberry Pi"
         }
         payload = json.dumps(status).encode("utf-8")
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(payload)))
+        self.end_headers()
+        self.wfile.write(payload)
+
+    def serve_wifi_scan(self):
+        payload = json.dumps({"networks": [{"ssid": "Wired / Eth Ethernet", "rssi": -30, "secure": True}]}).encode("utf-8")
         self.send_response(200)
         self.send_header("Content-Type", "application/json")
         self.send_header("Content-Length", str(len(payload)))

@@ -49,3 +49,11 @@ Discovery uses one device identifier, with 36 unique entity IDs in the default c
 ## Screenshots
 
 [Desktop](evidence/M4_desktop.png) · [Mobile](evidence/M4_mobile.png)
+
+## Bench acceptance
+
+Firmware v5.1-console-2, signed OTA SHA-256 5660bc6859c915a09036346724dd65fce730ecc420a03f092941e7751ed3f1c7, confirmed valid. The previous validated image remained available in the alternate slot. Configuration and browser tests exercised all tabs, save, backup without secrets, import, EMS and MQTT rollback, strategy selection, ampere conversion and broker connection test. The firmware served a complete 256-record ordered decision ring.
+
+The temporary authenticated LAN broker saw all 36 unique Discovery messages with one shared device identifier. Tests passed for accepted, expired, duplicate and retained commands, and an expiring override returned to the local strategy. Stopping the broker and an eight-second Wi-Fi radio interruption both preserved FC04 acquisition. MQTT reconnected on recovery. A requested reboot preserved the policy and reconnected to MQTT. Final ACK replay was repeated on the final firmware. The factory-default disabled broker settings were restored after the bench run and temporary credentials were purged from both active and previous broker configuration.
+
+The final firmware completed 3,608.80 s of sampled observation. The 345 samples show FC04 readings 5 to 7,974 (7,969 in window), zero errors and reset-free uptime. Decision sequence advanced from 19 to 3,561. Heap 159,564 B at start, 159,092 B at end and 155,732 B minimum across samples. Firmware low-water heap was 149,612 B. RSSI -62 to -58 dBm. Every sample showed broker connected, GPIO47 LOW, AUX1 DISABLED and zero Modbus writes. [Stability CSV](evidence/M4_STABILITY.csv) · [MQTT ACK evidence](evidence/M4_MQTT_ACKS.json).

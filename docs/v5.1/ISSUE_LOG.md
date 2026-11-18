@@ -51,3 +51,13 @@ After five seconds of passive listening, the unit read FC04 2002/1 followed by 5
 |---|---|---|---|---|
 | V51-09 | Passive detection stops on unscheduled traffic or foreign frames, but a quiet second master and wire-level proof require capture. | Medium | G4 | Validate topology and add independent capture in qualification. |
 | V51-10 | Raw words and corresponding scale are logged for the initial block round. Ongoing logs contain decoded snapshots. | Low | G5 | Add bounded raw diagnostic history if needed. |
+
+### Step 3 acceptance
+
+Host assertions passed for SELF_USE, CHARGE_FIRST, NATIVE_INVERTER and SAFE_MODE, including stale input, bus halt and the post-ramp SOC floor/ceiling regression. The signed image v5.1-shadow-1 (SHA-256 13088b3dd01d29a95d41d9d156363a7a32b00229701c56c5a6d6161ddb2a415f) booted valid on app1 at 10.0.0.110, leaving FC04 checkpoint app0 available. Final audit at 39.5 s: 52 valid reads, zero errors, SOC 23%, grid -3 W, battery -679 W, candidate -676 W, simulated -683 W, executed=false. Six consecutive health samples had increasing uptime and -67 to -63 dBm, with no unexpected reset. ELF scan did not find legacy write encoders, relay controller or profile driver execution. Raw evidence is in .pio/step3-shadow.log.
+
+| ID | Description | Severity | Gate | Proposal |
+|---|---|---|---|---|
+| V51-11 | SELF_USE is the fixed runtime strategy in this build. SAFE_MODE is selected on unusable inputs. CHARGE_FIRST and NATIVE_INVERTER are implemented and host tested. | Medium | G7/G8 | Expose strategy and threshold selection via authenticated configuration, then verify each strategy on the ESP32. |
+| V51-12 | Simplified decision audit shares the 64-record diagnostic ring. Timestamp uses heartbeat sequence/uptime, with RTC UTC currently unavailable. | Low | G6/G8 | Add a decision-only API and typed, longer-lived records. Replace the missing age placeholder with null. |
+| V51-13 | MQTT, broker and Wi-Fi outage recovery, and the 30-minute observation are still pending. | Medium | G7/G10 | Complete the connectivity and verification steps using the real plant. |

@@ -38,6 +38,18 @@ int main() {
     d=m.tick(sample(85,-100,32000),p,5,32000);
     assert(d.strategy==Strategy::Native && std::string_view(d.transition)=="MAINTENANCE_FAULT_ABORT");
     assert(!d.executed);
+    Policy limits;
+    limits.discharge=800;
+    limits.dischargeA=8;
+    auto power=sample(50,600,33000);
+    power.batteryVoltage={50,33000,Quality::Valid};
+    assert(m.tick(power,limits,6,33000).finalWatts==-400);
+    power.batteryVoltage.status=Quality::Missing;
+    assert(m.tick(power,limits,6,33000).finalWatts==0);
+    limits.dischargeA=0;
+    limits.exportLimit=200;
+    power.grid.value=-500;
+    assert(m.tick(power,limits,7,33000).lower==300);
     p.ceiling=10;
     assert(!p.valid());
 }

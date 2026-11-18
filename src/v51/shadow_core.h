@@ -15,9 +15,13 @@ struct Policy {
     int charge=1000, discharge=1000, deadband=20, ramp=250, staleMs=5000;
     int chargeFirstW=1000, surplusOnly=1, gridCharge=0, hysteresis=2, chargeFirstSec=7200;
     int deadlineSec=14400, capacityWh=5000, efficiencyPct=90, targetW=1000;
+    int chargeA=0,dischargeA=0,minVolt=0,maxVolt=0,resumeSoc=20,gridTarget=0,exportLimit=0;
     int maintenanceSoc=90, maintenanceHoldSec=600, maintenanceSec=14400;
     bool valid() const {
-        return strategy>=0 && strategy<=5 && (fallback==0 || fallback==2 || fallback==3) &&
+        return chargeA>=0 && chargeA<=500 && dischargeA>=0 && dischargeA<=500 &&
+            minVolt>=0 && maxVolt>=0 && minVolt<=1000 && maxVolt<=1000 && (!maxVolt || minVolt<maxVolt) &&
+            resumeSoc>=0 && resumeSoc<=ceiling && gridTarget>=-20000 && gridTarget<=20000 &&
+            exportLimit>=0 && exportLimit<=20000 && strategy>=0 && strategy<=5 && (fallback==0 || fallback==2 || fallback==3) &&
             floor>=0 && floor<ceiling && ceiling<=100 && target>floor && target<=ceiling &&
             maintenanceSoc>floor && maintenanceSoc<=ceiling &&
             charge>=0 && charge<=20000 && discharge>=0 && discharge<=20000 &&
@@ -102,13 +106,24 @@ public:
             return complete(d,now);
         }
 
-        const int balance=int(std::lround(*batt-*grid));
+        const int surplus=int(std::lround(*batt-*grid));
+        const int balance=surplus+p.gridTarget;
+        const auto volt=essential(e.batteryVoltage,now,p.staleMs);
+        const bool haveVoltage=volt && *volt>0 && *volt<=1000;
+        const bool voltageSafe=(!p.minVolt && !p.maxVolt) ||
+            (haveVoltage && *volt>=p.minVolt && (!p.maxVolt || *volt<=p.maxVolt));
+        if (*soc<=p.floor) reserve_=true;
+        else if (*soc>std::max(p.floor,p.resumeSoc)) reserve_=false;
         const bool charging=d.strategy!=Strategy::SelfUse;
         const bool holding=d.strategy==Strategy::Maintenance && holdSince_.has_value();
         const bool permitGrid=charging && p.gridCharge && !(d.strategy==Strategy::ChargeFirst && p.surplusOnly);
         const int cap=std::min(p.charge,d.strategy==Strategy::ChargeFirst ? p.chargeFirstW : charging ? p.targetW : p.charge);
-        d.lower=*soc<=p.floor || charging ? 0 : -p.discharge;
-        d.upper=*soc>=p.ceiling ? 0 : std::min(cap,permitGrid ? cap : std::max(0,balance));
+        d.lower=reserve_ || charging ? 0 : -p.discharge;
+        if(p.dischargeA) d.lower=std::max(*d.lower,haveVoltage ? -int(p.dischargeA**volt):0);
+        d.upper=*soc>=p.ceiling ? 0 : std::min(cap,permitGrid ? cap : std::max(0,surplus));
+        if(p.chargeA) d.upper=std::min(*d.upper,haveVoltage ? int(p.chargeA**volt):0);
+        if(p.exportLimit) d.lower=std::min(*d.upper,std::max(*d.lower,surplus-p.exportLimit));
+        if(!voltageSafe) {d.lower=0;d.upper=0;}
         d.state=holding ? "HOLD" : d.strategy==Strategy::ChargeFirst && nearTarget_ ? "TAPER" : "RUN";
         if (d.strategy==Strategy::Target || d.strategy==Strategy::Maintenance) {
             d.missingWh=std::max(0.0,goal-*soc)*p.capacityWh/p.efficiencyPct;
@@ -151,6 +166,6 @@ private:
     std::optional<int> priorW_;
     Strategy effective_=Strategy::Safe;
     const char* state_="SAFE", *exit_="UNCHANGED";
-    bool done_=false, nearTarget_=false;
+    bool done_=false, nearTarget_=false, reserve_=true;
 };
 }

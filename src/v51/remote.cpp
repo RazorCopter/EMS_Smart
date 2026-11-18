@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 #include "remote.h"
 #include "ems_runtime.h"
+#include "m4.h"
 
 #include <Arduino.h>
 #include <ESPmDNS.h>
@@ -196,7 +197,9 @@ esp_err_t setupPage(httpd_req_t* request) {
     if (!authorized(request)) return ESP_OK;
     httpd_resp_set_type(request, "text/html; charset=utf-8");
     httpd_resp_set_hdr(request, "Cache-Control", "no-store");
-    return httpd_resp_sendstr(request, kSetupPage);
+    if (strcmp(request->uri,"/wifi")==0) return httpd_resp_sendstr(request,kSetupPage);
+    httpd_resp_set_hdr(request,"Content-Encoding","gzip");
+    return httpd_resp_send(request,reinterpret_cast<const char*>(dashboardPage()),dashboardSize());
 }
 
 bool receiveBody(httpd_req_t* request, char* buffer, size_t capacity) {
@@ -337,11 +340,12 @@ bool startHttp() {
     config.stack_size = 10240;
     config.recv_wait_timeout = 5;
     config.send_wait_timeout = 5;
-    config.max_uri_handlers = 10;
+    config.max_uri_handlers = 22;
     config.lru_purge_enable = true;
     if (httpd_start(&server, &config) != ESP_OK) return false;
     const httpd_uri_t routes[] = {
         {"/", HTTP_GET, setupPage, nullptr},
+        {"/wifi", HTTP_GET, setupPage, nullptr},
         {"/setup", HTTP_POST, saveStation, nullptr},
         {"/api/v1/health", HTTP_GET, health, nullptr},
         {"/api/v1/logs", HTTP_GET, logResponse, nullptr},
@@ -355,6 +359,7 @@ bool startHttp() {
         }
     }
     registerEms(server,authorized);
+    registerM4(server,authorized,preferences);
     return true;
 }
 
@@ -378,6 +383,7 @@ void manageWifi(uint32_t now) {
             char line[96];
             snprintf(line, sizeof(line), "Wi-Fi STA ip=%s rssi=%d", address.c_str(), WiFi.RSSI());
             recordLog(line);
+            configTime(0,0,"pool.ntp.org");
         }
         lastConnection = now;
         if (!mdns && (mdns = MDNS.begin(kHost))) MDNS.addService("http", "tcp", 80);

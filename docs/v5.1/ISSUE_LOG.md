@@ -71,3 +71,14 @@ Host assertions passed for SELF_USE, CHARGE_FIRST, NATIVE_INVERTER and SAFE_MODE
 | V51-16 | Relative deadlines and hold timers use monotonic uptime; a reboot or configuration change starts a new session. | Medium | G6 | Qualify checkpointed session recovery and optional UTC deadlines after a trusted clock is available. |
 | V51-17 | SOC/limits are persisted; lead-time and maintenance lifecycle were replayed on the production ESP32 firmware. Fault injection and real battery control remain outside SHADOW. | Low | G10 | Expand coverage of real environmental and communications faults. |
 | V51-18 | Independent load metering and signed battery-to-AC loss calibration are pending. Small discrepancies in the instantaneous balance are expected because the sources have different capture windows. | Medium | G5/G10 | Evaluate separately with synchronized and independently measured reference data. |
+
+### Mission 4 issues
+
+| ID | Description | Severity | Gate | Proposal |
+|---|---|---|---|---|
+| V51-19 | SOH, battery temperature, grid current, inverter running status and cumulative energy lack a qualified binding in the current FC04 profile. | Medium | G5 | Validate manufacturer address, scale and quality on the installed inverter before publishing. |
+| V51-20 | Discovery was verified with a real broker and schema inspection; no production Home Assistant endpoint or production broker was configured for this mission. | Medium | G7 | Point HA and ESP to the same deployment broker and check entity onboarding. |
+| V51-21 | TLS requires both a valid clock and an ESP certificate-bundle chain. Positive TLS testing with the final broker and private CA provisioning are pending. | Medium | G7 | Test TLS with the installed broker and add private CA handling if required. |
+| V51-22 | Each settings section is atomic and has rollback. Whole-file restore spans EMS and MQTT namespaces and is not power-loss atomic across sections. Runtime revision counters restart on boot. | Medium | G8 | Add a persistent shared generation and a single bundle promotion if needed. |
+| V51-23 | Changing device ID or discovery prefix can leave the previous identifiers retained on the broker. Deduplication cache holds the latest 32 message IDs in RAM. | Low | G7 | Treat device ID as stable and remove old retained configs during migration; quantify command burst limits. |
+| V51-24 | Audit persists in PSRAM until reboot. The structured decision body carries core SOC/grid quality and no separate long-term raw trace. | Low | G8 | Extend correlation and cross-field quality metadata when analytics are added. |

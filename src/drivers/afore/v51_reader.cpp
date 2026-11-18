@@ -28,6 +28,14 @@ Sample* matchField(EnergyState& state, const char* id) {
     if (strcmp(id, "inverter.temperature") == 0) return &state.temperature;
     if (strcmp(id, "ac.phase_l1.voltage") == 0) return &state.voltage;
     if (strcmp(id, "ac.frequency") == 0) return &state.frequency;
+    if (strcmp(id, "battery.voltage") == 0) return &state.batteryVoltage;
+    if (strcmp(id, "battery.current") == 0) return &state.batteryCurrent;
+    if (strcmp(id, "dc.mppt_1.voltage") == 0) return &state.pv1v;
+    if (strcmp(id, "dc.mppt_1.current") == 0) return &state.pv1a;
+    if (strcmp(id, "dc.mppt_1.power") == 0) return &state.pv1w;
+    if (strcmp(id, "dc.mppt_2.voltage") == 0) return &state.pv2v;
+    if (strcmp(id, "dc.mppt_2.current") == 0) return &state.pv2a;
+    if (strcmp(id, "dc.mppt_2.power") == 0) return &state.pv2w;
     return nullptr;
 }
 

@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: MIT
 #include "ems_runtime.h"
 #include "remote.h"
+#include "m4.h"
 #include <array>
+#include <Arduino.h>
 #include <cstring>
 #include <mutex>
 #include <sstream>
@@ -11,6 +13,9 @@ namespace heliograph::v51 {
 namespace {
 struct Field { const char* name; int Policy::* member; };
 constexpr Field fields[]={
+    {"charge_a",&Policy::chargeA},{"discharge_a",&Policy::dischargeA},
+    {"voltage_min",&Policy::minVolt},{"voltage_max",&Policy::maxVolt},{"soc_resume",&Policy::resumeSoc},
+    {"grid_target_w",&Policy::gridTarget},{"export_limit_w",&Policy::exportLimit},
     {"strategy",&Policy::strategy},{"fallback",&Policy::fallback},{"soc_min",&Policy::floor},
     {"soc_max",&Policy::ceiling},{"soc_target",&Policy::target},{"charge_w",&Policy::charge},
     {"discharge_w",&Policy::discharge},{"deadband_w",&Policy::deadband},{"ramp_w_s",&Policy::ramp},
@@ -25,6 +30,8 @@ constexpr Field fields[]={
 std::mutex lock;
 Policy current;
 uint32_t revision=1;
+std::optional<Policy> overridePolicy;
+uint32_t leaseStart=0, leaseDuration=0;
 Preferences* storage=nullptr;
 bool (*checkAuth)(httpd_req_t*)=nullptr;
 
@@ -41,6 +48,7 @@ std::string audit(const EnergyState& e,const Policy& p,const Decision& d,
        <<"\",\"state\":\""<<d.state<<"\",\"transition\":\""<<d.transition<<"\",\"soc\":";
     number(out,essential(e.soc,now,p.staleMs));
     out<<",\"grid_w\":"; number(out,essential(e.grid,now,p.staleMs));
+    out<<",\"quality\":{\"soc\":\""<<(essential(e.soc,now,p.staleMs)?"valid":"unavailable")<<"\",\"grid\":\""<<(essential(e.grid,now,p.staleMs)?"valid":"unavailable")<<"\"}";
     out<<",\"battery_w\":"; number(out,essential(e.battery,now,p.staleMs));
     out<<",\"load_w\":"; number(out,essential(e.load,now,p.staleMs));
     out<<",\"pv_w\":"; number(out,essential(e.pv,now,p.staleMs));
@@ -51,7 +59,7 @@ std::string audit(const EnergyState& e,const Policy& p,const Decision& d,
     out<<",\"missing_wh\":"; number(out,d.missingWh);
     out<<",\"average_w\":"; number(out,d.averageW);
     out<<",\"unreachable\":"<<(d.unreachable ? "true":"false");
-    out<<",\"reason\":\""<<d.reason<<"\",\"executed\":false,\"modbus_write_count\":0}";
+    out<<",\"reason\":\""<<d.reason<<"\",\"executed\":false,\"applied\":null,\"aux1\":\"DISABLED\",\"modbus_write_count\":0}";
     return out.str();
 }
 
@@ -79,35 +87,7 @@ esp_err_t setPolicy(httpd_req_t* r) {
         offset+=n;
     }
     if (strlen(body)!=offset) return httpd_resp_send_err(r,HTTPD_400_BAD_REQUEST,"Invalid form");
-    Policy next;
-    { const std::lock_guard guard(lock); next=current; }
-    const int previousStrategy=next.strategy;
-    char* context=nullptr;
-    bool changed=false;
-    bool explicitFallback=false;
-    for (char* token=strtok_r(body,"&",&context); token; token=strtok_r(nullptr,"&",&context)) {
-        char* eq=strchr(token,'=');
-        if (!eq) return httpd_resp_send_err(r,HTTPD_400_BAD_REQUEST,"Invalid field");
-        *eq++=0;
-        const auto* end=eq+strlen(eq);
-        int value;
-        const auto result=std::from_chars(eq,end,value);
-        const auto field=std::find_if(std::begin(fields),std::end(fields),
-            [token](Field f){ return strcmp(f.name,token)==0; });
-        if (result.ec!=std::errc{} || result.ptr!=end || field==std::end(fields))
-            return httpd_resp_send_err(r,HTTPD_400_BAD_REQUEST,"Unknown or invalid field");
-        explicitFallback |= field->member==&Policy::fallback;
-        next.*(field->member)=value;
-        changed=true;
-    }
-    if (!explicitFallback && next.strategy!=previousStrategy && next.strategy>=4 &&
-        (previousStrategy==0 || previousStrategy==2 || previousStrategy==3)) {
-        next.fallback=previousStrategy;
-    }
-    if (!changed || !next.valid()) return httpd_resp_send_err(r,HTTPD_400_BAD_REQUEST,"Invalid policy limits");
-    if (!storage || storage->putBytes("ems-policy-v1",&next,sizeof(next))!=sizeof(next))
-        return httpd_resp_send_err(r,HTTPD_500_INTERNAL_SERVER_ERROR,"Policy persistence failed");
-    { const std::lock_guard guard(lock); current=next; ++revision; }
+    if (!applyPolicy(body,0,strcmp(body,"rollback=1")==0?3:0)) return httpd_resp_send_err(r,HTTPD_400_BAD_REQUEST,"Invalid policy or persistence failed");
     return getPolicy(r);
 }
 esp_err_t replay(httpd_req_t* r) {
@@ -140,20 +120,112 @@ esp_err_t replay(httpd_req_t* r) {
     return httpd_resp_send_chunk(r,nullptr,0);
 }
 }
+void appendPolicyJson(std::ostream& out) {
+    const std::lock_guard guard(lock);
+    out<<"{";
+    for (const auto& f:fields) out<<"\""<<f.name<<"\":"<<current.*(f.member)<<",";
+    out<<"\"strategy_name\":\""<<strategyName(static_cast<Strategy>(current.strategy))
+       <<"\",\"revision\":"<<revision<<",\"battery_model_provisional\":true}";
+}
+bool applyPolicy(const std::string& form,uint32_t leaseMs,int cancel) {
+    const std::lock_guard guard(lock);
+    if (cancel) {
+        if (cancel==3) {
+            Policy previous;
+            if (!storage || storage->getBytesLength("ems-policy-prev")!=sizeof(previous) ||
+                storage->getBytes("ems-policy-prev",&previous,sizeof(previous))!=sizeof(previous) ||
+                !previous.valid() || storage->putBytes("ems-policy-v1",&previous,sizeof(previous))!=sizeof(previous))
+                return false;
+            current=previous;
+        }
+        if (cancel==2 && (current.strategy==1 || current.strategy>=4)) {
+            Policy next=current;
+            next.strategy=current.strategy==1 ? 0 : current.fallback;
+            if (!storage || storage->putBytes("ems-policy-v1",&next,sizeof(next))!=sizeof(next))
+                return false;
+            current=next;
+        }
+        if (overridePolicy || cancel>=2) {
+            overridePolicy.reset();
+            ++revision;
+        }
+        return true;
+    }
+    if (form.empty() || form.size()>=768) return false;
+    char body[768];
+    memcpy(body,form.c_str(),form.size()+1);
+    Policy next;
+    next=current;
+    const int previousStrategy=next.strategy;
+    char* context=nullptr;
+    bool changed=false;
+    bool explicitFallback=false;
+    for (char* token=strtok_r(body,"&",&context); token; token=strtok_r(nullptr,"&",&context)) {
+        char* eq=strchr(token,'=');
+        if (!eq) return false;
+        *eq++=0;
+        const auto* end=eq+strlen(eq);
+        int value;
+        const auto result=std::from_chars(eq,end,value);
+        const auto field=std::find_if(std::begin(fields),std::end(fields),
+            [token](Field f){ return strcmp(f.name,token)==0; });
+        if (result.ec!=std::errc{} || result.ptr!=end || field==std::end(fields))
+            return false;
+        explicitFallback |= field->member==&Policy::fallback;
+        next.*(field->member)=value;
+        changed=true;
+    }
+    if (!explicitFallback && next.strategy!=previousStrategy && next.strategy>=4 &&
+        (previousStrategy==0 || previousStrategy==2 || previousStrategy==3)) {
+        next.fallback=previousStrategy;
+    }
+    if (!changed || !next.valid()) return false;
+    if (leaseMs) {
+        overridePolicy=next;
+        leaseStart=millis();
+        leaseDuration=leaseMs;
+    } else {
+        if (!storage || storage->putBytes("ems-policy-prev",&current,sizeof(current))!=sizeof(current) ||
+            storage->putBytes("ems-policy-v1",&next,sizeof(next))!=sizeof(next))
+            return false;
+        current=next;
+        overridePolicy.reset();
+    }
+    ++revision;
+    return true;
+}
 void loadPolicy(Preferences& preferences) {
     storage=&preferences;
+    struct LegacyPolicy { int fields[22]; };
+    LegacyPolicy legacy{};
     Policy saved;
+    if (preferences.getBytesLength("ems-policy-v1")==sizeof(legacy) &&
+        preferences.getBytes("ems-policy-v1",&legacy,sizeof(legacy))==sizeof(legacy)) {
+        for(size_t i=0;i<22;++i) saved.*(fields[i+7].member)=legacy.fields[i];
+        if(saved.valid()) current=saved;
+    }
     if (preferences.getBytesLength("ems-policy-v1")==sizeof(saved) &&
         preferences.getBytes("ems-policy-v1",&saved,sizeof(saved))==sizeof(saved) && saved.valid())
+        current=saved;
+    else if (preferences.getBytesLength("ems-policy-prev")==sizeof(saved) &&
+             preferences.getBytes("ems-policy-prev",&saved,sizeof(saved))==sizeof(saved) && saved.valid())
         current=saved;
 }
 void tickEms(const EnergyState& state,uint32_t now,uint32_t seq) {
     static StrategyManager manager;
     Policy p;
     uint32_t version;
-    { const std::lock_guard guard(lock); p=current; version=revision; }
+    {
+        const std::lock_guard guard(lock);
+        if (overridePolicy && now-leaseStart>=leaseDuration) {
+            overridePolicy.reset();
+            ++revision;
+        }
+        p=overridePolicy.value_or(current);
+        version=revision;
+    }
     const auto result=manager.tick(state,p,version,now);
-    recordLog(audit(state,p,result,now,seq,"MEASURED").c_str());
+    recordDecision(state,now,audit(state,p,result,now,seq,"MEASURED"));
 }
 void registerEms(httpd_handle_t server,bool (*authorize)(httpd_req_t*)) {
     checkAuth=authorize;

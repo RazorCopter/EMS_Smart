@@ -1,0 +1,423 @@
+// SPDX-License-Identifier: MIT
+#include "m4.h"
+#include "remote.h"
+#include <Arduino.h>
+#include <ArduinoJson.h>
+#include <WiFi.h>
+#include <mqtt_client.h>
+#include <esp_crt_bundle.h>
+#include <esp_wifi.h>
+#include <array>
+#include <algorithm>
+#include <driver/gpio.h>
+#include <mutex>
+#include <atomic>
+#include <sstream>
+#include <cstring>
+
+namespace heliograph::v51 {
+namespace {
+struct Channel { const char* key; const char* name; const char* unit; const char* type; Sample EnergyState::* sample; };
+constexpr Channel channels[]={
+ {"soc","Battery SOC","%","battery",&EnergyState::soc},{"battery_w","Battery power","W","power",&EnergyState::battery},
+ {"battery_v","Battery voltage","V","voltage",&EnergyState::batteryVoltage},{"battery_a","Battery current","A","current",&EnergyState::batteryCurrent},
+ {"pv_w","PV total","W","power",&EnergyState::pv},{"pv1_v","PV1 voltage","V","voltage",&EnergyState::pv1v},
+ {"pv1_a","PV1 current","A","current",&EnergyState::pv1a},{"pv1_w","PV1 power","W","power",&EnergyState::pv1w},
+ {"pv2_v","PV2 voltage","V","voltage",&EnergyState::pv2v},{"pv2_a","PV2 current","A","current",&EnergyState::pv2a},
+ {"pv2_w","PV2 power","W","power",&EnergyState::pv2w},{"grid_w","Grid power","W","power",&EnergyState::grid},
+ {"grid_v","Grid voltage","V","voltage",&EnergyState::voltage},{"hz","Grid frequency","Hz","frequency",&EnergyState::frequency},
+ {"load_w","Derived load","W","power",&EnergyState::load},{"inverter_w","Inverter AC power","W","power",&EnergyState::inverter},
+ {"temp_c","Inverter heatsink","°C","temperature",&EnergyState::temperature},
+};
+struct Broker {
+ bool enabled=false,tls=false,retain=true;
+ int port=1883,qos=0,telemetry_s=5,diagnostics_s=30,keepalive=30,timeout_ms=3000;
+ char host[96]{},user[64]{},password[96]{},device[32]="afore-ems",base[96]="afore/afore-ems/v1",prefix[32]="homeassistant";
+};
+std::mutex stateLock, brokerLock;
+std::atomic<bool> connected{false};
+std::atomic<uint32_t> linkedAt{0},publishedAt{0};
+std::atomic<int> lastError{0};
+Preferences* nvs=nullptr;
+Authorize authorized=nullptr;
+Broker configured, active;
+esp_mqtt_client_handle_t client=nullptr;
+uint32_t brokerRevision=1;
+std::string lastAck,lastCommand;
+std::array<std::string,32> ids;
+size_t idIndex=0;
+constexpr size_t records=256, recordSize=768;
+char* history=nullptr;
+uint32_t cursor=0;
+EnergyState snapshot;
+uint32_t sampleAt=0;
+std::string latest;
+
+std::string encode(JsonDocument& doc) {
+ std::string json;
+ serializeJson(doc,json);
+ return json;
+}
+esp_err_t jsonResponse(httpd_req_t* req,std::string value) {
+ httpd_resp_set_type(req,"application/json");
+ httpd_resp_set_hdr(req,"Cache-Control","no-store");
+ return httpd_resp_send(req,value.data(),value.size());
+}
+void telemetry(JsonDocument& d,const EnergyState& e,uint32_t now) {
+ JsonObject freshness=d["quality"].to<JsonObject>();
+ for (auto& c:channels) {
+   const auto& sample=e.*c.sample;
+   auto value=sample.usable(now);
+   if (value) d[c.key]=*value;
+   else d[c.key]=nullptr;
+   JsonObject q=freshness[c.key].to<JsonObject>();
+   auto age=sample.age(now);
+   if (age) q["age_ms"]=*age; else q["age_ms"]=nullptr;
+   q["source"]=c.sample==&EnergyState::load ? "derived":"measured";
+   q["state"]=value ? "valid": sample.quality(now)==Quality::Stale ? "stale":"unavailable";
+ }
+ d["reads"]=e.goodReads; d["errors"]=e.errors; d["fault"]=e.readHalted;
+ d["telemetry_valid"]=!e.readHalted && e.grid.usable(now).has_value() && e.soc.usable(now).has_value() && e.battery.usable(now).has_value();
+ d["shadow"]=true; d["aux1"]="DISABLED"; d["modbus_write_count"]=0;
+ d["mqtt"]=connected.load();
+}
+bool publish(const char* suffix,const std::string& value,bool retain=false) {
+ const auto topic=std::string(active.base)+"/"+suffix;
+ const bool ok=esp_mqtt_client_enqueue(client,topic.c_str(),value.c_str(),value.size(),active.qos,retain,true)>=0;
+ if(ok) publishedAt=millis();
+ return ok;
+}
+
+void discovery() {
+ const std::string base=active.base;
+ for (auto& c:channels) {
+   JsonDocument d;
+   const std::string id=std::string(active.device)+"_"+c.key;
+   d["name"]=c.name; d["unique_id"]=id;
+   d["device"]["identifiers"][0]=active.device; d["device"]["name"]="Afore Autonomous EMS";
+   d["device"]["manufacturer"]="Afore EMS";
+   d["state_topic"]=base+"/telemetry"; d["availability_topic"]=base+"/availability";
+   d["unit_of_measurement"]=c.unit; d["device_class"]=c.type; d["state_class"]="measurement";
+   d["value_template"]="{{ value_json."+std::string(c.key)+" }}";
+   auto topic=std::string(active.prefix)+"/sensor/"+id+"/config";
+   auto data=encode(d);
+   esp_mqtt_client_enqueue(client,topic.c_str(),data.c_str(),data.size(),1,1,true);
+ }
+ struct Entity {const char* component;const char* key;const char* label;const char* path;int max;};
+ const Entity entities[]={
+   {"binary_sensor","telemetry_valid","Telemetry valid","telemetry",0},{"binary_sensor","mqtt","MQTT","telemetry",0},
+   {"binary_sensor","shadow","SHADOW","telemetry",0},{"binary_sensor","fault","Bus fault","telemetry",0},
+   {"select","strategy","Local strategy","config/state",0},{"sensor","strategy","Effective strategy","ems/state",0},
+   {"sensor","simulated_w","Simulated power","ems/decision",0},
+   {"number","soc_min","Minimum SOC","config/state",100},{"number","soc_max","Maximum SOC","config/state",100},
+   {"number","soc_target","Target SOC","config/state",100},{"number","charge_w","Charge power limit","config/state",20000},
+   {"number","discharge_w","Discharge power limit","config/state",20000},
+   {"number","charge_a","Charge current limit","config/state",500},{"number","discharge_a","Discharge current limit","config/state",500},
+   {"number","voltage_min","Minimum battery voltage","config/state",1000},{"number","voltage_max","Maximum battery voltage","config/state",1000},
+   {"switch","grid_charge","Allow simulated grid charge","config/state",1},
+   {"button","cancel_override","Cancel override","config/state",0},{"button","cancel_session","Cancel session","config/state",0},
+ };
+ for(const auto& e:entities) {
+   JsonDocument d;
+   std::string component=e.component,key=e.key,id=std::string(active.device)+"_"+component+"_"+key;
+   d["name"]=e.label; d["unique_id"]=id;
+   d["device"]["identifiers"][0]=active.device; d["device"]["name"]="Afore Autonomous EMS";
+   d["availability_topic"]=base+"/availability";
+   if(component!="button") d["state_topic"]=base+"/"+e.path;
+   if(component=="binary_sensor") d["value_template"]="{{ 'ON' if value_json."+key+" else 'OFF' }}";
+   else if(component=="select") {
+     d["value_template"]="{{ value_json.strategy_name }}";
+     for(auto name:{"SELF_USE","CHARGE_FIRST","NATIVE_INVERTER","SAFE_MODE","TARGET_SOC","MAINTENANCE"}) d["options"].add(name);
+   } else if(component=="switch") {
+     d["value_template"]="{{ 'ON' if value_json.grid_charge else 'OFF' }}";
+   } else if(component!="button") d["value_template"]="{{ value_json."+key+" }}";
+   if(key=="simulated_w" || key=="charge_w" || key=="discharge_w") d["unit_of_measurement"]="W";
+   if(key=="charge_a" || key=="discharge_a") d["unit_of_measurement"]="A";
+   if(key=="voltage_min" || key=="voltage_max") d["unit_of_measurement"]="V";
+   if(key.rfind("soc_",0)==0) d["unit_of_measurement"]="%";
+   if(component=="number") {d["min"]=0;d["max"]=e.max;d["step"]=1;}
+   const auto envelope="{\"schema\":1,\"message_id\":\""+id+"-{{ (now().timestamp()*1000000)|int }}\",\"timestamp\":{{ now().timestamp()|int }},\"ttl\":30,";
+   if(component=="button") {
+     d["command_topic"]=base+"/ems/command";
+     d["command_template"]=envelope+"\"action\":\""+key+"\",\"payload\":{}}";
+   } else if(component=="number" || component=="select" || component=="switch") {
+     const std::string value=component=="select" ?
+       "{{ ['SELF_USE','CHARGE_FIRST','NATIVE_INVERTER','SAFE_MODE','TARGET_SOC','MAINTENANCE'].index(value) }}" :
+       component=="switch" ? "1":"{{ value|int }}";
+     auto tmpl=[&](const std::string& v){return envelope+"\"action\":\"policy\",\"payload\":{\""+key+"\":"+v+"}}";};
+     d["command_topic"]=base+"/ems/command";
+     if(component=="switch") {d["command_template"]=tmpl("{{ 1 if value=='ON' else 0 }}");}
+     else d["command_template"]=tmpl(value);
+   }
+   auto topic=std::string(active.prefix)+"/"+component+"/"+id+"/config";
+   auto data=encode(d);
+   esp_mqtt_client_enqueue(client,topic.c_str(),data.c_str(),data.size(),1,1,true);
+ }
+}
+void handleEvent(void*,esp_event_base_t,int32_t code,void* data) {
+ auto* e=static_cast<esp_mqtt_event_handle_t>(data);
+ if(code==MQTT_EVENT_CONNECTED) {
+   connected=true;
+   linkedAt=millis();
+   publish("availability","online",true);
+   const auto topic=std::string(active.base)+"/ems/command";
+   esp_mqtt_client_subscribe(e->client,topic.c_str(),active.qos);
+ } else if(code==MQTT_EVENT_DISCONNECTED) connected=false;
+ else if(code==MQTT_EVENT_ERROR) lastError=e->error_handle ? e->error_handle->error_type : -1;
+ else if(code==MQTT_EVENT_DATA && e->topic && e->data_len<=768 &&
+         e->data_len==e->total_data_len && e->current_data_offset==0 &&
+         std::string(e->topic,e->topic_len)==std::string(active.base)+"/ems/command") {
+   JsonDocument d;
+   if (deserializeJson(d,e->data,e->data_len)) return;
+   const std::string id=d["message_id"] | "";
+   const std::string action=d["action"] | "policy";
+   const int64_t timestamp=d["timestamp"] | int64_t(0);
+   const int ttl=d["ttl"] | 0;
+   const int64_t now=time(nullptr);
+   const char* reason="INVALID";
+   bool ok=false;
+   if(e->retain) reason="RETAINED";
+   else if(now<1700000000) reason="CLOCK_UNAVAILABLE";
+   else if(ttl<1 || ttl>600 || timestamp<=0 || timestamp>now+5 || timestamp<=now-ttl) reason="EXPIRED";
+   else if(d["schema"]==1 && !id.empty() && id.size()<=80) {
+     if(std::find(ids.begin(),ids.end(),id)!=ids.end()) reason="DUPLICATE";
+     else {
+       ids[idIndex++%ids.size()]=id;
+       std::string form;
+       bool allInts=d["payload"].is<JsonObject>();
+       for(auto field:d["payload"].as<JsonObject>()) {
+         if(!field.value().is<int>() || strspn(field.key().c_str(),"abcdefghijklmnopqrstuvwxyz_0123456789")!=strlen(field.key().c_str())) {allInts=false;break;}
+         if(!form.empty()) form+='&';
+         form+=field.key().c_str(); form+='='; form+=std::to_string(field.value().as<int>());
+       }
+       if(action=="cancel_override" || action=="cancel_session") ok=applyPolicy({},0,action=="cancel_session" ? 2 : 1);
+       else if(allInts && (action=="policy" || action=="override" || action=="target_soc" || action=="maintenance")) {
+         if(action=="target_soc" || action=="maintenance") {
+           if(!form.empty()) form+='&';
+           form+=action=="target_soc" ? "strategy=4":"strategy=5";
+         }
+         ok=applyPolicy(form,action=="override" ? 1000u*std::min<int64_t>(ttl,timestamp+ttl-now):0);
+       }
+       reason=ok?"ACCEPTED":"POLICY_REJECTED";
+     }
+   }
+   JsonDocument ack;
+   ack["schema"]=1;ack["message_id"]=id;ack["accepted"]=ok;ack["reason"]=reason;ack["executed"]=false;
+   auto value=encode(ack);
+   { const std::lock_guard guard(brokerLock); lastAck=value;lastCommand=action; }
+   publish("ems/ack",value);
+ }
+}
+void brokerTask(void*) {
+ uint32_t revision=0,lastState=0,lastInfo=0,seenConnection=0;
+ std::string willTopic;
+ while(true) {
+   Broker desired;
+   uint32_t next;
+   {const std::lock_guard guard(brokerLock); desired=configured;next=brokerRevision;}
+   if(revision!=next) {
+     if(client) {
+       if(connected) publish("availability","offline",true);
+       esp_mqtt_client_stop(client);esp_mqtt_client_destroy(client);client=nullptr;
+     }
+     connected=false;
+     active=desired;
+     revision=next;seenConnection=0;
+   }
+   if(!client && active.enabled && WiFi.status()==WL_CONNECTED) {
+     willTopic=std::string(active.base)+"/availability";
+     esp_mqtt_client_config_t c{};
+     c.broker.address.hostname=active.host;c.broker.address.port=active.port;
+     c.broker.address.transport=active.tls?MQTT_TRANSPORT_OVER_SSL:MQTT_TRANSPORT_OVER_TCP;
+     if(active.tls)c.broker.verification.crt_bundle_attach=esp_crt_bundle_attach;
+     c.credentials.client_id=active.device;c.credentials.username=active.user;
+     c.credentials.authentication.password=active.password;
+     c.session.keepalive=active.keepalive;c.network.timeout_ms=active.timeout_ms;
+     c.session.last_will.topic=willTopic.c_str();c.session.last_will.msg="offline";c.session.last_will.retain=1;c.session.last_will.qos=1;
+     c.outbox.limit=32768;
+     client=esp_mqtt_client_init(&c);
+     if(client) {
+       esp_mqtt_client_register_event(client,MQTT_EVENT_ANY,handleEvent,nullptr);
+       if(esp_mqtt_client_start(client)!=ESP_OK) {esp_mqtt_client_destroy(client);client=nullptr;lastError=-2;}
+     }
+   }
+   if(connected) {
+     uint32_t now=millis();
+     if(seenConnection!=linkedAt) {seenConnection=linkedAt;discovery();lastState=now-active.telemetry_s*1000;lastInfo=now-active.diagnostics_s*1000;}
+     if(now-lastState>=1000u*active.telemetry_s) {
+       lastState=now;
+       EnergyState e;std::string decision;
+       { const std::lock_guard guard(stateLock);e=snapshot;decision=latest; }
+       JsonDocument doc;telemetry(doc,e,now);
+       publish("telemetry",encode(doc),active.retain);
+       if(!decision.empty()) {publish("ems/state",decision,active.retain);publish("ems/decision",decision);}
+     }
+     if(now-lastInfo>=1000u*active.diagnostics_s) {
+       lastInfo=now;
+       std::ostringstream config;appendPolicyJson(config);publish("config/state",config.str(),active.retain);
+       JsonDocument doc;doc["rssi"]=WiFi.RSSI();doc["heap"]=ESP.getFreeHeap();doc["uptime_ms"]=now;
+       doc["psram"]=ESP.getPsramSize();doc["reset_reason"]=esp_reset_reason();doc["aux1"]="DISABLED";
+       doc["modbus_write_count"]=0;publish("diagnostics",encode(doc),active.retain);
+     }
+   }
+   vTaskDelay(pdMS_TO_TICKS(500));
+ }
+}
+
+esp_err_t getTelemetry(httpd_req_t* r) {
+ if(!authorized(r))return ESP_OK;
+ JsonDocument doc;
+ {const std::lock_guard guard(stateLock);telemetry(doc,snapshot,millis());}
+ return jsonResponse(r,encode(doc));
+}
+esp_err_t getDecision(httpd_req_t* r) {
+ if(!authorized(r))return ESP_OK;
+ const std::lock_guard guard(stateLock);
+ return jsonResponse(r,latest.empty()?"null":latest);
+}
+esp_err_t getDecisions(httpd_req_t* r) {
+ if(!authorized(r))return ESP_OK;
+ httpd_resp_set_type(r,"application/x-ndjson");
+ uint32_t end;
+ {const std::lock_guard guard(stateLock);end=cursor;}
+ if(history) for(uint32_t i=end>records?end-records:0;i<end;++i) {
+   char line[recordSize+1];
+   {const std::lock_guard guard(stateLock);
+    if(cursor-i>records) continue;
+    memcpy(line,history+(i%records)*recordSize,recordSize);}
+   if(line[0] && (httpd_resp_sendstr_chunk(r,line)!=ESP_OK || httpd_resp_sendstr_chunk(r,"\n")!=ESP_OK)) return ESP_FAIL;
+ }
+ return httpd_resp_send_chunk(r,nullptr,0);
+}
+void brokerJson(JsonDocument& d) {
+ const std::lock_guard guard(brokerLock);
+ const auto& b=configured;
+ d["enabled"]=b.enabled;d["tls"]=b.tls;d["retain"]=b.retain;d["port"]=b.port;d["qos"]=b.qos;
+ d["telemetry_s"]=b.telemetry_s;d["diagnostics_s"]=b.diagnostics_s;d["keepalive"]=b.keepalive;d["timeout_ms"]=b.timeout_ms;
+ d["host"]=b.host;d["user"]=b.user;d["device"]=b.device;d["base"]=b.base;d["prefix"]=b.prefix;
+ d["password_configured"]=b.password[0]!=0;d["schema_version"]=1;d["revision"]=brokerRevision;
+ d["connected"]=connected.load();d["last_connect_ms"]=linkedAt.load();d["last_publish_ms"]=publishedAt.load();
+ d["last_error"]=lastError.load();d["last_command"]=lastCommand;d["last_ack"]=lastAck;
+}
+esp_err_t getBroker(httpd_req_t* r) {
+ if(!authorized(r))return ESP_OK;
+ JsonDocument doc;brokerJson(doc);return jsonResponse(r,encode(doc));
+}
+bool validBroker(const Broker& b) {
+ auto simple=[](const char* s,const char* allowed){return *s && strspn(s,allowed)==strlen(s);};
+ constexpr char symbols[]="abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-";
+ constexpr char topic[]="abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-/";
+ return (!b.enabled || simple(b.host,"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-.:")) &&
+   simple(b.device,symbols) && simple(b.base,topic) && simple(b.prefix,topic) &&
+   b.port>=1 && b.port<=65535 && b.qos>=0 && b.qos<=1 && b.keepalive>=5 && b.keepalive<=300 &&
+   b.telemetry_s>=1 && b.telemetry_s<=300 && b.diagnostics_s>=5 && b.diagnostics_s<=600 &&
+   b.timeout_ms>=500 && b.timeout_ms<=15000;
+}
+esp_err_t saveBroker(httpd_req_t* r) {
+ if(!authorized(r))return ESP_OK;
+ auto invalid=[&](){return httpd_resp_send_err(r,HTTPD_400_BAD_REQUEST,"Invalid MQTT configuration");};
+ char data[1024];
+ if(!r->content_len || r->content_len>=sizeof(data))return invalid();
+ size_t size=0;
+ while(size<r->content_len) {int n=httpd_req_recv(r,data+size,r->content_len-size);if(n<=0)return ESP_FAIL;size+=n;}
+ JsonDocument doc;
+ if(deserializeJson(doc,data,size) || !doc.is<JsonObject>())return invalid();
+ Broker b;
+ {const std::lock_guard guard(brokerLock);b=configured;}
+ const bool rollback=doc.size()==1 && doc["rollback"]==true;
+ if(rollback) {
+   if(nvs->getBytesLength("mqtt-prev")!=sizeof(b) || nvs->getBytes("mqtt-prev",&b,sizeof(b))!=sizeof(b))
+     return invalid();
+ } else
+ for(auto field:doc.as<JsonObject>()) {
+   const std::string k=field.key().c_str();
+   auto v=field.value();
+   if(k=="enabled" || k=="tls" || k=="retain") {if(!v.is<bool>())return invalid(); (k=="enabled"?b.enabled:k=="tls"?b.tls:b.retain)=v.as<bool>();continue;}
+   struct Int {const char* name;int Broker::* field;};
+   const Int nums[]={{"port",&Broker::port},{"qos",&Broker::qos},{"telemetry_s",&Broker::telemetry_s},{"diagnostics_s",&Broker::diagnostics_s},{"keepalive",&Broker::keepalive},{"timeout_ms",&Broker::timeout_ms}};
+   auto num=std::find_if(std::begin(nums),std::end(nums),[&](auto n){return k==n.name;});
+   if(num!=std::end(nums)) {if(!v.is<int>())return invalid();b.*(num->field)=v.as<int>();continue;}
+   char* p=nullptr;size_t cap=0;
+   if(k=="host"){p=b.host;cap=sizeof(b.host);}else if(k=="user"){p=b.user;cap=sizeof(b.user);}
+   else if(k=="password"){p=b.password;cap=sizeof(b.password);}else if(k=="device"){p=b.device;cap=sizeof(b.device);}
+   else if(k=="base"){p=b.base;cap=sizeof(b.base);}else if(k=="prefix"){p=b.prefix;cap=sizeof(b.prefix);}
+   if(!p || !v.is<const char*>() || strlen(v.as<const char*>())>=cap)return invalid();
+   strcpy(p,v.as<const char*>());
+ }
+ if(doc["base"].isNull() && doc["device"].is<const char*>()) snprintf(b.base,sizeof(b.base),"afore/%s/v1",b.device);
+ if(!validBroker(b))return invalid();
+ Broker previous;
+ {const std::lock_guard guard(brokerLock);previous=configured;}
+ if((!rollback && nvs->putBytes("mqtt-prev",&previous,sizeof(previous))!=sizeof(previous)) ||
+    nvs->putBytes("mqtt-v1",&b,sizeof(b))!=sizeof(b))return httpd_resp_send_err(r,HTTPD_500_INTERNAL_SERVER_ERROR,"MQTT persistence failed");
+ {const std::lock_guard guard(brokerLock);configured=b;++brokerRevision;}
+ return getBroker(r);
+}
+esp_err_t testBroker(httpd_req_t* r) {
+ if(!authorized(r))return ESP_OK;
+ {
+   const std::lock_guard guard(brokerLock);
+   if(!configured.enabled) return httpd_resp_send_err(r,HTTPD_400_BAD_REQUEST,"MQTT disabled");
+   ++brokerRevision;
+ }
+ return jsonResponse(r,"{\"reconnect_requested\":true}");
+}
+std::atomic<bool> wifiTesting{false};
+esp_err_t testWifi(httpd_req_t* r) {
+ if(!authorized(r))return ESP_OK;
+ if(wifiTesting.exchange(true))return httpd_resp_send_err(r,HTTPD_400_BAD_REQUEST,"Wi-Fi test already active");
+ if(xTaskCreate([](void*){
+     vTaskDelay(pdMS_TO_TICKS(400));
+     esp_wifi_stop();
+     vTaskDelay(pdMS_TO_TICKS(8000));
+     esp_wifi_start();
+     WiFi.reconnect();
+     wifiTesting=false;
+     vTaskDelete(nullptr);
+   },"v51_wifi_test",4096,nullptr,1,nullptr)!=pdPASS) {
+   wifiTesting=false;
+   return httpd_resp_send_err(r,HTTPD_500_INTERNAL_SERVER_ERROR,"Test task unavailable");
+ }
+ return jsonResponse(r,"{\"wifi_outage_ms\":8000}");
+}
+esp_err_t getSystem(httpd_req_t* r) {
+ if(!authorized(r))return ESP_OK;
+ JsonDocument doc;doc["ssid"]=WiFi.SSID();doc["ip"]=WiFi.localIP().toString();
+ doc["gpio47"]=gpio_get_level(GPIO_NUM_47);doc["rtc_utc_available"]=time(nullptr)>1700000000;
+ return jsonResponse(r,encode(doc));
+}
+esp_err_t reboot(httpd_req_t* r) {
+ if(!authorized(r))return ESP_OK;
+ auto result=jsonResponse(r,"{\"restart\":true}");
+ xTaskCreate([](void*){vTaskDelay(pdMS_TO_TICKS(300));ESP.restart();},"v51_restart",2048,nullptr,1,nullptr);
+ return result;
+}
+}
+void recordDecision(const EnergyState& e,uint32_t now,const std::string& record) {
+ const std::lock_guard guard(stateLock);
+ snapshot=e;sampleAt=now;latest=record;
+ if(history && record.size()<recordSize) {
+   auto* p=history+(cursor++%records)*recordSize;
+   memcpy(p,record.c_str(),record.size()+1);
+ }
+}
+void registerM4(httpd_handle_t server,Authorize auth,Preferences& storage) {
+ nvs=&storage;authorized=auth;
+ Broker candidate;
+ if(storage.getBytesLength("mqtt-v1")==sizeof(candidate) &&
+    storage.getBytes("mqtt-v1",&candidate,sizeof(candidate))==sizeof(candidate) && validBroker(candidate))configured=candidate;
+ else if(storage.getBytesLength("mqtt-prev")==sizeof(candidate) &&
+         storage.getBytes("mqtt-prev",&candidate,sizeof(candidate))==sizeof(candidate) && validBroker(candidate))
+   configured=candidate;
+ history=static_cast<char*>(ps_calloc(records,recordSize));
+ const httpd_uri_t routes[]={
+   {"/api/v1/telemetry",HTTP_GET,getTelemetry,nullptr},{"/api/v1/ems/decision",HTTP_GET,getDecision,nullptr},
+   {"/api/v1/ems/decisions",HTTP_GET,getDecisions,nullptr},{"/api/v1/mqtt",HTTP_GET,getBroker,nullptr},
+   {"/api/v1/mqtt",HTTP_POST,saveBroker,nullptr},{"/api/v1/system",HTTP_GET,getSystem,nullptr},
+   {"/api/v1/reboot",HTTP_POST,reboot,nullptr},
+   {"/api/v1/mqtt/test",HTTP_POST,testBroker,nullptr},{"/api/v1/system/wifi-test",HTTP_POST,testWifi,nullptr},
+ };
+ for(auto& route:routes) if(httpd_register_uri_handler(server,&route)!=ESP_OK) recordLog("M4 route registration failed");
+ xTaskCreate(brokerTask,"v51_mqtt",8192,nullptr,1,nullptr);
+}
+}

@@ -1,0 +1,33 @@
+{
+  "discovery": 36,
+  "acks": [
+    {
+      "schema": 1,
+      "message_id": "mission4-valid",
+      "accepted": true,
+      "reason": "ACCEPTED",
+      "executed": false
+    },
+    {
+      "schema": 1,
+      "message_id": "mission4-valid",
+      "accepted": false,
+      "reason": "DUPLICATE",
+      "executed": false
+    },
+    {
+      "schema": 1,
+      "message_id": "mission4-expired",
+      "accepted": false,
+      "reason": "EXPIRED",
+      "executed": false
+    },
+    {
+      "schema": 1,
+      "message_id": "mission4-override",
+      "accepted": true,
+      "reason": "ACCEPTED",
+      "executed": false
+    }
+  ]
+}

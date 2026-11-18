@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 #include "m4.h"
+#include "clock_service.h"
 #include "m5.h"
 #include "remote.h"
 #include <Arduino.h>
@@ -35,7 +36,8 @@ struct Broker {
  int port=1883,qos=0,telemetry_s=5,diagnostics_s=30,keepalive=30,timeout_ms=3000;
  char host[96]{},user[64]{},password[96]{},device[32]="afore-ems",base[96]="afore/afore-ems/v1",prefix[32]="homeassistant";
 };
-std::mutex stateLock, brokerLock;
+std::mutex stateLock, brokerLock, eventLock;
+ClockStamp linkedClock{}, publishedClock{}, commandClock{};
 std::atomic<bool> connected{false};
 std::atomic<uint32_t> linkedAt{0},publishedAt{0};
 std::atomic<int> lastError{0};
@@ -47,7 +49,7 @@ uint32_t brokerRevision=1;
 std::string lastAck,lastCommand;
 std::array<std::string,32> ids;
 size_t idIndex=0;
-constexpr size_t records=256, recordSize=1152;
+constexpr size_t records=256, recordSize=1408;
 char* history=nullptr;
 uint32_t cursor=0;
 EnergyState snapshot;
@@ -81,11 +83,19 @@ void telemetry(JsonDocument& d,const EnergyState& e,uint32_t now) {
  d["telemetry_valid"]=!e.readHalted && e.grid.usable(now).has_value() && e.soc.usable(now).has_value() && e.battery.usable(now).has_value();
  d["shadow"]=true; d["aux1"]=auxOn()?"ON":"OFF"; d["modbus_write_count"]=0;
  d["mqtt"]=connected.load();
+ auto stamp=clockStamp();
+
+ stamp.uptime=now;
+ addClock(d.as<JsonObject>(),stamp);
 }
 bool publish(const char* suffix,const std::string& value,bool retain=false) {
  const auto topic=std::string(active.base)+"/"+suffix;
  const bool ok=esp_mqtt_client_enqueue(client,topic.c_str(),value.c_str(),value.size(),active.qos,retain,true)>=0;
- if(ok) publishedAt=millis();
+ if(ok) {
+   const auto stamp=clockStamp();
+   const std::lock_guard guard(eventLock);
+   publishedClock=stamp;publishedAt=stamp.uptime;
+ }
  return ok;
 }
 
@@ -171,7 +181,11 @@ void handleEvent(void*,esp_event_base_t,int32_t code,void* data) {
  auto* e=static_cast<esp_mqtt_event_handle_t>(data);
  if(code==MQTT_EVENT_CONNECTED) {
    connected=true;
-   linkedAt=millis();
+   {
+     const auto stamp=clockStamp();
+     const std::lock_guard guard(eventLock);
+     linkedClock=stamp;linkedAt=stamp.uptime;
+   }
    publish("availability","online",true);
    const auto topic=std::string(active.base)+"/ems/command";
    esp_mqtt_client_subscribe(e->client,topic.c_str(),active.qos);
@@ -197,11 +211,12 @@ void handleEvent(void*,esp_event_base_t,int32_t code,void* data) {
    const std::string action=d["action"] | "policy";
    const int64_t timestamp=d["timestamp"] | int64_t(0);
    const int ttl=d["ttl"] | 0;
-   const int64_t now=time(nullptr);
+   const auto arrival=clockStamp();
+   const int64_t now=arrival.utc;
    const char* reason="INVALID";
    bool ok=false;
    if(e->retain) reason="RETAINED";
-   else if(now<1700000000) reason="CLOCK_UNAVAILABLE";
+   else if(!now) reason="CLOCK_UNAVAILABLE";
    else if(ttl<1 || ttl>600 || timestamp<=0 || timestamp>now+5 || timestamp<=now-ttl) reason="EXPIRED";
    else if(d["schema"]==1 && !id.empty() && id.size()<=80) {
      if(std::find(ids.begin(),ids.end(),id)!=ids.end()) reason="DUPLICATE";
@@ -240,8 +255,9 @@ void handleEvent(void*,esp_event_base_t,int32_t code,void* data) {
      recordLog(row);
    }
    ack["aux1"]=auxOn()?"ON":"OFF";ack["physical_feedback"]=nullptr;
+   addClock(ack.as<JsonObject>(),arrival);
    auto value=encode(ack);
-   { const std::lock_guard guard(brokerLock); lastAck=value;lastCommand=action; }
+   { const std::lock_guard guard(brokerLock); lastAck=value;lastCommand=action;commandClock=arrival; }
    publish("ems/ack",value);
  }
 }
@@ -296,7 +312,7 @@ void brokerTask(void*) {
        std::ostringstream config;appendPolicyJson(config);publish("config/state",config.str(),active.retain);
        JsonDocument doc;doc["rssi"]=WiFi.RSSI();doc["heap"]=ESP.getFreeHeap();doc["uptime_ms"]=now;
        doc["psram"]=ESP.getPsramSize();doc["reset_reason"]=esp_reset_reason();doc["aux1"]=auxOn()?"ON":"OFF";
-       doc["modbus_write_count"]=0;publish("diagnostics",encode(doc),active.retain);
+       doc["modbus_write_count"]=0;addClock(doc.as<JsonObject>(),clockStamp());publish("diagnostics",encode(doc),active.retain);
      }
    }
    vTaskDelay(pdMS_TO_TICKS(500));
@@ -337,6 +353,12 @@ void brokerJson(JsonDocument& d) {
  d["password_configured"]=b.password[0]!=0;d["schema_version"]=1;d["revision"]=brokerRevision;
  d["connected"]=connected.load();d["last_connect_ms"]=linkedAt.load();d["last_publish_ms"]=publishedAt.load();
  d["last_error"]=lastError.load();d["last_command"]=lastCommand;d["last_ack"]=lastAck;
+ {
+   const std::lock_guard events(eventLock);
+   if(linkedClock.uptime)addClock(d["last_connect_time"].to<JsonObject>(),linkedClock);
+   if(publishedClock.uptime)addClock(d["last_publish_time"].to<JsonObject>(),publishedClock);
+ }
+ if(!lastCommand.empty())addClock(d["last_command_time"].to<JsonObject>(),commandClock);
 }
 esp_err_t getBroker(httpd_req_t* r) {
  if(!authorized(r))return ESP_OK;
@@ -422,7 +444,7 @@ esp_err_t testWifi(httpd_req_t* r) {
 esp_err_t getSystem(httpd_req_t* r) {
  if(!authorized(r))return ESP_OK;
  JsonDocument doc;doc["ssid"]=WiFi.SSID();doc["ip"]=WiFi.localIP().toString();
- doc["gpio47"]=gpio_get_level(GPIO_NUM_47);doc["rtc_utc_available"]=time(nullptr)>1700000000;
+ doc["gpio47"]=gpio_get_level(GPIO_NUM_47);doc["rtc_utc_available"]=clockStamp().utc!=0;
  return jsonResponse(r,encode(doc));
 }
 esp_err_t reboot(httpd_req_t* r) {

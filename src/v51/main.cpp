@@ -5,7 +5,7 @@
 #include <esp_task_wdt.h>
 
 #include "boards/waveshare_esp32_s3_relay_1ch.h"
-#include "network/rtc_time.h"
+#include "clock_service.h"
 #include "remote.h"
 #include "ems_runtime.h"
 #include "m5.h"
@@ -34,20 +34,6 @@ const char* sampleValue(const v51::Sample& sample, uint32_t now, char (&out)[20]
     return out;
 }
 
-
-const char* readRtc(time_t& utc) {
-    Wire.beginTransmission(board::kRtcI2cAddress);
-    Wire.write(0x04);
-    if (Wire.endTransmission(false) != 0 || Wire.requestFrom(board::kRtcI2cAddress, 7) != 7) {
-        return "i2c_unavailable";
-    }
-    rtc::Registers bytes{};
-    for (auto& value : bytes) {
-        value = static_cast<uint8_t>(Wire.read());
-    }
-    if (bytes[0] & 0x80) return "oscillator_stopped";
-    return rtc::decodeRegisters(bytes, utc) ? "valid" : "invalid_time";
-}
 
 void serialSetup() {
     static char command[20]{};
@@ -104,15 +90,13 @@ void loop() {
     v51::serviceAux(readsStarted && watchdogReady && !reader.state().readHalted);
     if (millis() - lastHeartbeat >= 1000) {
         lastHeartbeat = millis();
-        time_t utc = 0;
-        const char* rtcStatus = readRtc(utc);
+        const auto clock=v51::clockStamp();
         char row[240]{};
         snprintf(row, sizeof(row), "SHADOW heartbeat=%lu reset=%d heap=%u min_heap=%u "
-                 "psram=%u psram_free=%u rtc=%s utc=%lld watchdog=%s AUX1=%s gpio47=%d "
+                 "psram=%u psram_free=%u time_source=%s watchdog=%s AUX1=%s gpio47=%d "
                  "modbus_write_count=0",
                  static_cast<unsigned long>(++sequence), int(esp_reset_reason()), ESP.getFreeHeap(),
-                 ESP.getMinFreeHeap(), ESP.getPsramSize(), ESP.getFreePsram(), rtcStatus,
-                 static_cast<long long>(utc), watchdogReady ? "on" : "error", v51::auxOn() ? "ON" : "OFF", gpio_get_level(kAux));
+                 ESP.getMinFreeHeap(), ESP.getPsramSize(), ESP.getFreePsram(), v51::timeSourceName(clock.source), watchdogReady ? "on" : "error", v51::auxOn() ? "ON" : "OFF", gpio_get_level(kAux));
         v51::recordLog(row);
         const auto& state = reader.state();
         char soc[20], grid[20], pv[20], battery[20], load[20], temperature[20], voltage[20], frequency[20];

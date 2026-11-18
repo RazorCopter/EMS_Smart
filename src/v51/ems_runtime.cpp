@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 #include "ems_runtime.h"
+#include "clock_service.h"
 #include "remote.h"
 #include "m4.h"
 #include "m5.h"
@@ -44,8 +45,11 @@ template<typename T> void number(std::ostream& out,std::optional<T> value) {
 std::string audit(const EnergyState& e,const Policy& p,const Decision& d,
                   uint32_t now,uint32_t seq,const char* provenance) {
     std::ostringstream out;
-    out<<"{\"schema\":1,\"source\":\""<<provenance<<"\",\"seq\":"<<seq
-       <<",\"uptime_ms\":"<<now<<",\"strategy\":\""<<strategyName(d.strategy)
+    auto stamp=clockStamp();
+    stamp.uptime=now;
+    out<<"{\"schema\":1,\"source\":\""<<provenance<<"\",\"seq\":"<<seq;
+    appendClock(out,stamp);
+    out<<",\"strategy\":\""<<strategyName(d.strategy)
        <<"\",\"configured\":\""<<strategyName(d.configured)<<"\",\"previous\":\""<<strategyName(d.previous)
        <<"\",\"state\":\""<<d.state<<"\",\"transition\":\""<<d.transition<<"\",\"soc\":";
     number(out,essential(e.soc,now,p.staleMs));
@@ -128,7 +132,9 @@ void appendPolicyJson(std::ostream& out) {
     out<<"{";
     for (const auto& f:fields) out<<"\""<<f.name<<"\":"<<current.*(f.member)<<",";
     out<<"\"strategy_name\":\""<<strategyName(static_cast<Strategy>(current.strategy))
-       <<"\",\"revision\":"<<revision<<",\"battery_profile_source\":\"HA/Solarman\",\"battery_model_provisional\":false,\"efficiency_provisional\":true}";
+       <<"\",\"revision\":"<<revision<<",\"battery_profile_source\":\"HA/Solarman\",\"battery_model_provisional\":false,\"efficiency_provisional\":true";
+    appendClock(out,clockStamp());
+    out<<"}";
 }
 bool applyPolicy(const std::string& form,uint32_t leaseMs,int cancel) {
     const std::lock_guard guard(lock);
@@ -231,10 +237,11 @@ void tickEms(const EnergyState& state,uint32_t now,uint32_t seq) {
         p=overridePolicy.value_or(current);
         version=revision;
     }
-    const auto wall=time(nullptr);
+    const auto wall=clockStamp().utc;
     tm local{};
-    const auto* calendar=wall>=1700000000 ? localtime_r(&wall,&local) : nullptr;
-    const auto result=manager.tick(state,p,version,now,calendar);
+    const auto* calendar=wall ? localtime_r(&wall,&local) : nullptr;
+    const auto result=manager.tick(state,p,version,now,calendar,
+        calendar && p.strategy==4 && p.daily ? dailySeconds(wall,local,p.deadlineMinute) : std::nullopt);
     auto line=audit(state,p,result,now,seq,"MEASURED");
     line.pop_back();
     line+=",\"ha_inputs\":"+haSummary(false)+"}";

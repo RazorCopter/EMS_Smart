@@ -1,8 +1,10 @@
 // SPDX-License-Identifier: MIT
 #include "m5.h"
+#include "clock_service.h"
 #include "remote.h"
 #include <Arduino.h>
 #include <driver/gpio.h>
+#include <esp_timer.h>
 #include <array>
 #include <algorithm>
 #include <cmath>
@@ -19,7 +21,9 @@ constexpr auto kAux=GPIO_NUM_47;
 struct Input {
     const char* name;
     unsigned ttl;
-    time_t timestamp=0, expires=0, sourceTime=0;
+    time_t timestamp=0, expires=0;
+    uint64_t acceptedAt=0;
+    uint32_t validityMs=0, initialAge=0;
     std::string payload;
 };
 std::array<Input,5> inputs{{{"forecast_solar",50400},{"forecast_ratio",1800},
@@ -41,10 +45,10 @@ bool range(JsonVariantConst v,double low,double high) {
     const auto n=v.as<double>();
     return std::isfinite(n) && n>=low && n<=high;
 }
-bool forecast(JsonVariantConst v) {
+bool forecast(JsonVariantConst v,time_t now) {
     if(!v.is<JsonObjectConst>() || !v["poll_timestamp"].is<int64_t>()) return false;
-    auto now=time(nullptr), poll=v["poll_timestamp"].as<int64_t>();
-    if(poll>now+5 || now-poll>=50400) return false;
+    auto poll=v["poll_timestamp"].as<int64_t>();
+    if(poll>now+5 || poll<=now-50400) return false;
     size_t count=0;
     for(auto key:{"today","tomorrow"}) {
         if(!v[key].is<JsonArrayConst>() || v[key].size()>50) return false;
@@ -95,6 +99,7 @@ esp_err_t postManual(httpd_req_t* r) {
     const auto outcome=manualCommand(request["action"]|"",request["payload"],origin);
     JsonDocument ack;
     ack["accepted"]=outcome.accepted;ack["reason"]=outcome.reason;ack["executed"]=false;
+    addClock(ack.as<JsonObject>(),clockStamp());
     ack["aux1"]=auxOn()?"ON":"OFF";ack["physical_feedback"]=nullptr;
     if(!outcome.accepted)httpd_resp_set_status(r,"409 Conflict");
     return respond(r,encode(ack));
@@ -148,6 +153,7 @@ std::string manualState() {
     d["operating_mode"]="SHADOW";d["live_lock"]="LIVE_NOT_QUALIFIED";
     d["aux1"]=commanded?"ON":"OFF";d["physical_feedback"]=nullptr;
     d["aux_auto_off_ms"]=commanded && timed ? std::max<int32_t>(0,int32_t(until-millis())) : 0;
+    addClock(d.as<JsonObject>(),clockStamp());
     return encode(d);
 }
 
@@ -158,12 +164,13 @@ bool acceptHaInput(const char* kind,const char* data,size_t size) {
     JsonDocument d;
     if(deserializeJson(d,data,size) || d["schema"]!=1 || !d["timestamp"].is<int64_t>() ||
        !d["valid_until"].is<int64_t>())return false;
-    auto now=time(nullptr);
+    const auto clock=clockStamp();
+    const auto now=clock.utc;
     const auto ts=d["timestamp"].as<int64_t>(), until=d["valid_until"].as<int64_t>();
-    if(now<1700000000 || ts<=0 || ts>now+5 || until<=now || until<=ts || until-ts>it->ttl) return false;
+    if(!now || ts<=0 || ts>now+5 || until<=now || until<=ts || until-ts>it->ttl) return false;
     auto v=d["data"].as<JsonVariantConst>();
     bool valid=false;
-    if(strcmp(kind,"forecast_solar")==0) valid=forecast(v) && until<=v["poll_timestamp"].as<int64_t>()+50400;
+    if(strcmp(kind,"forecast_solar")==0) valid=forecast(v,now) && until<=v["poll_timestamp"].as<int64_t>()+50400;
     else if(strcmp(kind,"forecast_ratio")==0) valid=range(v["ratio"],0,10);
     else if(strcmp(kind,"weather")==0)
         valid=v["fog"].is<bool>() && (v["spread_c"].isNull() || range(v["spread_c"],-30,100)) &&
@@ -175,22 +182,25 @@ bool acceptHaInput(const char* kind,const char* data,size_t size) {
     std::string payload;
     serializeJson(v,payload);
     const std::lock_guard guard(inputMutex);
-    if(ts<it->timestamp)return false;
+    if(ts<=it->timestamp)return false;
     it->timestamp=ts;it->expires=until;
-    it->sourceTime=strcmp(kind,"forecast_solar")==0 ? v["poll_timestamp"].as<int64_t>() : ts;
+    const auto sourceTime=strcmp(kind,"forecast_solar")==0 ? v["poll_timestamp"].as<int64_t>() : ts;
+    it->acceptedAt=esp_timer_get_time()/1000;it->validityMs=uint32_t(until-now)*1000;
+    it->initialAge=std::max<int64_t>(0,now-sourceTime);
     it->payload=std::move(payload);
     return true;
 }
 std::string haSummary(bool contents) {
-    const auto now=time(nullptr);
     const std::lock_guard guard(inputMutex);
+    const uint64_t now=esp_timer_get_time()/1000;
     JsonDocument d;
-    d["ha_online"]=now>=1700000000 && inputs.back().expires>now;
+    const auto freshAt=[now](const Input& input){return input.timestamp && now-input.acceptedAt<input.validityMs;};
+    d["ha_online"]=freshAt(inputs.back());
     for(const auto& input:inputs) {
         auto row=d[input.name].to<JsonObject>();
-        const bool fresh=now>=1700000000 && input.expires>now && input.timestamp<=now+5;
+        const bool fresh=freshAt(input);
         row["status"]=fresh?"valid":input.timestamp?"stale":"unavailable";
-        if(input.timestamp && now>=1700000000) row["age_s"]=std::max<int64_t>(0,now-input.sourceTime);
+        if(input.timestamp) row["age_s"]=input.initialAge+(now-input.acceptedAt)/1000;
         else row["age_s"]=nullptr;
         row["used"]=false;
         if(contents) {

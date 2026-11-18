@@ -63,6 +63,18 @@ int main() {
     assert(scheduler.tick(sample(50,-2000,41000),daily,1,41000,&time).strategy==Strategy::SelfUse);
     time.tm_yday=321; time.tm_hour=8; time.tm_min=0;
     assert(scheduler.tick(sample(50,-2000,42000),daily,1,42000,&time).strategy==Strategy::Target);
+    time.tm_yday=320;
+    assert(scheduler.tick(sample(50,-2000,43000),daily,1,43000,&time).strategy==Strategy::SelfUse);
+    time.tm_yday=321;
+    assert(scheduler.tick(sample(50,-2000,44000),daily,1,44000,&time).strategy==Strategy::SelfUse);
+    time.tm_yday=322;
+    assert(scheduler.tick(sample(50,-2000,45000),daily,1,45000,&time,3600).strategy==Strategy::Target);
+
+    StrategyManager lateClock;
+    daily.deadlineSec=2;
+    assert(lateClock.tick(sample(50,-2000,1000),daily,1,1000).strategy==Strategy::Target);
+    assert(lateClock.tick(sample(50,-2000,3000),daily,1,3000).strategy==Strategy::SelfUse);
+    assert(lateClock.tick(sample(50,-2000,4000),daily,1,4000,&time,3600).strategy==Strategy::SelfUse);
     p.ceiling=10;
     assert(!p.valid());
 }

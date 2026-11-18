@@ -59,12 +59,48 @@ inline std::optional<double> essential(const Sample& s, uint32_t now, uint32_t t
     return s.value;
 }
 
+// Convert the day's civil deadline to an instant. On the autumn transition choose
+// the first occurrence of a duplicated hour. A missing spring hour moves forward
+// by the size of the gap.
+inline std::optional<int> dailySeconds(time_t now,const tm& local,int minute) {
+    tm target=local;
+    target.tm_hour=minute/60;
+    target.tm_min=minute%60;
+    target.tm_sec=0;
+    target.tm_isdst=-1;
+    tm normalized=target;
+    auto deadline=mktime(&normalized);
+    if(deadline==time_t(-1))return std::nullopt;
+    time_t earliest{};
+    time_t afterGap{};
+    for(int dst:{0,1}) {
+        tm candidate=target;
+        candidate.tm_isdst=dst;
+        const auto instant=mktime(&candidate);
+        tm check{};
+#ifdef _WIN32
+        const bool converted=localtime_s(&check,&instant)==0;
+#else
+        const bool converted=localtime_r(&instant,&check)!=nullptr;
+#endif
+        if(instant==time_t(-1) || !converted)continue;
+        const int dayOrder=(check.tm_year-target.tm_year)*366+check.tm_yday-target.tm_yday;
+        const int minuteOrder=(check.tm_hour-target.tm_hour)*60+check.tm_min-target.tm_min;
+        if(dayOrder==0 && minuteOrder==0 && (!earliest || instant<earliest))earliest=instant;
+        if((dayOrder>0 || (dayOrder==0 && minuteOrder>0)) &&
+           (!afterGap || instant<afterGap))afterGap=instant;
+    }
+    if(earliest)deadline=earliest;
+    else if(afterGap)deadline=afterGap;
+    return int(std::clamp(difftime(deadline,now),0.0,172800.0));
+}
 class StrategyManager {
 public:
-    Decision tick(const EnergyState& e, const Policy& p, uint32_t revision, uint32_t now, const tm* local=nullptr) {
+    Decision tick(const EnergyState& e, const Policy& p, uint32_t revision, uint32_t now, const tm* local=nullptr, std::optional<int> dailyRemaining={}) {
         if (revision_ != revision) {
             revision_=revision;
             start_=now;
+            day_=-1;
             holdSince_.reset();
             priorW_.reset();
             done_=false;
@@ -94,10 +130,11 @@ public:
         int limit=p.strategy==1 ? p.chargeFirstSec : p.strategy==4 ? p.deadlineSec : p.maintenanceSec;
         if (p.strategy==4 && p.daily && local) {
             const int day=local->tm_year*366+local->tm_yday;
-            if (day!=day_) {day_=day;done_=false;exit_="UNCHANGED";}
+            if (day_>=0 && day>day_) {done_=false;exit_="UNCHANGED";}
+            day_=std::max(day_,day);
             const int localSeconds=local->tm_hour*3600+local->tm_min*60+local->tm_sec;
             elapsed=0;
-            limit=std::max(0,p.deadlineMinute*60-localSeconds);
+            limit=day<day_ ? 0 : dailyRemaining.value_or(std::max(0,p.deadlineMinute*60-localSeconds));
         }
         const int goal=p.strategy==5 ? p.maintenanceSoc : p.target;
         if (temporary && !done_) {

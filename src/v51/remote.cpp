@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: MIT
 #include "remote.h"
+#include "clock_service.h"
+#include <sstream>
 #include "ems_runtime.h"
 #include "m4.h"
 #include "m5.h"
@@ -50,7 +52,7 @@ struct StationSettings {
 
 struct LogEntry {
     uint32_t sequence = 0;
-    uint32_t uptime = 0;
+    ClockStamp clock{};
     char message[768]{};
 };
 
@@ -171,9 +173,11 @@ esp_err_t logResponse(httpd_req_t* request) {
             entry = logs[(id - 1) % logs.size()];
         }
         if (entry.sequence != id) continue;
-        char row[830];
-        snprintf(row, sizeof(row), "%lu %lu %s\n", static_cast<unsigned long>(id),
-                 static_cast<unsigned long>(entry.uptime), entry.message);
+        char row[940];
+        std::ostringstream timing;
+        appendClock(timing,entry.clock);
+        snprintf(row, sizeof(row), "%lu %lu %s {%s}\n", static_cast<unsigned long>(id),
+                 static_cast<unsigned long>(entry.clock.uptime), entry.message, timing.str().c_str()+1);
         if (httpd_resp_sendstr_chunk(request, row) != ESP_OK) return ESP_FAIL;
     }
     return httpd_resp_send_chunk(request, nullptr, 0);
@@ -362,7 +366,7 @@ bool startHttp() {
     registerEms(server,authorized);
     registerM4(server,authorized,preferences);
     registerM5(server,authorized);
-    return true;
+    return registerClock(server,authorized);
 }
 
 void startFallback() {
@@ -385,7 +389,6 @@ void manageWifi(uint32_t now) {
             char line[96];
             snprintf(line, sizeof(line), "Wi-Fi STA ip=%s rssi=%d", address.c_str(), WiFi.RSSI());
             recordLog(line);
-            configTzTime("CET-1CEST,M3.5.0,M10.5.0/3","pool.ntp.org");
         }
         lastConnection = now;
         if (!mdns && (mdns = MDNS.begin(kHost))) MDNS.addService("http", "tcp", 80);
@@ -438,8 +441,7 @@ bool beginRemote() {
     }
 
     loadPolicy(preferences);
-    setenv("TZ","CET-1CEST,M3.5.0,M10.5.0/3",1);
-    tzset();
+    loadClock(preferences);
     WiFi.persistent(false);
     WiFi.mode(WIFI_STA);
     if (preferences.getString("manage", password, sizeof(password)) != sizeof(password) ||
@@ -475,6 +477,7 @@ void tickRemote(bool healthy) {
         ESP.restart();
     }
     if (server) manageWifi(millis());
+    if (server) serviceClock(online);
     verifyBoot(millis(), healthy);
 }
 
@@ -484,7 +487,7 @@ void recordLog(const char* message) {
     const auto id = ++sequence;
     auto& entry = logs[(id - 1) % logs.size()];
     entry.sequence = id;
-    entry.uptime = millis();
+    entry.clock = clockStamp();
     snprintf(entry.message, sizeof(entry.message), "%s", message);
 }
 

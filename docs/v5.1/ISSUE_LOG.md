@@ -92,3 +92,10 @@ Host assertions passed for SELF_USE, CHARGE_FIRST, NATIVE_INVERTER and SAFE_MODE
 | V51-27 | HA package and Obsidian patch are delivered as files; installation, rendered card and actual HA switch are not validated in a running HA instance. | Low | G7 | Install on the owner side and validate entity IDs; MQTT protocol tests use the equivalent Discovery envelopes. |
 | V51-28 | The HA/Solarman battery profile sets 10,240 Wh, 51.2 V nominal and 50 A. Independent 1,000 W caps remain active when more restrictive. Charge efficiency remains a separate provisional setting. | Low | G5 | Review measured limits and efficiency against the battery specification before changing policy. |
 | V51-29 | Browser tooltip and sliders cover the requested forms; explicit minimum/maximum consistency across settings is still enforced server-side. Day schedule uses the Europe/Rome clock with a relative fallback. | Low | G8 | Add a formatted time picker and more cross-field inline diagnostics if needed. |
+
+### Missione 5B
+
+| ID | Descrizione | Gravità | Gate | Proposta |
+|---|---|---|---|---|
+| V51-30 | Il firmware incorpora le regole POSIX future del database IANA 2025b. Le variazioni istituzionali successive richiedono un aggiornamento del dataset. | Bassa | G8 | Rigenerare la tabella quando cambiano le zone usate sul campo. |
+| V51-31 | Verificati avvio, sincronizzazione su richiesta, boot con RTC e i due server fallback separatamente. Il ciclo di sei ore e la perdita fisica del Wi-Fi non hanno una prova di durata dedicata. | Bassa | G8 | Acquisire un log di sei ore e ripetere il test con il Wi-Fi temporaneamente interrotto. |

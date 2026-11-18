@@ -1,0 +1,38 @@
+{
+  "telemetry": {
+    "timestamp": "2026-11-18T21:29:44Z",
+    "uptime_ms": 42653,
+    "time_source": "NTP",
+    "time_valid": true
+  },
+  "ems/state": {
+    "timestamp": "2026-11-18T21:29:43Z",
+    "uptime_ms": 42505,
+    "time_source": "NTP",
+    "time_valid": true
+  },
+  "diagnostics": {
+    "timestamp": "2026-11-18T21:29:33Z",
+    "uptime_ms": 32650,
+    "time_source": "NTP",
+    "time_valid": true
+  },
+  "config/state": {
+    "timestamp": "2026-11-18T21:29:33Z",
+    "uptime_ms": 32649,
+    "time_source": "NTP",
+    "time_valid": true
+  },
+  "system/manual": {
+    "timestamp": "2026-11-18T21:29:44Z",
+    "uptime_ms": 42656,
+    "time_source": "NTP",
+    "time_valid": true
+  },
+  "ems/decision": {
+    "timestamp": "2026-11-18T21:29:43Z",
+    "uptime_ms": 42505,
+    "time_source": "NTP",
+    "time_valid": true
+  }
+}

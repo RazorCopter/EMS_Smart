@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 #include "m4.h"
+#include "m5.h"
 #include "remote.h"
 #include <Arduino.h>
 #include <ArduinoJson.h>
@@ -46,7 +47,7 @@ uint32_t brokerRevision=1;
 std::string lastAck,lastCommand;
 std::array<std::string,32> ids;
 size_t idIndex=0;
-constexpr size_t records=256, recordSize=768;
+constexpr size_t records=256, recordSize=1152;
 char* history=nullptr;
 uint32_t cursor=0;
 EnergyState snapshot;
@@ -78,7 +79,7 @@ void telemetry(JsonDocument& d,const EnergyState& e,uint32_t now) {
  }
  d["reads"]=e.goodReads; d["errors"]=e.errors; d["fault"]=e.readHalted;
  d["telemetry_valid"]=!e.readHalted && e.grid.usable(now).has_value() && e.soc.usable(now).has_value() && e.battery.usable(now).has_value();
- d["shadow"]=true; d["aux1"]="DISABLED"; d["modbus_write_count"]=0;
+ d["shadow"]=true; d["aux1"]=auxOn()?"ON":"OFF"; d["modbus_write_count"]=0;
  d["mqtt"]=connected.load();
 }
 bool publish(const char* suffix,const std::string& value,bool retain=false) {
@@ -107,6 +108,11 @@ void discovery() {
  const Entity entities[]={
    {"binary_sensor","telemetry_valid","Telemetry valid","telemetry",0},{"binary_sensor","mqtt","MQTT","telemetry",0},
    {"binary_sensor","shadow","SHADOW","telemetry",0},{"binary_sensor","fault","Bus fault","telemetry",0},
+   {"select","operating_mode","Operating mode","system/manual",0},
+   {"switch","aux1","AUX1","system/manual",1},
+   {"sensor","live_lock","LIVE lock reason","system/manual",0},
+   {"sensor","capacity_wh","Battery useful capacity","config/state",0},
+   {"sensor","nominal_mv","Battery nominal voltage","config/state",0},
    {"select","strategy","Local strategy","config/state",0},{"sensor","strategy","Effective strategy","ems/state",0},
    {"sensor","simulated_w","Simulated power","ems/decision",0},
    {"number","soc_min","Minimum SOC","config/state",100},{"number","soc_max","Maximum SOC","config/state",100},
@@ -127,10 +133,15 @@ void discovery() {
    if(component=="binary_sensor") d["value_template"]="{{ 'ON' if value_json."+key+" else 'OFF' }}";
    else if(component=="select") {
      d["value_template"]="{{ value_json.strategy_name }}";
-     for(auto name:{"SELF_USE","CHARGE_FIRST","NATIVE_INVERTER","SAFE_MODE","TARGET_SOC","MAINTENANCE"}) d["options"].add(name);
+     if(key=="operating_mode") {
+       d["value_template"]="{{ value_json.operating_mode }}";
+       d["options"].add("SHADOW"); d["options"].add("LIVE");
+     } else for(auto name:{"SELF_USE","CHARGE_FIRST","NATIVE_INVERTER","SAFE_MODE","TARGET_SOC","MAINTENANCE"}) d["options"].add(name);
    } else if(component=="switch") {
-     d["value_template"]="{{ 'ON' if value_json.grid_charge else 'OFF' }}";
+     d["value_template"]=key=="aux1"?"{{ value_json.aux1 }}":"{{ 'ON' if value_json.grid_charge else 'OFF' }}";
    } else if(component!="button") d["value_template"]="{{ value_json."+key+" }}";
+   if(key=="capacity_wh") d["unit_of_measurement"]="Wh";
+   if(key=="nominal_mv") {d["unit_of_measurement"]="V";d["value_template"]="{{ value_json.nominal_mv / 1000 }}";}
    if(key=="simulated_w" || key=="charge_w" || key=="discharge_w") d["unit_of_measurement"]="W";
    if(key=="charge_a" || key=="discharge_a") d["unit_of_measurement"]="A";
    if(key=="voltage_min" || key=="voltage_max") d["unit_of_measurement"]="V";
@@ -146,7 +157,9 @@ void discovery() {
        component=="switch" ? "1":"{{ value|int }}";
      auto tmpl=[&](const std::string& v){return envelope+"\"action\":\"policy\",\"payload\":{\""+key+"\":"+v+"}}";};
      d["command_topic"]=base+"/ems/command";
-     if(component=="switch") {d["command_template"]=tmpl("{{ 1 if value=='ON' else 0 }}");}
+     if(key=="operating_mode") d["command_template"]=envelope+"\"action\":\"operating_mode\",\"payload\":{\"mode\":\"{{ value }}\"}}";
+     else if(key=="aux1") d["command_template"]=envelope+"\"action\":\"aux\",\"payload\":{\"on\":{{ 'true' if value=='ON' else 'false' }}}}";
+     else if(component=="switch") {d["command_template"]=tmpl("{{ 1 if value=='ON' else 0 }}");}
      else d["command_template"]=tmpl(value);
    }
    auto topic=std::string(active.prefix)+"/"+component+"/"+id+"/config";
@@ -162,8 +175,19 @@ void handleEvent(void*,esp_event_base_t,int32_t code,void* data) {
    publish("availability","online",true);
    const auto topic=std::string(active.base)+"/ems/command";
    esp_mqtt_client_subscribe(e->client,topic.c_str(),active.qos);
+   const auto inputs=std::string(active.base)+"/input/+";
+   const auto solar=std::string(active.base)+"/forecast/solar";
+   esp_mqtt_client_subscribe(e->client,inputs.c_str(),active.qos);
+   esp_mqtt_client_subscribe(e->client,solar.c_str(),active.qos);
  } else if(code==MQTT_EVENT_DISCONNECTED) connected=false;
  else if(code==MQTT_EVENT_ERROR) lastError=e->error_handle ? e->error_handle->error_type : -1;
+ else if(code==MQTT_EVENT_DATA && e->topic && e->data_len==e->total_data_len &&
+         e->current_data_offset==0 && std::string(e->topic,e->topic_len)!=std::string(active.base)+"/ems/command") {
+   const auto name=std::string(e->topic,e->topic_len);
+   const auto root=std::string(active.base)+"/input/";
+   if(name.compare(0,root.size(),root)==0) acceptHaInput(name.c_str()+root.size(),e->data,e->data_len);
+   else if(name==std::string(active.base)+"/forecast/solar") acceptHaInput("forecast_solar",e->data,e->data_len);
+ }
  else if(code==MQTT_EVENT_DATA && e->topic && e->data_len<=768 &&
          e->data_len==e->total_data_len && e->current_data_offset==0 &&
          std::string(e->topic,e->topic_len)==std::string(active.base)+"/ems/command") {
@@ -190,7 +214,12 @@ void handleEvent(void*,esp_event_base_t,int32_t code,void* data) {
          if(!form.empty()) form+='&';
          form+=field.key().c_str(); form+='='; form+=std::to_string(field.value().as<int>());
        }
-       if(action=="cancel_override" || action=="cancel_session") ok=applyPolicy({},0,action=="cancel_session" ? 2 : 1);
+       if(action=="aux" || action=="operating_mode") {
+         const auto result=manualCommand(action.c_str(),d["payload"],"MQTT");
+         ok=result.accepted;
+         reason=result.reason;
+       }
+       else if(action=="cancel_override" || action=="cancel_session") ok=applyPolicy({},0,action=="cancel_session" ? 2 : 1);
        else if(allInts && (action=="policy" || action=="override" || action=="target_soc" || action=="maintenance")) {
          if(action=="target_soc" || action=="maintenance") {
            if(!form.empty()) form+='&';
@@ -198,11 +227,19 @@ void handleEvent(void*,esp_event_base_t,int32_t code,void* data) {
          }
          ok=applyPolicy(form,action=="override" ? 1000u*std::min<int64_t>(ttl,timestamp+ttl-now):0);
        }
-       reason=ok?"ACCEPTED":"POLICY_REJECTED";
+       if(action!="aux" && action!="operating_mode")reason=ok?"ACCEPTED":"POLICY_REJECTED";
      }
    }
    JsonDocument ack;
    ack["schema"]=1;ack["message_id"]=id;ack["accepted"]=ok;ack["reason"]=reason;ack["executed"]=false;
+   if ((action=="aux" || action=="operating_mode") &&
+       (strcmp(reason,"RETAINED")==0 || strcmp(reason,"EXPIRED")==0 ||
+        strcmp(reason,"DUPLICATE")==0 || strcmp(reason,"CLOCK_UNAVAILABLE")==0 || strcmp(reason,"INVALID")==0)) {
+     char row[128];
+     snprintf(row,sizeof(row),"MANUAL origin=MQTT action=%s outcome=%s",action.c_str(),reason);
+     recordLog(row);
+   }
+   ack["aux1"]=auxOn()?"ON":"OFF";ack["physical_feedback"]=nullptr;
    auto value=encode(ack);
    { const std::lock_guard guard(brokerLock); lastAck=value;lastCommand=action; }
    publish("ems/ack",value);
@@ -235,6 +272,7 @@ void brokerTask(void*) {
      c.session.keepalive=active.keepalive;c.network.timeout_ms=active.timeout_ms;
      c.session.last_will.topic=willTopic.c_str();c.session.last_will.msg="offline";c.session.last_will.retain=1;c.session.last_will.qos=1;
      c.outbox.limit=32768;
+     c.buffer.size=8192;
      client=esp_mqtt_client_init(&c);
      if(client) {
        esp_mqtt_client_register_event(client,MQTT_EVENT_ANY,handleEvent,nullptr);
@@ -250,13 +288,14 @@ void brokerTask(void*) {
        { const std::lock_guard guard(stateLock);e=snapshot;decision=latest; }
        JsonDocument doc;telemetry(doc,e,now);
        publish("telemetry",encode(doc),active.retain);
+       publish("system/manual",manualState(),true);
        if(!decision.empty()) {publish("ems/state",decision,active.retain);publish("ems/decision",decision);}
      }
      if(now-lastInfo>=1000u*active.diagnostics_s) {
        lastInfo=now;
        std::ostringstream config;appendPolicyJson(config);publish("config/state",config.str(),active.retain);
        JsonDocument doc;doc["rssi"]=WiFi.RSSI();doc["heap"]=ESP.getFreeHeap();doc["uptime_ms"]=now;
-       doc["psram"]=ESP.getPsramSize();doc["reset_reason"]=esp_reset_reason();doc["aux1"]="DISABLED";
+       doc["psram"]=ESP.getPsramSize();doc["reset_reason"]=esp_reset_reason();doc["aux1"]=auxOn()?"ON":"OFF";
        doc["modbus_write_count"]=0;publish("diagnostics",encode(doc),active.retain);
      }
    }

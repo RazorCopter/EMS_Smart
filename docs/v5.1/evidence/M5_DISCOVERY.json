@@ -1,0 +1,680 @@
+{
+  "homeassistant/binary_sensor/afore-ems_binary_sensor_fault/config": {
+    "name": "Bus fault",
+    "unique_id": "afore-ems_binary_sensor_fault",
+    "device": {
+      "identifiers": [
+        "afore-ems"
+      ],
+      "name": "Afore Autonomous EMS"
+    },
+    "availability_topic": "afore/afore-ems/v1/availability",
+    "state_topic": "afore/afore-ems/v1/telemetry",
+    "value_template": "{{ 'ON' if value_json.fault else 'OFF' }}"
+  },
+  "homeassistant/binary_sensor/afore-ems_binary_sensor_mqtt/config": {
+    "name": "MQTT",
+    "unique_id": "afore-ems_binary_sensor_mqtt",
+    "device": {
+      "identifiers": [
+        "afore-ems"
+      ],
+      "name": "Afore Autonomous EMS"
+    },
+    "availability_topic": "afore/afore-ems/v1/availability",
+    "state_topic": "afore/afore-ems/v1/telemetry",
+    "value_template": "{{ 'ON' if value_json.mqtt else 'OFF' }}"
+  },
+  "homeassistant/binary_sensor/afore-ems_binary_sensor_shadow/config": {
+    "name": "SHADOW",
+    "unique_id": "afore-ems_binary_sensor_shadow",
+    "device": {
+      "identifiers": [
+        "afore-ems"
+      ],
+      "name": "Afore Autonomous EMS"
+    },
+    "availability_topic": "afore/afore-ems/v1/availability",
+    "state_topic": "afore/afore-ems/v1/telemetry",
+    "value_template": "{{ 'ON' if value_json.shadow else 'OFF' }}"
+  },
+  "homeassistant/binary_sensor/afore-ems_binary_sensor_telemetry_valid/config": {
+    "name": "Telemetry valid",
+    "unique_id": "afore-ems_binary_sensor_telemetry_valid",
+    "device": {
+      "identifiers": [
+        "afore-ems"
+      ],
+      "name": "Afore Autonomous EMS"
+    },
+    "availability_topic": "afore/afore-ems/v1/availability",
+    "state_topic": "afore/afore-ems/v1/telemetry",
+    "value_template": "{{ 'ON' if value_json.telemetry_valid else 'OFF' }}"
+  },
+  "homeassistant/button/afore-ems_button_cancel_override/config": {
+    "name": "Cancel override",
+    "unique_id": "afore-ems_button_cancel_override",
+    "device": {
+      "identifiers": [
+        "afore-ems"
+      ],
+      "name": "Afore Autonomous EMS"
+    },
+    "availability_topic": "afore/afore-ems/v1/availability",
+    "command_topic": "afore/afore-ems/v1/ems/command",
+    "command_template": "{\"schema\":1,\"message_id\":\"afore-ems_button_cancel_override-{{ (now().timestamp()*1000000)|int }}\",\"timestamp\":{{ now().timestamp()|int }},\"ttl\":30,\"action\":\"cancel_override\",\"payload\":{}}"
+  },
+  "homeassistant/button/afore-ems_button_cancel_session/config": {
+    "name": "Cancel session",
+    "unique_id": "afore-ems_button_cancel_session",
+    "device": {
+      "identifiers": [
+        "afore-ems"
+      ],
+      "name": "Afore Autonomous EMS"
+    },
+    "availability_topic": "afore/afore-ems/v1/availability",
+    "command_topic": "afore/afore-ems/v1/ems/command",
+    "command_template": "{\"schema\":1,\"message_id\":\"afore-ems_button_cancel_session-{{ (now().timestamp()*1000000)|int }}\",\"timestamp\":{{ now().timestamp()|int }},\"ttl\":30,\"action\":\"cancel_session\",\"payload\":{}}"
+  },
+  "homeassistant/number/afore-ems_number_charge_a/config": {
+    "name": "Charge current limit",
+    "unique_id": "afore-ems_number_charge_a",
+    "device": {
+      "identifiers": [
+        "afore-ems"
+      ],
+      "name": "Afore Autonomous EMS"
+    },
+    "availability_topic": "afore/afore-ems/v1/availability",
+    "state_topic": "afore/afore-ems/v1/config/state",
+    "value_template": "{{ value_json.charge_a }}",
+    "unit_of_measurement": "A",
+    "min": 0,
+    "max": 500,
+    "step": 1,
+    "command_topic": "afore/afore-ems/v1/ems/command",
+    "command_template": "{\"schema\":1,\"message_id\":\"afore-ems_number_charge_a-{{ (now().timestamp()*1000000)|int }}\",\"timestamp\":{{ now().timestamp()|int }},\"ttl\":30,\"action\":\"policy\",\"payload\":{\"charge_a\":{{ value|int }}}}"
+  },
+  "homeassistant/number/afore-ems_number_charge_w/config": {
+    "name": "Charge power limit",
+    "unique_id": "afore-ems_number_charge_w",
+    "device": {
+      "identifiers": [
+        "afore-ems"
+      ],
+      "name": "Afore Autonomous EMS"
+    },
+    "availability_topic": "afore/afore-ems/v1/availability",
+    "state_topic": "afore/afore-ems/v1/config/state",
+    "value_template": "{{ value_json.charge_w }}",
+    "unit_of_measurement": "W",
+    "min": 0,
+    "max": 20000,
+    "step": 1,
+    "command_topic": "afore/afore-ems/v1/ems/command",
+    "command_template": "{\"schema\":1,\"message_id\":\"afore-ems_number_charge_w-{{ (now().timestamp()*1000000)|int }}\",\"timestamp\":{{ now().timestamp()|int }},\"ttl\":30,\"action\":\"policy\",\"payload\":{\"charge_w\":{{ value|int }}}}"
+  },
+  "homeassistant/number/afore-ems_number_discharge_a/config": {
+    "name": "Discharge current limit",
+    "unique_id": "afore-ems_number_discharge_a",
+    "device": {
+      "identifiers": [
+        "afore-ems"
+      ],
+      "name": "Afore Autonomous EMS"
+    },
+    "availability_topic": "afore/afore-ems/v1/availability",
+    "state_topic": "afore/afore-ems/v1/config/state",
+    "value_template": "{{ value_json.discharge_a }}",
+    "unit_of_measurement": "A",
+    "min": 0,
+    "max": 500,
+    "step": 1,
+    "command_topic": "afore/afore-ems/v1/ems/command",
+    "command_template": "{\"schema\":1,\"message_id\":\"afore-ems_number_discharge_a-{{ (now().timestamp()*1000000)|int }}\",\"timestamp\":{{ now().timestamp()|int }},\"ttl\":30,\"action\":\"policy\",\"payload\":{\"discharge_a\":{{ value|int }}}}"
+  },
+  "homeassistant/number/afore-ems_number_discharge_w/config": {
+    "name": "Discharge power limit",
+    "unique_id": "afore-ems_number_discharge_w",
+    "device": {
+      "identifiers": [
+        "afore-ems"
+      ],
+      "name": "Afore Autonomous EMS"
+    },
+    "availability_topic": "afore/afore-ems/v1/availability",
+    "state_topic": "afore/afore-ems/v1/config/state",
+    "value_template": "{{ value_json.discharge_w }}",
+    "unit_of_measurement": "W",
+    "min": 0,
+    "max": 20000,
+    "step": 1,
+    "command_topic": "afore/afore-ems/v1/ems/command",
+    "command_template": "{\"schema\":1,\"message_id\":\"afore-ems_number_discharge_w-{{ (now().timestamp()*1000000)|int }}\",\"timestamp\":{{ now().timestamp()|int }},\"ttl\":30,\"action\":\"policy\",\"payload\":{\"discharge_w\":{{ value|int }}}}"
+  },
+  "homeassistant/number/afore-ems_number_soc_max/config": {
+    "name": "Maximum SOC",
+    "unique_id": "afore-ems_number_soc_max",
+    "device": {
+      "identifiers": [
+        "afore-ems"
+      ],
+      "name": "Afore Autonomous EMS"
+    },
+    "availability_topic": "afore/afore-ems/v1/availability",
+    "state_topic": "afore/afore-ems/v1/config/state",
+    "value_template": "{{ value_json.soc_max }}",
+    "unit_of_measurement": "%",
+    "min": 0,
+    "max": 100,
+    "step": 1,
+    "command_topic": "afore/afore-ems/v1/ems/command",
+    "command_template": "{\"schema\":1,\"message_id\":\"afore-ems_number_soc_max-{{ (now().timestamp()*1000000)|int }}\",\"timestamp\":{{ now().timestamp()|int }},\"ttl\":30,\"action\":\"policy\",\"payload\":{\"soc_max\":{{ value|int }}}}"
+  },
+  "homeassistant/number/afore-ems_number_soc_min/config": {
+    "name": "Minimum SOC",
+    "unique_id": "afore-ems_number_soc_min",
+    "device": {
+      "identifiers": [
+        "afore-ems"
+      ],
+      "name": "Afore Autonomous EMS"
+    },
+    "availability_topic": "afore/afore-ems/v1/availability",
+    "state_topic": "afore/afore-ems/v1/config/state",
+    "value_template": "{{ value_json.soc_min }}",
+    "unit_of_measurement": "%",
+    "min": 0,
+    "max": 100,
+    "step": 1,
+    "command_topic": "afore/afore-ems/v1/ems/command",
+    "command_template": "{\"schema\":1,\"message_id\":\"afore-ems_number_soc_min-{{ (now().timestamp()*1000000)|int }}\",\"timestamp\":{{ now().timestamp()|int }},\"ttl\":30,\"action\":\"policy\",\"payload\":{\"soc_min\":{{ value|int }}}}"
+  },
+  "homeassistant/number/afore-ems_number_soc_target/config": {
+    "name": "Target SOC",
+    "unique_id": "afore-ems_number_soc_target",
+    "device": {
+      "identifiers": [
+        "afore-ems"
+      ],
+      "name": "Afore Autonomous EMS"
+    },
+    "availability_topic": "afore/afore-ems/v1/availability",
+    "state_topic": "afore/afore-ems/v1/config/state",
+    "value_template": "{{ value_json.soc_target }}",
+    "unit_of_measurement": "%",
+    "min": 0,
+    "max": 100,
+    "step": 1,
+    "command_topic": "afore/afore-ems/v1/ems/command",
+    "command_template": "{\"schema\":1,\"message_id\":\"afore-ems_number_soc_target-{{ (now().timestamp()*1000000)|int }}\",\"timestamp\":{{ now().timestamp()|int }},\"ttl\":30,\"action\":\"policy\",\"payload\":{\"soc_target\":{{ value|int }}}}"
+  },
+  "homeassistant/number/afore-ems_number_voltage_max/config": {
+    "name": "Maximum battery voltage",
+    "unique_id": "afore-ems_number_voltage_max",
+    "device": {
+      "identifiers": [
+        "afore-ems"
+      ],
+      "name": "Afore Autonomous EMS"
+    },
+    "availability_topic": "afore/afore-ems/v1/availability",
+    "state_topic": "afore/afore-ems/v1/config/state",
+    "value_template": "{{ value_json.voltage_max }}",
+    "unit_of_measurement": "V",
+    "min": 0,
+    "max": 1000,
+    "step": 1,
+    "command_topic": "afore/afore-ems/v1/ems/command",
+    "command_template": "{\"schema\":1,\"message_id\":\"afore-ems_number_voltage_max-{{ (now().timestamp()*1000000)|int }}\",\"timestamp\":{{ now().timestamp()|int }},\"ttl\":30,\"action\":\"policy\",\"payload\":{\"voltage_max\":{{ value|int }}}}"
+  },
+  "homeassistant/number/afore-ems_number_voltage_min/config": {
+    "name": "Minimum battery voltage",
+    "unique_id": "afore-ems_number_voltage_min",
+    "device": {
+      "identifiers": [
+        "afore-ems"
+      ],
+      "name": "Afore Autonomous EMS"
+    },
+    "availability_topic": "afore/afore-ems/v1/availability",
+    "state_topic": "afore/afore-ems/v1/config/state",
+    "value_template": "{{ value_json.voltage_min }}",
+    "unit_of_measurement": "V",
+    "min": 0,
+    "max": 1000,
+    "step": 1,
+    "command_topic": "afore/afore-ems/v1/ems/command",
+    "command_template": "{\"schema\":1,\"message_id\":\"afore-ems_number_voltage_min-{{ (now().timestamp()*1000000)|int }}\",\"timestamp\":{{ now().timestamp()|int }},\"ttl\":30,\"action\":\"policy\",\"payload\":{\"voltage_min\":{{ value|int }}}}"
+  },
+  "homeassistant/select/afore-ems_select_operating_mode/config": {
+    "name": "Operating mode",
+    "unique_id": "afore-ems_select_operating_mode",
+    "device": {
+      "identifiers": [
+        "afore-ems"
+      ],
+      "name": "Afore Autonomous EMS"
+    },
+    "availability_topic": "afore/afore-ems/v1/availability",
+    "state_topic": "afore/afore-ems/v1/system/manual",
+    "value_template": "{{ value_json.operating_mode }}",
+    "options": [
+      "SHADOW",
+      "LIVE"
+    ],
+    "command_topic": "afore/afore-ems/v1/ems/command",
+    "command_template": "{\"schema\":1,\"message_id\":\"afore-ems_select_operating_mode-{{ (now().timestamp()*1000000)|int }}\",\"timestamp\":{{ now().timestamp()|int }},\"ttl\":30,\"action\":\"operating_mode\",\"payload\":{\"mode\":\"{{ value }}\"}}"
+  },
+  "homeassistant/select/afore-ems_select_strategy/config": {
+    "name": "Local strategy",
+    "unique_id": "afore-ems_select_strategy",
+    "device": {
+      "identifiers": [
+        "afore-ems"
+      ],
+      "name": "Afore Autonomous EMS"
+    },
+    "availability_topic": "afore/afore-ems/v1/availability",
+    "state_topic": "afore/afore-ems/v1/config/state",
+    "value_template": "{{ value_json.strategy_name }}",
+    "options": [
+      "SELF_USE",
+      "CHARGE_FIRST",
+      "NATIVE_INVERTER",
+      "SAFE_MODE",
+      "TARGET_SOC",
+      "MAINTENANCE"
+    ],
+    "command_topic": "afore/afore-ems/v1/ems/command",
+    "command_template": "{\"schema\":1,\"message_id\":\"afore-ems_select_strategy-{{ (now().timestamp()*1000000)|int }}\",\"timestamp\":{{ now().timestamp()|int }},\"ttl\":30,\"action\":\"policy\",\"payload\":{\"strategy\":{{ ['SELF_USE','CHARGE_FIRST','NATIVE_INVERTER','SAFE_MODE','TARGET_SOC','MAINTENANCE'].index(value) }}}}"
+  },
+  "homeassistant/sensor/afore-ems_battery_a/config": {
+    "name": "Battery current",
+    "unique_id": "afore-ems_battery_a",
+    "device": {
+      "identifiers": [
+        "afore-ems"
+      ],
+      "name": "Afore Autonomous EMS",
+      "manufacturer": "Afore EMS"
+    },
+    "state_topic": "afore/afore-ems/v1/telemetry",
+    "availability_topic": "afore/afore-ems/v1/availability",
+    "unit_of_measurement": "A",
+    "device_class": "current",
+    "state_class": "measurement",
+    "value_template": "{{ value_json.battery_a }}"
+  },
+  "homeassistant/sensor/afore-ems_battery_v/config": {
+    "name": "Battery voltage",
+    "unique_id": "afore-ems_battery_v",
+    "device": {
+      "identifiers": [
+        "afore-ems"
+      ],
+      "name": "Afore Autonomous EMS",
+      "manufacturer": "Afore EMS"
+    },
+    "state_topic": "afore/afore-ems/v1/telemetry",
+    "availability_topic": "afore/afore-ems/v1/availability",
+    "unit_of_measurement": "V",
+    "device_class": "voltage",
+    "state_class": "measurement",
+    "value_template": "{{ value_json.battery_v }}"
+  },
+  "homeassistant/sensor/afore-ems_battery_w/config": {
+    "name": "Battery power",
+    "unique_id": "afore-ems_battery_w",
+    "device": {
+      "identifiers": [
+        "afore-ems"
+      ],
+      "name": "Afore Autonomous EMS",
+      "manufacturer": "Afore EMS"
+    },
+    "state_topic": "afore/afore-ems/v1/telemetry",
+    "availability_topic": "afore/afore-ems/v1/availability",
+    "unit_of_measurement": "W",
+    "device_class": "power",
+    "state_class": "measurement",
+    "value_template": "{{ value_json.battery_w }}"
+  },
+  "homeassistant/sensor/afore-ems_grid_v/config": {
+    "name": "Grid voltage",
+    "unique_id": "afore-ems_grid_v",
+    "device": {
+      "identifiers": [
+        "afore-ems"
+      ],
+      "name": "Afore Autonomous EMS",
+      "manufacturer": "Afore EMS"
+    },
+    "state_topic": "afore/afore-ems/v1/telemetry",
+    "availability_topic": "afore/afore-ems/v1/availability",
+    "unit_of_measurement": "V",
+    "device_class": "voltage",
+    "state_class": "measurement",
+    "value_template": "{{ value_json.grid_v }}"
+  },
+  "homeassistant/sensor/afore-ems_grid_w/config": {
+    "name": "Grid power",
+    "unique_id": "afore-ems_grid_w",
+    "device": {
+      "identifiers": [
+        "afore-ems"
+      ],
+      "name": "Afore Autonomous EMS",
+      "manufacturer": "Afore EMS"
+    },
+    "state_topic": "afore/afore-ems/v1/telemetry",
+    "availability_topic": "afore/afore-ems/v1/availability",
+    "unit_of_measurement": "W",
+    "device_class": "power",
+    "state_class": "measurement",
+    "value_template": "{{ value_json.grid_w }}"
+  },
+  "homeassistant/sensor/afore-ems_hz/config": {
+    "name": "Grid frequency",
+    "unique_id": "afore-ems_hz",
+    "device": {
+      "identifiers": [
+        "afore-ems"
+      ],
+      "name": "Afore Autonomous EMS",
+      "manufacturer": "Afore EMS"
+    },
+    "state_topic": "afore/afore-ems/v1/telemetry",
+    "availability_topic": "afore/afore-ems/v1/availability",
+    "unit_of_measurement": "Hz",
+    "device_class": "frequency",
+    "state_class": "measurement",
+    "value_template": "{{ value_json.hz }}"
+  },
+  "homeassistant/sensor/afore-ems_inverter_w/config": {
+    "name": "Inverter AC power",
+    "unique_id": "afore-ems_inverter_w",
+    "device": {
+      "identifiers": [
+        "afore-ems"
+      ],
+      "name": "Afore Autonomous EMS",
+      "manufacturer": "Afore EMS"
+    },
+    "state_topic": "afore/afore-ems/v1/telemetry",
+    "availability_topic": "afore/afore-ems/v1/availability",
+    "unit_of_measurement": "W",
+    "device_class": "power",
+    "state_class": "measurement",
+    "value_template": "{{ value_json.inverter_w }}"
+  },
+  "homeassistant/sensor/afore-ems_load_w/config": {
+    "name": "Derived load",
+    "unique_id": "afore-ems_load_w",
+    "device": {
+      "identifiers": [
+        "afore-ems"
+      ],
+      "name": "Afore Autonomous EMS",
+      "manufacturer": "Afore EMS"
+    },
+    "state_topic": "afore/afore-ems/v1/telemetry",
+    "availability_topic": "afore/afore-ems/v1/availability",
+    "unit_of_measurement": "W",
+    "device_class": "power",
+    "state_class": "measurement",
+    "value_template": "{{ value_json.load_w }}"
+  },
+  "homeassistant/sensor/afore-ems_pv1_a/config": {
+    "name": "PV1 current",
+    "unique_id": "afore-ems_pv1_a",
+    "device": {
+      "identifiers": [
+        "afore-ems"
+      ],
+      "name": "Afore Autonomous EMS",
+      "manufacturer": "Afore EMS"
+    },
+    "state_topic": "afore/afore-ems/v1/telemetry",
+    "availability_topic": "afore/afore-ems/v1/availability",
+    "unit_of_measurement": "A",
+    "device_class": "current",
+    "state_class": "measurement",
+    "value_template": "{{ value_json.pv1_a }}"
+  },
+  "homeassistant/sensor/afore-ems_pv1_v/config": {
+    "name": "PV1 voltage",
+    "unique_id": "afore-ems_pv1_v",
+    "device": {
+      "identifiers": [
+        "afore-ems"
+      ],
+      "name": "Afore Autonomous EMS",
+      "manufacturer": "Afore EMS"
+    },
+    "state_topic": "afore/afore-ems/v1/telemetry",
+    "availability_topic": "afore/afore-ems/v1/availability",
+    "unit_of_measurement": "V",
+    "device_class": "voltage",
+    "state_class": "measurement",
+    "value_template": "{{ value_json.pv1_v }}"
+  },
+  "homeassistant/sensor/afore-ems_pv1_w/config": {
+    "name": "PV1 power",
+    "unique_id": "afore-ems_pv1_w",
+    "device": {
+      "identifiers": [
+        "afore-ems"
+      ],
+      "name": "Afore Autonomous EMS",
+      "manufacturer": "Afore EMS"
+    },
+    "state_topic": "afore/afore-ems/v1/telemetry",
+    "availability_topic": "afore/afore-ems/v1/availability",
+    "unit_of_measurement": "W",
+    "device_class": "power",
+    "state_class": "measurement",
+    "value_template": "{{ value_json.pv1_w }}"
+  },
+  "homeassistant/sensor/afore-ems_pv2_a/config": {
+    "name": "PV2 current",
+    "unique_id": "afore-ems_pv2_a",
+    "device": {
+      "identifiers": [
+        "afore-ems"
+      ],
+      "name": "Afore Autonomous EMS",
+      "manufacturer": "Afore EMS"
+    },
+    "state_topic": "afore/afore-ems/v1/telemetry",
+    "availability_topic": "afore/afore-ems/v1/availability",
+    "unit_of_measurement": "A",
+    "device_class": "current",
+    "state_class": "measurement",
+    "value_template": "{{ value_json.pv2_a }}"
+  },
+  "homeassistant/sensor/afore-ems_pv2_v/config": {
+    "name": "PV2 voltage",
+    "unique_id": "afore-ems_pv2_v",
+    "device": {
+      "identifiers": [
+        "afore-ems"
+      ],
+      "name": "Afore Autonomous EMS",
+      "manufacturer": "Afore EMS"
+    },
+    "state_topic": "afore/afore-ems/v1/telemetry",
+    "availability_topic": "afore/afore-ems/v1/availability",
+    "unit_of_measurement": "V",
+    "device_class": "voltage",
+    "state_class": "measurement",
+    "value_template": "{{ value_json.pv2_v }}"
+  },
+  "homeassistant/sensor/afore-ems_pv2_w/config": {
+    "name": "PV2 power",
+    "unique_id": "afore-ems_pv2_w",
+    "device": {
+      "identifiers": [
+        "afore-ems"
+      ],
+      "name": "Afore Autonomous EMS",
+      "manufacturer": "Afore EMS"
+    },
+    "state_topic": "afore/afore-ems/v1/telemetry",
+    "availability_topic": "afore/afore-ems/v1/availability",
+    "unit_of_measurement": "W",
+    "device_class": "power",
+    "state_class": "measurement",
+    "value_template": "{{ value_json.pv2_w }}"
+  },
+  "homeassistant/sensor/afore-ems_pv_w/config": {
+    "name": "PV total",
+    "unique_id": "afore-ems_pv_w",
+    "device": {
+      "identifiers": [
+        "afore-ems"
+      ],
+      "name": "Afore Autonomous EMS",
+      "manufacturer": "Afore EMS"
+    },
+    "state_topic": "afore/afore-ems/v1/telemetry",
+    "availability_topic": "afore/afore-ems/v1/availability",
+    "unit_of_measurement": "W",
+    "device_class": "power",
+    "state_class": "measurement",
+    "value_template": "{{ value_json.pv_w }}"
+  },
+  "homeassistant/sensor/afore-ems_sensor_capacity_wh/config": {
+    "name": "Battery useful capacity",
+    "unique_id": "afore-ems_sensor_capacity_wh",
+    "device": {
+      "identifiers": [
+        "afore-ems"
+      ],
+      "name": "Afore Autonomous EMS"
+    },
+    "availability_topic": "afore/afore-ems/v1/availability",
+    "state_topic": "afore/afore-ems/v1/config/state",
+    "value_template": "{{ value_json.capacity_wh }}",
+    "unit_of_measurement": "Wh"
+  },
+  "homeassistant/sensor/afore-ems_sensor_live_lock/config": {
+    "name": "LIVE lock reason",
+    "unique_id": "afore-ems_sensor_live_lock",
+    "device": {
+      "identifiers": [
+        "afore-ems"
+      ],
+      "name": "Afore Autonomous EMS"
+    },
+    "availability_topic": "afore/afore-ems/v1/availability",
+    "state_topic": "afore/afore-ems/v1/system/manual",
+    "value_template": "{{ value_json.live_lock }}"
+  },
+  "homeassistant/sensor/afore-ems_sensor_nominal_mv/config": {
+    "name": "Battery nominal voltage",
+    "unique_id": "afore-ems_sensor_nominal_mv",
+    "device": {
+      "identifiers": [
+        "afore-ems"
+      ],
+      "name": "Afore Autonomous EMS"
+    },
+    "availability_topic": "afore/afore-ems/v1/availability",
+    "state_topic": "afore/afore-ems/v1/config/state",
+    "value_template": "{{ value_json.nominal_mv / 1000 }}",
+    "unit_of_measurement": "V"
+  },
+  "homeassistant/sensor/afore-ems_sensor_simulated_w/config": {
+    "name": "Simulated power",
+    "unique_id": "afore-ems_sensor_simulated_w",
+    "device": {
+      "identifiers": [
+        "afore-ems"
+      ],
+      "name": "Afore Autonomous EMS"
+    },
+    "availability_topic": "afore/afore-ems/v1/availability",
+    "state_topic": "afore/afore-ems/v1/ems/decision",
+    "value_template": "{{ value_json.simulated_w }}",
+    "unit_of_measurement": "W"
+  },
+  "homeassistant/sensor/afore-ems_sensor_strategy/config": {
+    "name": "Effective strategy",
+    "unique_id": "afore-ems_sensor_strategy",
+    "device": {
+      "identifiers": [
+        "afore-ems"
+      ],
+      "name": "Afore Autonomous EMS"
+    },
+    "availability_topic": "afore/afore-ems/v1/availability",
+    "state_topic": "afore/afore-ems/v1/ems/state",
+    "value_template": "{{ value_json.strategy }}"
+  },
+  "homeassistant/sensor/afore-ems_soc/config": {
+    "name": "Battery SOC",
+    "unique_id": "afore-ems_soc",
+    "device": {
+      "identifiers": [
+        "afore-ems"
+      ],
+      "name": "Afore Autonomous EMS",
+      "manufacturer": "Afore EMS"
+    },
+    "state_topic": "afore/afore-ems/v1/telemetry",
+    "availability_topic": "afore/afore-ems/v1/availability",
+    "unit_of_measurement": "%",
+    "device_class": "battery",
+    "state_class": "measurement",
+    "value_template": "{{ value_json.soc }}"
+  },
+  "homeassistant/sensor/afore-ems_temp_c/config": {
+    "name": "Inverter heatsink",
+    "unique_id": "afore-ems_temp_c",
+    "device": {
+      "identifiers": [
+        "afore-ems"
+      ],
+      "name": "Afore Autonomous EMS",
+      "manufacturer": "Afore EMS"
+    },
+    "state_topic": "afore/afore-ems/v1/telemetry",
+    "availability_topic": "afore/afore-ems/v1/availability",
+    "unit_of_measurement": "°C",
+    "device_class": "temperature",
+    "state_class": "measurement",
+    "value_template": "{{ value_json.temp_c }}"
+  },
+  "homeassistant/switch/afore-ems_switch_aux1/config": {
+    "name": "AUX1",
+    "unique_id": "afore-ems_switch_aux1",
+    "device": {
+      "identifiers": [
+        "afore-ems"
+      ],
+      "name": "Afore Autonomous EMS"
+    },
+    "availability_topic": "afore/afore-ems/v1/availability",
+    "state_topic": "afore/afore-ems/v1/system/manual",
+    "value_template": "{{ value_json.aux1 }}",
+    "command_topic": "afore/afore-ems/v1/ems/command",
+    "command_template": "{\"schema\":1,\"message_id\":\"afore-ems_switch_aux1-{{ (now().timestamp()*1000000)|int }}\",\"timestamp\":{{ now().timestamp()|int }},\"ttl\":30,\"action\":\"aux\",\"payload\":{\"on\":{{ 'true' if value=='ON' else 'false' }}}}"
+  },
+  "homeassistant/switch/afore-ems_switch_grid_charge/config": {
+    "name": "Allow simulated grid charge",
+    "unique_id": "afore-ems_switch_grid_charge",
+    "device": {
+      "identifiers": [
+        "afore-ems"
+      ],
+      "name": "Afore Autonomous EMS"
+    },
+    "availability_topic": "afore/afore-ems/v1/availability",
+    "state_topic": "afore/afore-ems/v1/config/state",
+    "value_template": "{{ 'ON' if value_json.grid_charge else 'OFF' }}",
+    "command_topic": "afore/afore-ems/v1/ems/command",
+    "command_template": "{\"schema\":1,\"message_id\":\"afore-ems_switch_grid_charge-{{ (now().timestamp()*1000000)|int }}\",\"timestamp\":{{ now().timestamp()|int }},\"ttl\":30,\"action\":\"policy\",\"payload\":{\"grid_charge\":{{ 1 if value=='ON' else 0 }}}}"
+  }
+}

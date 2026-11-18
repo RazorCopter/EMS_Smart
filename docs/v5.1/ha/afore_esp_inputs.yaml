@@ -1,0 +1,144 @@
+# Add as a separate Home Assistant package. The SEM package remains in place.
+automation:
+  - id: afore_esp_publish_inputs
+    alias: "Afore ESP SHADOW - push inputs"
+    mode: restart
+    triggers:
+      - trigger: time_pattern
+        minutes: "/5"
+      - trigger: state
+        entity_id:
+          - sensor.solcast_pv_forecast_previsione_per_oggi
+          - sensor.solcast_pv_forecast_previsione_per_domani
+          - sensor.solcast_pv_forecast_ultimo_polling_api
+          - sensor.sem_rapporto_reale_previsto
+          - binary_sensor.sem_nebbia
+          - sensor.sense_esterno_temperature
+          - sensor.punto_di_rugiada
+          - sensor.radiazione_solare
+    actions:
+      - variables:
+          stamp: "{{ as_timestamp(now()) | int }}"
+          poll: "{{ as_timestamp(states('sensor.solcast_pv_forecast_ultimo_polling_api'), 0) | int }}"
+          today_slots: >-
+            {% set ns = namespace(values=[]) %}
+            {% for row in (state_attr('sensor.solcast_pv_forecast_previsione_per_oggi','detailedForecast') or []) %}
+              {% if row is mapping and is_number(row.get('pv_estimate')) %}
+                {% set start = as_timestamp(row.get('period_start'), none) %}
+                {% if start is not none %}
+                  {% set ns.values = ns.values + [dict(start=start|int, kw=row.get('pv_estimate')|float)] %}
+                {% endif %}
+              {% endif %}
+            {% endfor %}
+            {{ (ns.values | sort(attribute='start'))[:50] }}
+          tomorrow_slots: >-
+            {% set ns = namespace(values=[]) %}
+            {% for row in (state_attr('sensor.solcast_pv_forecast_previsione_per_domani','detailedForecast') or []) %}
+              {% if row is mapping and is_number(row.get('pv_estimate')) %}
+                {% set start = as_timestamp(row.get('period_start'), none) %}
+                {% if start is not none %}
+                  {% set ns.values = ns.values + [dict(start=start|int, kw=row.get('pv_estimate')|float)] %}
+                {% endif %}
+              {% endif %}
+            {% endfor %}
+            {{ (ns.values | sort(attribute='start'))[:50] }}
+      - if:
+          - condition: template
+            value_template: "{{ 0 <= stamp | int - poll | int < 50400 and (today_slots | count + tomorrow_slots | count > 0) }}"
+        then:
+          - action: mqtt.publish
+            data:
+              topic: afore/afore-ems/v1/input/forecast_solar
+              qos: 1
+              retain: false
+              payload: >-
+                {{ dict(schema=1, timestamp=stamp|int, valid_until=poll|int+50400,
+                  data=dict(poll_timestamp=poll|int,today=today_slots,tomorrow=tomorrow_slots)) | to_json }}
+      - if:
+          - condition: template
+            value_template: "{{ is_number(states('sensor.sem_rapporto_reale_previsto')) }}"
+        then:
+          - action: mqtt.publish
+            data:
+              topic: afore/afore-ems/v1/input/forecast_ratio
+              retain: false
+              payload: >-
+                {{ dict(schema=1,timestamp=stamp|int,valid_until=stamp|int+1800,
+                  data=dict(ratio=states('sensor.sem_rapporto_reale_previsto')|float)) | to_json }}
+      - if:
+          - condition: template
+            value_template: "{{ states('binary_sensor.sem_nebbia') in ['on','off'] }}"
+        then:
+          - action: mqtt.publish
+            data:
+              topic: afore/afore-ems/v1/input/weather
+              retain: false
+              payload: >-
+                {% set t = states('sensor.sense_esterno_temperature') | float(none) %}
+                {% set td = states('sensor.punto_di_rugiada') | float(none) %}
+                {{ dict(schema=1,timestamp=stamp|int,valid_until=stamp|int+1800,
+                  data=dict(fog=is_state('binary_sensor.sem_nebbia','on'),
+                  spread_c=(t-td) if t is not none and td is not none else none,
+                  radiation_w_m2=states('sensor.radiazione_solare')|float(none))) | to_json }}
+      - action: mqtt.publish
+        data:
+          topic: afore/afore-ems/v1/input/load_profile
+          retain: false
+          payload: >-
+            {% set sem = state_attr('sensor.sem_calcoli','dati') or {} %}
+            {{ dict(schema=1,timestamp=stamp|int,valid_until=stamp|int+172800,
+              data=dict(today_kw=sem.get('load_today',0.9 if now().weekday() in [5,6] else 0.6),
+                tomorrow_kw=sem.get('load_tomorrow',0.9 if (now()+timedelta(days=1)).weekday() in [5,6] else 0.6))) | to_json }}
+  - id: afore_esp_ha_heartbeat
+    alias: "Afore ESP SHADOW - heartbeat HA"
+    mode: single
+    triggers:
+      - trigger: time_pattern
+        minutes: "/1"
+      - trigger: homeassistant
+        event: start
+    actions:
+      - action: mqtt.publish
+        data:
+          topic: afore/afore-ems/v1/input/heartbeat
+          retain: false
+          payload: >-
+            {% set stamp = as_timestamp(now()) | int %}
+            {{ dict(schema=1,timestamp=stamp,valid_until=stamp+90,data=dict(online=true)) | to_json }}
+
+mqtt:
+  sensor:
+    - name: Afore ESP SHADOW Decision
+      unique_id: afore_esp_shadow_comparison_packet
+      default_entity_id: sensor.afore_esp_shadow_decision
+      state_topic: afore/afore-ems/v1/ems/decision
+      value_template: "{{ value_json.strategy }}"
+      json_attributes_topic: afore/afore-ems/v1/ems/decision
+      expire_after: 30
+    - name: Afore ESP Manual Status
+      unique_id: afore_esp_manual_comparison_packet
+      default_entity_id: sensor.afore_esp_manual
+      state_topic: afore/afore-ems/v1/system/manual
+      value_template: "{{ value_json.operating_mode }}"
+      json_attributes_topic: afore/afore-ems/v1/system/manual
+      expire_after: 30
+
+template:
+  - sensor:
+      - name: Concordanza SEM ESP SHADOW
+        unique_id: afore_sem_esp_concordanza
+        availability: >-
+          {{ states('sensor.sem_decisione_prevista') not in ['unknown','unavailable'] and
+             states('sensor.afore_esp_shadow_decision') not in ['unknown','unavailable'] }}
+        state: >-
+          {% set sem = states('sensor.sem_decisione_prevista') %}
+          {% set esp = states('sensor.afore_esp_shadow_decision') %}
+          {% set mode = 'SELF_USE' if sem.startswith('SelfUse') else
+                        'CHARGE_FIRST' if sem.startswith('ChgFst') else none %}
+          {{ 'non confrontabile' if mode is none or esp not in ['SELF_USE','CHARGE_FIRST'] else
+             'concorde' if mode == esp else 'discorde' }}
+        attributes:
+          sem_decision: "{{ states('sensor.sem_decisione_prevista') }}"
+          sem_charge_cap_a: "{{ states('sensor.sem_corrente_calcolata') | float(none) }}"
+          esp_strategy: "{{ states('sensor.afore_esp_shadow_decision') }}"
+          esp_simulated_w: "{{ state_attr('sensor.afore_esp_shadow_decision','simulated_w') }}"

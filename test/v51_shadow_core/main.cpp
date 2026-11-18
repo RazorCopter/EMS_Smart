@@ -6,6 +6,7 @@ using namespace heliograph::v51;
 EnergyState sample(double soc,double grid,int ms) {
     EnergyState e;
     e.goodReads=1;
+    e.batteryVoltage={51.2,uint32_t(ms),Quality::Valid};
     e.soc={soc,uint32_t(ms),Quality::Valid};
     e.grid={grid,uint32_t(ms),Quality::Valid};
     e.battery={0,uint32_t(ms),Quality::Valid};
@@ -14,7 +15,8 @@ EnergyState sample(double soc,double grid,int ms) {
 int main() {
     StrategyManager m;
     Policy p;
-    assert(p.valid());
+    assert(p.target==100 && p.capacityWh==10240 && p.nominalMv==51200 && p.valid());
+    p.target=80;
     assert(m.tick(sample(50,600,1000),p,1,1000).finalWatts == -600);
     assert(m.tick(sample(20,600,2000),p,1,2000).finalWatts == 0);
     assert(m.tick(sample(50,500,1000),p,1,8000).strategy==Strategy::Safe);
@@ -47,9 +49,20 @@ int main() {
     power.batteryVoltage.status=Quality::Missing;
     assert(m.tick(power,limits,6,33000).finalWatts==0);
     limits.dischargeA=0;
+    limits.chargeA=0;
     limits.exportLimit=200;
     power.grid.value=-500;
     assert(m.tick(power,limits,7,33000).lower==300);
+    Policy daily;
+    daily.strategy=4;
+    StrategyManager scheduler;
+    tm time{};
+    time.tm_year=126; time.tm_yday=320; time.tm_hour=15; time.tm_min=29;
+    assert(scheduler.tick(sample(50,-2000,40000),daily,1,40000,&time).strategy==Strategy::Target);
+    time.tm_min=30;
+    assert(scheduler.tick(sample(50,-2000,41000),daily,1,41000,&time).strategy==Strategy::SelfUse);
+    time.tm_yday=321; time.tm_hour=8; time.tm_min=0;
+    assert(scheduler.tick(sample(50,-2000,42000),daily,1,42000,&time).strategy==Strategy::Target);
     p.ceiling=10;
     assert(!p.valid());
 }

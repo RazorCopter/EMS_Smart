@@ -8,6 +8,7 @@
 #include "network/rtc_time.h"
 #include "remote.h"
 #include "ems_runtime.h"
+#include "m5.h"
 #include "drivers/afore/v51_reader.h"
 #include <esp_ota_ops.h>
 
@@ -100,17 +101,18 @@ void loop() {
         }
     }
     reader.tick(millis());
+    v51::serviceAux(readsStarted && watchdogReady && !reader.state().readHalted);
     if (millis() - lastHeartbeat >= 1000) {
         lastHeartbeat = millis();
         time_t utc = 0;
         const char* rtcStatus = readRtc(utc);
         char row[240]{};
         snprintf(row, sizeof(row), "SHADOW heartbeat=%lu reset=%d heap=%u min_heap=%u "
-                 "psram=%u psram_free=%u rtc=%s utc=%lld watchdog=%s AUX1=DISABLED gpio47=%d "
+                 "psram=%u psram_free=%u rtc=%s utc=%lld watchdog=%s AUX1=%s gpio47=%d "
                  "modbus_write_count=0",
                  static_cast<unsigned long>(++sequence), int(esp_reset_reason()), ESP.getFreeHeap(),
                  ESP.getMinFreeHeap(), ESP.getPsramSize(), ESP.getFreePsram(), rtcStatus,
-                 static_cast<long long>(utc), watchdogReady ? "on" : "error", gpio_get_level(kAux));
+                 static_cast<long long>(utc), watchdogReady ? "on" : "error", v51::auxOn() ? "ON" : "OFF", gpio_get_level(kAux));
         v51::recordLog(row);
         const auto& state = reader.state();
         char soc[20], grid[20], pv[20], battery[20], load[20], temperature[20], voltage[20], frequency[20];

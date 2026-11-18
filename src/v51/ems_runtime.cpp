@@ -2,6 +2,7 @@
 #include "ems_runtime.h"
 #include "remote.h"
 #include "m4.h"
+#include "m5.h"
 #include <array>
 #include <Arduino.h>
 #include <cstring>
@@ -26,6 +27,7 @@ constexpr Field fields[]={
     {"efficiency_pct",&Policy::efficiencyPct},{"target_w",&Policy::targetW},
     {"maintenance_soc",&Policy::maintenanceSoc},{"hold_s",&Policy::maintenanceHoldSec},
     {"maintenance_timeout_s",&Policy::maintenanceSec},
+    {"nominal_mv",&Policy::nominalMv},{"daily_deadline",&Policy::daily},{"deadline_minute",&Policy::deadlineMinute},
 };
 std::mutex lock;
 Policy current;
@@ -59,7 +61,7 @@ std::string audit(const EnergyState& e,const Policy& p,const Decision& d,
     out<<",\"missing_wh\":"; number(out,d.missingWh);
     out<<",\"average_w\":"; number(out,d.averageW);
     out<<",\"unreachable\":"<<(d.unreachable ? "true":"false");
-    out<<",\"reason\":\""<<d.reason<<"\",\"executed\":false,\"applied\":null,\"aux1\":\"DISABLED\",\"modbus_write_count\":0}";
+    out<<",\"reason\":\""<<d.reason<<"\",\"executed\":false,\"applied\":null,\"aux1\":\""<<(auxOn()?"ON":"OFF")<<"\",\"modbus_write_count\":0}";
     return out.str();
 }
 
@@ -70,7 +72,7 @@ esp_err_t getPolicy(httpd_req_t* r) {
     {
         const std::lock_guard guard(lock);
         for (const auto& f:fields) json<<"\""<<f.name<<"\":"<<current.*(f.member)<<",";
-        json<<"\"battery_model_provisional\":true,\"revision\":"<<revision<<"}";
+        json<<"\"battery_profile_source\":\"HA/Solarman\",\"battery_model_provisional\":false,\"efficiency_provisional\":true,\"revision\":"<<revision<<"}";
     }
     httpd_resp_set_type(r,"application/json");
     return httpd_resp_sendstr(r,json.str().c_str());
@@ -96,6 +98,7 @@ esp_err_t replay(httpd_req_t* r) {
     for (int i=0;i<6;++i) {
         Policy p;
         p.strategy=i;
+        p.target=80; p.chargeA=0; p.dischargeA=0;
         p.maintenanceHoldSec=2;
         p.maintenanceSec=60;
         p.chargeFirstSec=30;
@@ -125,23 +128,23 @@ void appendPolicyJson(std::ostream& out) {
     out<<"{";
     for (const auto& f:fields) out<<"\""<<f.name<<"\":"<<current.*(f.member)<<",";
     out<<"\"strategy_name\":\""<<strategyName(static_cast<Strategy>(current.strategy))
-       <<"\",\"revision\":"<<revision<<",\"battery_model_provisional\":true}";
+       <<"\",\"revision\":"<<revision<<",\"battery_profile_source\":\"HA/Solarman\",\"battery_model_provisional\":false,\"efficiency_provisional\":true}";
 }
 bool applyPolicy(const std::string& form,uint32_t leaseMs,int cancel) {
     const std::lock_guard guard(lock);
     if (cancel) {
         if (cancel==3) {
             Policy previous;
-            if (!storage || storage->getBytesLength("ems-policy-prev")!=sizeof(previous) ||
-                storage->getBytes("ems-policy-prev",&previous,sizeof(previous))!=sizeof(previous) ||
-                !previous.valid() || storage->putBytes("ems-policy-v1",&previous,sizeof(previous))!=sizeof(previous))
+            if (!storage || storage->getBytesLength("ems-v2-prev")!=sizeof(previous) ||
+                storage->getBytes("ems-v2-prev",&previous,sizeof(previous))!=sizeof(previous) ||
+                !previous.valid() || storage->putBytes("ems-policy-v2",&previous,sizeof(previous))!=sizeof(previous))
                 return false;
             current=previous;
         }
         if (cancel==2 && (current.strategy==1 || current.strategy>=4)) {
             Policy next=current;
             next.strategy=current.strategy==1 ? 0 : current.fallback;
-            if (!storage || storage->putBytes("ems-policy-v1",&next,sizeof(next))!=sizeof(next))
+            if (!storage || storage->putBytes("ems-policy-v2",&next,sizeof(next))!=sizeof(next))
                 return false;
             current=next;
         }
@@ -185,8 +188,8 @@ bool applyPolicy(const std::string& form,uint32_t leaseMs,int cancel) {
         leaseStart=millis();
         leaseDuration=leaseMs;
     } else {
-        if (!storage || storage->putBytes("ems-policy-prev",&current,sizeof(current))!=sizeof(current) ||
-            storage->putBytes("ems-policy-v1",&next,sizeof(next))!=sizeof(next))
+        if (!storage || storage->putBytes("ems-v2-prev",&current,sizeof(current))!=sizeof(current) ||
+            storage->putBytes("ems-policy-v2",&next,sizeof(next))!=sizeof(next))
             return false;
         current=next;
         overridePolicy.reset();
@@ -196,6 +199,10 @@ bool applyPolicy(const std::string& form,uint32_t leaseMs,int cancel) {
 }
 void loadPolicy(Preferences& preferences) {
     storage=&preferences;
+    Policy old;
+    constexpr size_t oldSize=offsetof(Policy,nominalMv);
+    if(preferences.getBytesLength("ems-policy-v1")==oldSize &&
+       preferences.getBytes("ems-policy-v1",&old,oldSize)==oldSize && old.valid())current=old;
     struct LegacyPolicy { int fields[22]; };
     LegacyPolicy legacy{};
     Policy saved;
@@ -204,11 +211,11 @@ void loadPolicy(Preferences& preferences) {
         for(size_t i=0;i<22;++i) saved.*(fields[i+7].member)=legacy.fields[i];
         if(saved.valid()) current=saved;
     }
-    if (preferences.getBytesLength("ems-policy-v1")==sizeof(saved) &&
-        preferences.getBytes("ems-policy-v1",&saved,sizeof(saved))==sizeof(saved) && saved.valid())
+    if (preferences.getBytesLength("ems-policy-v2")==sizeof(saved) &&
+        preferences.getBytes("ems-policy-v2",&saved,sizeof(saved))==sizeof(saved) && saved.valid())
         current=saved;
-    else if (preferences.getBytesLength("ems-policy-prev")==sizeof(saved) &&
-             preferences.getBytes("ems-policy-prev",&saved,sizeof(saved))==sizeof(saved) && saved.valid())
+    else if (preferences.getBytesLength("ems-v2-prev")==sizeof(saved) &&
+             preferences.getBytes("ems-v2-prev",&saved,sizeof(saved))==sizeof(saved) && saved.valid())
         current=saved;
 }
 void tickEms(const EnergyState& state,uint32_t now,uint32_t seq) {
@@ -224,8 +231,14 @@ void tickEms(const EnergyState& state,uint32_t now,uint32_t seq) {
         p=overridePolicy.value_or(current);
         version=revision;
     }
-    const auto result=manager.tick(state,p,version,now);
-    recordDecision(state,now,audit(state,p,result,now,seq,"MEASURED"));
+    const auto wall=time(nullptr);
+    tm local{};
+    const auto* calendar=wall>=1700000000 ? localtime_r(&wall,&local) : nullptr;
+    const auto result=manager.tick(state,p,version,now,calendar);
+    auto line=audit(state,p,result,now,seq,"MEASURED");
+    line.pop_back();
+    line+=",\"ha_inputs\":"+haSummary(false)+"}";
+    recordDecision(state,now,line);
 }
 void registerEms(httpd_handle_t server,bool (*authorize)(httpd_req_t*)) {
     checkAuth=authorize;

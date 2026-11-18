@@ -3,6 +3,7 @@
 #include "energy_state.h"
 #include <algorithm>
 #include <cmath>
+#include <ctime>
 #include <string_view>
 
 namespace heliograph::v51 {
@@ -11,14 +12,15 @@ inline constexpr const char* names[] = {"SELF_USE","CHARGE_FIRST","NATIVE_INVERT
 inline const char* strategyName(Strategy s) { return names[static_cast<int>(s)]; }
 
 struct Policy {
-    int strategy=0, fallback=0, floor=20, ceiling=95, target=80;
+    int strategy=0, fallback=0, floor=20, ceiling=100, target=100;
     int charge=1000, discharge=1000, deadband=20, ramp=250, staleMs=5000;
     int chargeFirstW=1000, surplusOnly=1, gridCharge=0, hysteresis=2, chargeFirstSec=7200;
-    int deadlineSec=14400, capacityWh=5000, efficiencyPct=90, targetW=1000;
-    int chargeA=0,dischargeA=0,minVolt=0,maxVolt=0,resumeSoc=20,gridTarget=0,exportLimit=0;
+    int deadlineSec=14400, capacityWh=10240, efficiencyPct=90, targetW=1000;
+    int chargeA=50,dischargeA=50,minVolt=0,maxVolt=0,resumeSoc=20,gridTarget=0,exportLimit=3300;
     int maintenanceSoc=90, maintenanceHoldSec=600, maintenanceSec=14400;
+    int nominalMv=51200, daily=1, deadlineMinute=930;
     bool valid() const {
-        return chargeA>=0 && chargeA<=500 && dischargeA>=0 && dischargeA<=500 &&
+        return nominalMv>=1000 && nominalMv<=1000000 && (daily==0 || daily==1) && deadlineMinute>=0 && deadlineMinute<1440 && chargeA>=0 && chargeA<=500 && dischargeA>=0 && dischargeA<=500 &&
             minVolt>=0 && maxVolt>=0 && minVolt<=1000 && maxVolt<=1000 && (!maxVolt || minVolt<maxVolt) &&
             resumeSoc>=0 && resumeSoc<=ceiling && gridTarget>=-20000 && gridTarget<=20000 &&
             exportLimit>=0 && exportLimit<=20000 && strategy>=0 && strategy<=5 && (fallback==0 || fallback==2 || fallback==3) &&
@@ -43,7 +45,13 @@ struct Decision {
     bool unreachable=false;
     static constexpr bool executed=false;
 };
-struct ShadowExecutor { static Decision simulate(Decision d) { return d; } };
+struct CommandExecutor {
+    virtual ~CommandExecutor() = default;
+    virtual Decision resolve(Decision decision) const = 0;
+};
+struct ShadowCommandExecutor final : CommandExecutor {
+    Decision resolve(Decision decision) const override { return decision; }
+};
 
 inline std::optional<double> essential(const Sample& s, uint32_t now, uint32_t timeout) {
     if (s.status != Quality::Valid || now-s.stamp > timeout || !s.value || !std::isfinite(*s.value))
@@ -53,7 +61,7 @@ inline std::optional<double> essential(const Sample& s, uint32_t now, uint32_t t
 
 class StrategyManager {
 public:
-    Decision tick(const EnergyState& e, const Policy& p, uint32_t revision, uint32_t now) {
+    Decision tick(const EnergyState& e, const Policy& p, uint32_t revision, uint32_t now, const tm* local=nullptr) {
         if (revision_ != revision) {
             revision_=revision;
             start_=now;
@@ -82,8 +90,15 @@ public:
                 finish("MAINTENANCE_FAULT_ABORT");
         }
         if (!healthy) return complete(d,now);
-        const uint32_t elapsed=(now-start_)/1000;
-        const int limit=p.strategy==1 ? p.chargeFirstSec : p.strategy==4 ? p.deadlineSec : p.maintenanceSec;
+        uint32_t elapsed=(now-start_)/1000;
+        int limit=p.strategy==1 ? p.chargeFirstSec : p.strategy==4 ? p.deadlineSec : p.maintenanceSec;
+        if (p.strategy==4 && p.daily && local) {
+            const int day=local->tm_year*366+local->tm_yday;
+            if (day!=day_) {day_=day;done_=false;exit_="UNCHANGED";}
+            const int localSeconds=local->tm_hour*3600+local->tm_min*60+local->tm_sec;
+            elapsed=0;
+            limit=std::max(0,p.deadlineMinute*60-localSeconds);
+        }
         const int goal=p.strategy==5 ? p.maintenanceSoc : p.target;
         if (temporary && !done_) {
             if (elapsed>=uint32_t(limit)) finish("DEADLINE_EXPIRED");
@@ -159,8 +174,9 @@ private:
         state_=d.state;
         last_=now;
         priorW_=d.finalWatts;
-        return ShadowExecutor::simulate(d);
+        return ShadowCommandExecutor{}.resolve(d);
     }
+    int day_=-1;
     uint32_t revision_=0, start_=0, last_=0;
     std::optional<uint32_t> holdSince_;
     std::optional<int> priorW_;

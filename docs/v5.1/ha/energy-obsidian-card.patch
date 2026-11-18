@@ -1,0 +1,48 @@
+--- a/energy-obsidian-card.js
++++ b/energy-obsidian-card.js
+@@ -1,6 +1,6 @@
+ /* Obsidian Energy: external profile + settings UI. No third-party runtime. */
+ (() => {
+-  const VERSION='20261024-5';
++  const VERSION='20261118-ems';
+   const clone = value => JSON.parse(JSON.stringify(value));
+   const escapeHTML = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+   const finite = value => value !== '' && value !== null && Number.isFinite(Number(value));
+@@ -146,7 +146,7 @@
+     connectedCallback(){owners.set(this._owner,this);}
+     disconnectedCallback(){owners.delete(this._owner);}
+     setConfig(config){if(!config.config_url)throw new Error('config_url mancante');this._config=config;this._storage=config.storage_key||'energy-obsidian-profile:'+config.config_url;this._load();}
+-    set hass(hass){this._hass=hass;if(this._card)this._card.hass=hass;}
++    set hass(hass){this._hass=hass;if(this._card)this._card.hass=hass;const ems=this._dialog?.querySelector('[data-esp-ems]');if(ems)this._renderEms(ems);}
+     get hass(){return this._hass;}
+     getCardSize(){return 12;}
+     _uiButton(event){return event.composedPath().find(node=>node?.getAttribute?.('data-obsidian-owner')===this._owner&&['settings','appliances','month-today','month-summary'].includes(node.getAttribute('data-obsidian-ui')));}
+@@ -233,6 +233,7 @@
+       const actions=addTab('Cancelli');actions.append(this._note('Coordinate in percentuale della foto. Gli offset verticali sono in pixel. Ogni comando mantiene la conferma prima dell’esecuzione.'));
+       for(const a of this._draft.actions){const block=document.createElement('details');block.className='block';block.innerHTML='<summary>'+escapeHTML(a.name)+'</summary>';const grid=this._grid(block);for(const key of ['name','entity','service','icon','tooltip','confirm','x','y','y_offset','minimumTop'])if(a[key]!=null)grid.append(this._field(key,a[key],v=>a[key]=v,{type:typeof a[key]==='number'?'number':'text',step:.1}).el);actions.append(block);}
+       const live=addTab('Inverter live');this._renderLive(live);
++      const ems=addTab('EMS');ems.dataset.espEms='true';this._renderEms(ems);
+       const advanced=addTab('Avanzate');advanced.append(this._note('Profilo completo, suddiviso in sezioni JSON. Sono accessibili anche regole meteo, CSS, testi e struttura delle schede. Premi Usa questo JSON per acquisire le modifiche alla sezione, poi Salva e applica.'));
+       const part=document.createElement('select');part.className='search';part.setAttribute('aria-label','Sezione JSON');
+       const labels={params:'Parametri',entities:'Associazioni entita',images:'Immagini',weatherRules:'Regole meteo',photo:'Geometria foto',actions:'Comandi cancelli',appliances:'Utenze e soglie',colors:'Colori cockpit',applianceColors:'Colori utenze',dashboard:'Struttura completa delle schede'};
+@@ -249,6 +250,20 @@
+       this.shadowRoot.append(dialog);sections.get(initialTab||groups[0]).button.click();this._showSettingsDialog(dialog);this._status(this._storageWarning||'Modifica un valore, poi salva e applica.');
+     }
+     _download(p){const url=URL.createObjectURL(new Blob([JSON.stringify(p,null,2)],{type:'application/json'}));const a=document.createElement('a');a.href=url;a.download='energy-obsidian-config.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}
++    _renderEms(section){
++      section.replaceChildren();
++      const states=this._hass?.states||{},get=id=>states[this._draft?.entities?.[id]||id];
++      const esp=get('sensor.afore_esp_shadow_decision'),manual=get('sensor.afore_esp_manual'),sem=get('sensor.sem_decisione_prevista'),current=get('sensor.sem_corrente_calcolata');
++      const add=(label,value)=>{const row=document.createElement('div');row.className='live';const key=document.createElement('label'),out=document.createElement('span');key.textContent=label;out.textContent=unavailable(value)?'Non disponibile':String(value);row.append(key,out);section.append(row);};
++      add('Decisione SEM',sem?.state);
++      add('Corrente calcolata SEM',finite(current?.state)?current.state+' A':null);
++      add('Decisione ESP SHADOW',esp?.state);
++      add('Modalita operativa',manual?.state);
++      add('Setpoint simulato',esp?.attributes?.simulated_w==null?null:esp.attributes.simulated_w+' W');
++      add('Motivo ESP',esp?.attributes?.reason);
++      add('AUX1 comandata',manual?.attributes?.aux1);
++      add('Concordanza',get('sensor.concordanza_sem_esp_shadow')?.state);
++    }
+     _renderLive(section){
+       section.append(this._note('Questi controlli scrivono le entita reali. Le modifiche al profilo grafico non inviano comandi all’inverter.'));
+       const defs=[['Modalita EMS','select.solarman_modalita_ems','select','select_option','option'],['Corrente massima (A)','number.solarman_corrente_max_carica','number','set_value','value']];

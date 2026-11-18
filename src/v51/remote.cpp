@@ -2,6 +2,7 @@
 #include "remote.h"
 #include "ems_runtime.h"
 #include "m4.h"
+#include "m5.h"
 
 #include <Arduino.h>
 #include <ESPmDNS.h>
@@ -142,10 +143,10 @@ esp_err_t health(httpd_req_t* request) {
              "{\"firmware\":\"%s\",\"mode\":\"SHADOW\",\"uptime_ms\":%lu,\"reset_reason\":%d,"
              "\"heap\":%u,\"min_heap\":%u,\"psram\":%u,\"sta_connected\":%s,\"ip\":\"%s\","
              "\"rssi_dbm\":%s,\"ota_slot\":\"%s\",\"ota_state\":\"%s\","
-             "\"aux1\":\"DISABLED\",\"executed\":false,\"modbus_write_count\":0}",
+             "\"aux1\":\"%s\",\"executed\":false,\"modbus_write_count\":0}",
              V51_BUILD_ID, static_cast<unsigned long>(millis()), int(esp_reset_reason()),
              ESP.getFreeHeap(), ESP.getMinFreeHeap(), ESP.getPsramSize(), sta ? "true" : "false",
-             staIp.c_str(), rssi, running ? running->label : "unknown", imageState(bootState.load()));
+             staIp.c_str(), rssi, running ? running->label : "unknown", imageState(bootState.load()), auxOn()?"ON":"OFF");
     httpd_resp_set_type(request, "application/json");
     httpd_resp_set_hdr(request, "Cache-Control", "no-store");
     const auto result = httpd_resp_sendstr(request, response);
@@ -340,7 +341,7 @@ bool startHttp() {
     config.stack_size = 10240;
     config.recv_wait_timeout = 5;
     config.send_wait_timeout = 5;
-    config.max_uri_handlers = 22;
+    config.max_uri_handlers = 28;
     config.lru_purge_enable = true;
     if (httpd_start(&server, &config) != ESP_OK) return false;
     const httpd_uri_t routes[] = {
@@ -360,6 +361,7 @@ bool startHttp() {
     }
     registerEms(server,authorized);
     registerM4(server,authorized,preferences);
+    registerM5(server,authorized);
     return true;
 }
 
@@ -383,7 +385,7 @@ void manageWifi(uint32_t now) {
             char line[96];
             snprintf(line, sizeof(line), "Wi-Fi STA ip=%s rssi=%d", address.c_str(), WiFi.RSSI());
             recordLog(line);
-            configTime(0,0,"pool.ntp.org");
+            configTzTime("CET-1CEST,M3.5.0,M10.5.0/3","pool.ntp.org");
         }
         lastConnection = now;
         if (!mdns && (mdns = MDNS.begin(kHost))) MDNS.addService("http", "tcp", 80);
@@ -436,6 +438,8 @@ bool beginRemote() {
     }
 
     loadPolicy(preferences);
+    setenv("TZ","CET-1CEST,M3.5.0,M10.5.0/3",1);
+    tzset();
     WiFi.persistent(false);
     WiFi.mode(WIFI_STA);
     if (preferences.getString("manage", password, sizeof(password)) != sizeof(password) ||

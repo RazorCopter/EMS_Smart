@@ -1,0 +1,38 @@
+{
+  "ha_online": false,
+  "forecast_solar": {
+    "status": "stale",
+    "age_s": 72,
+    "used": false,
+    "data": null,
+    "valid_until": 1795031310
+  },
+  "forecast_ratio": {
+    "status": "stale",
+    "age_s": 35,
+    "used": false,
+    "data": null,
+    "valid_until": 1795031310
+  },
+  "weather": {
+    "status": "stale",
+    "age_s": 35,
+    "used": false,
+    "data": null,
+    "valid_until": 1795031310
+  },
+  "load_profile": {
+    "status": "stale",
+    "age_s": 35,
+    "used": false,
+    "data": null,
+    "valid_until": 1795031310
+  },
+  "heartbeat": {
+    "status": "stale",
+    "age_s": 35,
+    "used": false,
+    "data": null,
+    "valid_until": 1795031310
+  }
+}

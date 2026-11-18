@@ -82,3 +82,13 @@ Host assertions passed for SELF_USE, CHARGE_FIRST, NATIVE_INVERTER and SAFE_MODE
 | V51-22 | Each settings section is atomic and has rollback. Whole-file restore spans EMS and MQTT namespaces and is not power-loss atomic across sections. Runtime revision counters restart on boot. | Medium | G8 | Add a persistent shared generation and a single bundle promotion if needed. |
 | V51-23 | Changing device ID or discovery prefix can leave the previous identifiers retained on the broker. Deduplication cache holds the latest 32 message IDs in RAM. | Low | G7 | Treat device ID as stable and remove old retained configs during migration; quantify command burst limits. |
 | V51-24 | Audit persists in PSRAM until reboot. The structured decision body carries core SOC/grid quality and no separate long-term raw trace. | Low | G8 | Extend correlation and cross-field quality metadata when analytics are added. |
+
+### Mission 5 issues
+
+| ID | Description | Severity | Gate | Proposal |
+|---|---|---|---|---|
+| V51-25 | SEM forecast surplus-to-target, next-day deferral, and fog compensation are intentionally not part of TARGET_SOC yet. Push inputs are validated, visible and audited as unused. | Medium | Next mission | Adapt and replay the existing SEM logic before letting any HA input influence a decision. |
+| V51-26 | There is no relay contact feedback. Software restart and pin-level checks do not qualify every watchdog, ROM startup or brownout transient. | Medium | G3 | Document contact monitoring and scope the unloaded unit during separate bench qualification. |
+| V51-27 | HA package and Obsidian patch are delivered as files; installation, rendered card and actual HA switch are not validated in a running HA instance. | Low | G7 | Install on the owner side and validate entity IDs; MQTT protocol tests use the equivalent Discovery envelopes. |
+| V51-28 | The HA/Solarman battery profile sets 10,240 Wh, 51.2 V nominal and 50 A. Independent 1,000 W caps remain active when more restrictive. Charge efficiency remains a separate provisional setting. | Low | G5 | Review measured limits and efficiency against the battery specification before changing policy. |
+| V51-29 | Browser tooltip and sliders cover the requested forms; explicit minimum/maximum consistency across settings is still enforced server-side. Day schedule uses the Europe/Rome clock with a relative fallback. | Low | G8 | Add a formatted time picker and more cross-field inline diagnostics if needed. |

@@ -81,8 +81,10 @@ esp_err_t setPolicy(httpd_req_t* r) {
     if (strlen(body)!=offset) return httpd_resp_send_err(r,HTTPD_400_BAD_REQUEST,"Invalid form");
     Policy next;
     { const std::lock_guard guard(lock); next=current; }
+    const int previousStrategy=next.strategy;
     char* context=nullptr;
     bool changed=false;
+    bool explicitFallback=false;
     for (char* token=strtok_r(body,"&",&context); token; token=strtok_r(nullptr,"&",&context)) {
         char* eq=strchr(token,'=');
         if (!eq) return httpd_resp_send_err(r,HTTPD_400_BAD_REQUEST,"Invalid field");
@@ -94,8 +96,13 @@ esp_err_t setPolicy(httpd_req_t* r) {
             [token](Field f){ return strcmp(f.name,token)==0; });
         if (result.ec!=std::errc{} || result.ptr!=end || field==std::end(fields))
             return httpd_resp_send_err(r,HTTPD_400_BAD_REQUEST,"Unknown or invalid field");
+        explicitFallback |= field->member==&Policy::fallback;
         next.*(field->member)=value;
         changed=true;
+    }
+    if (!explicitFallback && next.strategy!=previousStrategy && next.strategy>=4 &&
+        (previousStrategy==0 || previousStrategy==2 || previousStrategy==3)) {
+        next.fallback=previousStrategy;
     }
     if (!changed || !next.valid()) return httpd_resp_send_err(r,HTTPD_400_BAD_REQUEST,"Invalid policy limits");
     if (!storage || storage->putBytes("ems-policy-v1",&next,sizeof(next))!=sizeof(next))

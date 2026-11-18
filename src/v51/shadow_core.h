@@ -56,6 +56,7 @@ public:
             holdSince_.reset();
             priorW_.reset();
             done_=false;
+            nearTarget_=false;
             exit_="UNCHANGED";
         }
         Decision d;
@@ -70,7 +71,11 @@ public:
         const bool temporary=p.strategy==1 || p.strategy>=4;
         if (!healthy && temporary) {
             holdSince_.reset();
-            if (p.strategy==5 && e.readHalted) finish("MAINTENANCE_FAULT_ABORT");
+            const auto fault = [](const Sample& sample) {
+                return sample.status==Quality::ReadError || sample.status==Quality::Invalid;
+            };
+            if (p.strategy==5 && (e.readHalted || fault(e.soc) || fault(e.grid) || fault(e.battery)))
+                finish("MAINTENANCE_FAULT_ABORT");
         }
         if (!healthy) return complete(d,now);
         const uint32_t elapsed=(now-start_)/1000;
@@ -79,7 +84,10 @@ public:
         if (temporary && !done_) {
             if (elapsed>=uint32_t(limit)) finish("DEADLINE_EXPIRED");
             else if (p.strategy!=5 && *soc>=goal) finish("TARGET_REACHED");
-            else if (p.strategy==5) {
+            else if (p.strategy==1) {
+                if (*soc>=goal-p.hysteresis) nearTarget_=true;
+                else if (*soc<goal-2*p.hysteresis) nearTarget_=false;
+            } else if (p.strategy==5) {
                 if (*soc>=goal && !holdSince_) holdSince_=now;
                 if (holdSince_ && *soc<goal-p.hysteresis) holdSince_.reset();
                 if (holdSince_ && (now-*holdSince_)/1000>=uint32_t(p.maintenanceHoldSec))
@@ -101,7 +109,7 @@ public:
         const int cap=std::min(p.charge,d.strategy==Strategy::ChargeFirst ? p.chargeFirstW : charging ? p.targetW : p.charge);
         d.lower=*soc<=p.floor || charging ? 0 : -p.discharge;
         d.upper=*soc>=p.ceiling ? 0 : std::min(cap,permitGrid ? cap : std::max(0,balance));
-        d.state=holding ? "HOLD" : "RUN";
+        d.state=holding ? "HOLD" : d.strategy==Strategy::ChargeFirst && nearTarget_ ? "TAPER" : "RUN";
         if (d.strategy==Strategy::Target || d.strategy==Strategy::Maintenance) {
             d.missingWh=std::max(0.0,goal-*soc)*p.capacityWh/p.efficiencyPct;
             const uint32_t reserve=d.strategy==Strategy::Maintenance ? p.maintenanceHoldSec : 0;
@@ -111,7 +119,7 @@ public:
             d.unreachable=*d.missingWh>0 && (!d.averageW || *d.averageW>*d.upper);
             d.candidate=holding ? (*soc<goal ? cap : 0) : d.averageW.value_or(cap);
         } else {
-            d.candidate=charging ? (*soc>=goal-p.hysteresis ? std::min(cap,250) : cap) : balance;
+            d.candidate=charging ? (nearTarget_ ? std::min(cap,250) : cap) : balance;
         }
         int selected=std::clamp(*d.candidate,*d.lower,*d.upper);
         const int bounded=selected;
@@ -143,6 +151,6 @@ private:
     std::optional<int> priorW_;
     Strategy effective_=Strategy::Safe;
     const char* state_="SAFE", *exit_="UNCHANGED";
-    bool done_=false;
+    bool done_=false, nearTarget_=false;
 };
 }

@@ -21,6 +21,8 @@ int main() {
     p.strategy=1;
     assert(m.tick(sample(50,-1200,9000),p,2,9000).finalWatts==1000);
     assert(m.tick(sample(79,-1200,10000),p,2,10000).candidate==250);
+    assert(m.tick(sample(77,-1200,10500),p,2,10500).candidate==250);
+    assert(m.tick(sample(75,-1200,10700),p,2,10700).candidate==1000);
     assert(m.tick(sample(80,-1200,11000),p,2,11000).strategy==Strategy::SelfUse);
     p.strategy=4; p.fallback=2; p.deadlineSec=10;
     auto d=m.tick(sample(50,-100,12000),p,3,12000);

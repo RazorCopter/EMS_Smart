@@ -1,6 +1,6 @@
 # Mission 5 · Console, manual AUX and HA inputs
 
-Firmware v5.1-console-3, signed OTA SHA-256 d1e9c09a1f06e0f70c6f00c0367f95dc04e2e23cf5564220f9ad508f68ba260d. Console at http://10.0.0.110/. The configured production MQTT host, credentials, device ID, prefix and base topic are retained. The previous SHADOW image remains available for OTA rollback. Modbus remains FC04 only.
+Firmware v5.1-console-3, signed OTA SHA-256 fcdd543c07650ce3dbf29d400f04355ab582691a92e00d6f2000cd198906fa42. Console at http://10.0.0.110/. The configured production MQTT host, credentials, device ID, prefix and base topic are retained. The previous SHADOW image remains available for OTA rollback. Modbus remains FC04 only.
 
 The HA/Solarman defaults are 10,240 Wh, 51.2 V nominal, 50 A charge/discharge, 20–100% SOC, 100% target and 3,300 W export limit. The independent 1,000 W caps remain active. Daily TARGET_SOC expires at 15:30 Europe/Rome and re-arms the next local day. Relative duration is still selectable and serves as the fallback without a valid wall clock.
 
@@ -21,3 +21,7 @@ The console replaces the flow list with a self-contained SVG diagram, poll inter
 [Desktop overview](evidence/M5_desktop_overview.png) · [Desktop tooltip](evidence/M5_desktop_tooltip.png) · [Desktop system](evidence/M5_desktop_system.png)
 
 [Mobile overview](evidence/M5_mobile_overview.png) · [Mobile tooltip](evidence/M5_mobile_tooltip.png) · [Mobile system](evidence/M5_mobile_system.png)
+
+## Final stability window
+
+The final OTA app1 image passed the mobile label/tooltip verification. The consecutive field observation covered 3607.67 s and 338 samples. FC04 reads advanced from 14 to 7965 (7951 in-window), with zero errors, no unexpected reset and monotonically increasing decision sequence. Free heap was 160184 B initially, 159368 B finally and 157696 B at the lowest sampled point. RSSI -71 to -59 dBm. All samples showed original MQTT connected, AUX OFF, GPIO47 LOW, executed=false and zero Modbus writes. [CSV](evidence/M5_STABILITY.csv).

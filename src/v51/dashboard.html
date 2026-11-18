@@ -23,7 +23,17 @@ header{padding-top:17px;padding-bottom:10px}main{padding-top:8px}nav{margin-bott
 <label for="ntpPrimary">Server NTP primario<input id="ntpPrimary" name="primary" type="text" maxlength="63" spellcheck="false" required></label>
 <label for="ntpFallback1">Server NTP fallback 1<input id="ntpFallback1" name="fallback1" type="text" maxlength="63" spellcheck="false" required></label>
 <label for="ntpFallback2">Server NTP fallback 2<input id="ntpFallback2" name="fallback2" type="text" maxlength="63" spellcheck="false" required></label>
-</div><div class="actions"><button class="primary">Salva data e ora</button></div></form></details></article><div class="split"><article><h2>Diagnostica</h2><div class="rows" id="device"></div></article><article><h2>Gestione dispositivo</h2><label>Modalità operativa<select id="opMode"><option>SHADOW</option><option>LIVE</option></select></label><p class="tag">🔒 Controllo reale non ancora qualificato</p>
+</div><div class="actions"><button class="primary">Salva data e ora</button></div></form></details></article><div class="split"><article><h2>Diagnostica</h2><div class="rows" id="device"></div></article><article><h2>Gestione dispositivo</h2><details><summary>Password amministratore</summary>
+<form id="adminPasswordForm" method="post" autocomplete="on">
+<p class="sub">Usa da 12 a 64 caratteri ASCII stampabili (lettere, numeri, simboli o spazi).</p>
+<input type="hidden" name="username" value="admin" autocomplete="username">
+<label>Password attuale<input name="current_password" type="password" autocomplete="current-password" required maxlength="64"></label>
+<label>Nuova password<input name="new_password" type="password" autocomplete="new-password" required minlength="12" maxlength="64"></label>
+<label>Conferma nuova password<input name="confirm_password" type="password" autocomplete="new-password" required minlength="12" maxlength="64"></label>
+<div class="actions"><button class="primary">Cambia password admin</button>
+<button id="adminSignIn" type="button" hidden>Accedi di nuovo</button></div>
+<p id="adminPasswordStatus" class="status" role="status" aria-live="polite"></p>
+</form></details><label>Modalità operativa<select id="opMode"><option>SHADOW</option><option>LIVE</option></select></label><p class="tag">🔒 Controllo reale non ancora qualificato</p>
 <label>Spegnimento automatico AUX1 (secondi, 0 = manuale)<input id="auxTtl" type="number" min="0" max="86400" value="0"></label><div class="actions"><button id="auxOn">Attiva AUX1</button><button id="auxOff">Spegni AUX1</button></div><p class="tag" id="auxStatus"></p><p><a href="/wifi">Configurazione Wi-Fi</a> · <a href="/api/v1/ems/decisions">Scarica audit decisioni</a></p><div class="actions"><button id="backup">Esporta configurazione</button><button id="restart">Riavvia</button><button id="rollbackPolicy">Ripristina EMS precedente</button><button id="rollbackBroker">Ripristina MQTT precedente</button></div><label>Ripristina configurazione EMS e MQTT<input id="restore" type="file" accept="application/json"></label><details><summary>Aggiornamento OTA firmato</summary><form id="otaForm"><label>Firmware applicativo<input name="image" type="file" accept=".bin" required></label><label>SHA-256 del firmware<input name="sha" required pattern="[A-Fa-f0-9]{64}"></label><label>Firma ECDSA DER in esadecimale<input name="signature" required pattern="[A-Fa-f0-9]+"></label><div class="actions"><button>Carica e riavvia</button></div></form></details></article></div></section>
 <div id="feedback" class="status" role="status" aria-live="polite"></div></main>
 <script>
@@ -351,6 +361,28 @@ $('rollbackPolicy').onclick=async()=>{if(confirm('Ripristinare i parametri EMS p
 $('rollbackBroker').onclick=async()=>{if(confirm('Ripristinare la configurazione MQTT precedente?'))try{await saveBroker({rollback:true});notice('Configurazione MQTT ripristinata');await load()}catch(e){notice(e.message,true)}};
 $('restart').onclick=async()=>{if(confirm('Riavviare il dispositivo?'))try{await call('reboot',{method:'POST'});notice('Riavvio richiesto')}catch(e){notice(e.message,true)}};
 $('otaForm').onsubmit=async e=>{e.preventDefault();if(!confirm('Installare l’immagine firmata e riavviare?'))return;try{const form=new FormData(e.target),file=form.get('image');const sha=form.get('sha');await call('ota',{method:'POST',headers:{'Content-Type':'application/octet-stream','X-Firmware-SHA256':sha,'X-Firmware-Signature':form.get('signature')},body:file});notice('Immagine accettata. Riavvio in corso.')}catch(e){notice(e.message,true)}};
+const adminForm=$('adminPasswordForm');
+$('adminSignIn').onclick=()=>location.reload();
+adminForm.onsubmit=async e=>{
+ e.preventDefault();
+ const form=e.currentTarget,status=$('adminPasswordStatus'),submit=form.querySelector('button[type="submit"],.primary');
+ const fields=form.elements;
+ status.dataset.error='true';
+ const next=fields.new_password.value;
+ if(next!==fields.confirm_password.value){status.textContent='Le nuove password non coincidono.';return}
+ if(!/^[ -~]{12,64}$/.test(next)||!next.trim()){status.textContent='Usa da 12 a 64 caratteri ASCII stampabili.';return}
+ submit.disabled=true;
+ try{
+  await call('system/admin-password',{method:'POST',headers:{'Content-Type':'application/json'},
+   body:JSON.stringify({current_password:fields.current_password.value,new_password:next})});
+  clearInterval(updateTimer);
+  form.reset();
+  status.dataset.error='false';
+  status.textContent='Password aggiornata. Accedi di nuovo come admin.';
+  $('adminSignIn').hidden=false;
+  $('adminSignIn').focus();
+ }catch(error){status.textContent=error.message;submit.disabled=false}
+};
 const clockForm=$('clockForm');
 function renderClock(state,refreshForm=false){
  const initialized=clockState!==null;
@@ -388,5 +420,6 @@ clockForm.onsubmit=async e=>{
  }catch(e){notice(e.message,true)}
 };
 async function load(){try{const [p,b]=await Promise.all([call('ems/config'),call('mqtt')]);makeForm('strategyForm',strategyFields,p);makeForm('limitsForm',limitFields,p);makeForm('brokerForm',brokerFields,b);await update()}catch(e){notice(e.message,true)}}
-load();setInterval(update,2000);
+if(location.hash==='#system')document.querySelector('[data-pane=system]').click();
+load();const updateTimer=setInterval(update,2000);
 </script></body></html>

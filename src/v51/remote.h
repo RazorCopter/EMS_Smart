@@ -7,5 +7,5 @@ namespace heliograph::v51 {
 bool beginRemote();
 void tickRemote(bool healthy);
 void recordLog(const char* message);
-const char* managementPassword();
+void copyManagementPassword(char (&output)[65]);
 }

@@ -42,7 +42,9 @@ void serialSetup() {
         const int input = Serial.read();
         if (input == '\n') {
             if (length == 9 && memcmp(command, "SETUP KEY", 9) == 0) {
-                Serial.printf("setup_admin_password=%s\n", v51::managementPassword());
+                char admin[65]{};
+                v51::copyManagementPassword(admin);
+                Serial.printf("setup_admin_password=%s\n", admin);
             }
             length = 0;
         } else if (input != '\r' && length < sizeof(command)) {

@@ -7,6 +7,7 @@
 #include "m5.h"
 
 #include <Arduino.h>
+#include <ArduinoJson.h>
 #include <ESPmDNS.h>
 #include <Preferences.h>
 #include <WiFi.h>
@@ -43,6 +44,9 @@ constexpr char kApName[] = "Afore-EMS-Setup";
 constexpr char kNvsNamespace[] = "afore-v51";
 constexpr uint32_t kBootConfirmTimeout = 90000;
 constexpr uint32_t kBootStableTime = 10000;
+constexpr size_t kAdminMinLength = 12;
+constexpr size_t kAdminMaxLength = 64;
+constexpr char kAdminKey[] = "admin-pass";
 constexpr size_t kMaxSlot = 0x600000;
 
 struct StationSettings {
@@ -58,7 +62,9 @@ struct LogEntry {
 
 Preferences preferences;
 StationSettings station;
-char password[25]{};
+char setupPassword[25]{};
+char adminPassword[kAdminMaxLength + 1]{};
+std::mutex adminMutex;
 httpd_handle_t server = nullptr;
 std::atomic<bool> sawHealth{false};
 std::atomic<bool> restartRequested{false};
@@ -100,24 +106,43 @@ bool equalBytes(const uint8_t* left, const uint8_t* right, size_t size) {
     return difference == 0;
 }
 
+bool adminMatches(const char* candidate, size_t length) {
+    const std::lock_guard lock(adminMutex);
+    return adminPassword[0] && length == strlen(adminPassword) &&
+        equalBytes(reinterpret_cast<const uint8_t*>(candidate),
+                   reinterpret_cast<const uint8_t*>(adminPassword), length);
+}
+
 bool authorized(httpd_req_t* request) {
-    char header[96]{};
-    char expected[32]{};
-    uint8_t decoded[64]{};
+    constexpr size_t prefixLength = 6;
+    constexpr size_t decodedCapacity = prefixLength + kAdminMaxLength;
+    char header[prefixLength + 4 * ((decodedCapacity + 2) / 3) + 1]{};
+    uint8_t decoded[decodedCapacity]{};
     size_t length = 0;
-    snprintf(expected, sizeof(expected), "admin:%s", password);
-    if (password[0] &&
-        httpd_req_get_hdr_value_str(request, "Authorization", header, sizeof(header)) == ESP_OK &&
-        strncmp(header, "Basic ", 6) == 0 &&
+    if (httpd_req_get_hdr_value_str(request, "Authorization", header, sizeof(header)) == ESP_OK &&
+        strncmp(header, "Basic ", prefixLength) == 0 &&
         mbedtls_base64_decode(decoded, sizeof(decoded), &length,
-                              reinterpret_cast<const uint8_t*>(header + 6), strlen(header + 6)) == 0 &&
-        length == strlen(expected) && equalBytes(decoded, reinterpret_cast<const uint8_t*>(expected), length)) {
+                              reinterpret_cast<const uint8_t*>(header + prefixLength),
+                              strlen(header + prefixLength)) == 0 &&
+        length >= prefixLength && memcmp(decoded, "admin:", prefixLength) == 0 &&
+        adminMatches(reinterpret_cast<const char*>(decoded) + prefixLength, length - prefixLength)) {
         return true;
     }
     httpd_resp_set_status(request, "401 Unauthorized");
     httpd_resp_set_hdr(request, "WWW-Authenticate", "Basic realm=\"Afore EMS\"");
     httpd_resp_sendstr(request, "Authentication required");
     return false;
+}
+
+bool validAdminPassword(const char* value, size_t length) {
+    if (length < kAdminMinLength || length > kAdminMaxLength) return false;
+    bool nonSpace = false;
+    for (size_t i = 0; i < length; ++i) {
+        const auto ch = static_cast<unsigned char>(value[i]);
+        if (ch < 0x20 || ch > 0x7E) return false;
+        nonSpace |= ch != ' ';
+    }
+    return nonSpace;
 }
 
 const char* imageState(esp_ota_img_states_t state) {
@@ -195,7 +220,7 @@ a{color:#b1e8cc;margin-right:16px}
 <form action="/setup" method="post"><label for="ssid">Rete Wi-Fi (2,4 GHz)</label>
 <input id="ssid" name="ssid" maxlength="32" required autocomplete="off">
 <label for="key">Password Wi-Fi</label><input id="key" name="key" type="password" maxlength="64" autocomplete="new-password">
-<button>Salva e riavvia</button></form><p><a href="/api/v1/health">Stato ESP32</a><a href="/api/v1/logs">Log</a></p></main></html>
+<button>Salva e riavvia</button></form><p><a href="/#system">Cambia password admin</a><a href="/api/v1/health">Stato ESP32</a><a href="/api/v1/logs">Log</a></p></main></html>
 )HTML";
 
 esp_err_t setupPage(httpd_req_t* request) {
@@ -217,6 +242,43 @@ bool receiveBody(httpd_req_t* request, char* buffer, size_t capacity) {
     }
     buffer[received] = '\0';
     return true;
+}
+
+esp_err_t changeAdminPassword(httpd_req_t* request) {
+    if (!authorized(request)) return ESP_OK;
+
+    char type[32]{};
+    char body[1200]{};
+    JsonDocument data;
+    if (httpd_req_get_hdr_value_str(request, "Content-Type", type, sizeof(type)) != ESP_OK ||
+        strcmp(type, "application/json") != 0 ||
+        !receiveBody(request, body, sizeof(body)) ||
+        deserializeJson(data, body, request->content_len) ||
+        !data["current_password"].is<const char*>() || !data["new_password"].is<const char*>()) {
+        return httpd_resp_send_err(request, HTTPD_400_BAD_REQUEST, "Richiesta di cambio password non valida.");
+    }
+    const auto current = data["current_password"].as<JsonString>();
+    const auto next = data["new_password"].as<JsonString>();
+    if (!adminMatches(current.c_str(), current.size())) {
+        return httpd_resp_send_err(request, HTTPD_403_FORBIDDEN, "La password attuale non è corretta.");
+    }
+    if (!validAdminPassword(next.c_str(), next.size())) {
+        return httpd_resp_send_err(request, HTTPD_400_BAD_REQUEST, "Usa da 12 a 64 caratteri ASCII stampabili.");
+    }
+    if (adminMatches(next.c_str(), next.size())) {
+        return httpd_resp_send_err(request, HTTPD_400_BAD_REQUEST, "Scegli una password diversa da quella attuale.");
+    }
+    {
+        const std::lock_guard lock(adminMutex);
+        if (preferences.putString(kAdminKey, next.c_str()) != next.size()) {
+            return httpd_resp_send_err(request, HTTPD_500_INTERNAL_SERVER_ERROR, "Salvataggio password non riuscito.");
+        }
+        memcpy(adminPassword, next.c_str(), next.size() + 1);
+    }
+    recordLog("Admin password changed");
+    httpd_resp_set_type(request, "application/json");
+    httpd_resp_set_hdr(request, "Cache-Control", "no-store");
+    return httpd_resp_sendstr(request, "{\"updated\":true}");
 }
 
 bool decodeFormValue(const char* input, char* output, size_t size) {
@@ -355,6 +417,7 @@ bool startHttp() {
         {"/api/v1/health", HTTP_GET, health, nullptr},
         {"/api/v1/logs", HTTP_GET, logResponse, nullptr},
         {"/api/v1/ota", HTTP_POST, updateFirmware, nullptr},
+        {"/api/v1/system/admin-password", HTTP_POST, changeAdminPassword, nullptr},
     };
     for (const auto& route : routes) {
         if (httpd_register_uri_handler(server, &route) != ESP_OK) {
@@ -372,7 +435,7 @@ bool startHttp() {
 void startFallback() {
     if (accessPoint) return;
     WiFi.mode(WIFI_AP_STA);
-    accessPoint = WiFi.softAP(kApName, password);
+    accessPoint = WiFi.softAP(kApName, setupPassword);
     recordLog(accessPoint ? "Setup AP available at 192.168.4.1" : "Setup AP startup failed");
 }
 
@@ -444,20 +507,24 @@ bool beginRemote() {
     loadClock(preferences);
     WiFi.persistent(false);
     WiFi.mode(WIFI_STA);
-    if (preferences.getString("manage", password, sizeof(password)) != sizeof(password) ||
-        strnlen(password, sizeof(password)) != sizeof(password) - 1) {
+    if (preferences.getString("manage", setupPassword, sizeof(setupPassword)) != sizeof(setupPassword) ||
+        strnlen(setupPassword, sizeof(setupPassword)) != sizeof(setupPassword) - 1) {
         constexpr char digits[] = "0123456789abcdef";
         uint8_t random[12];
         esp_fill_random(random, sizeof(random));
         for (size_t i = 0; i < sizeof(random); ++i) {
-            password[i * 2] = digits[random[i] >> 4];
-            password[i * 2 + 1] = digits[random[i] & 15];
+            setupPassword[i * 2] = digits[random[i] >> 4];
+            setupPassword[i * 2 + 1] = digits[random[i] & 15];
         }
-        password[24] = '\0';
-        if (preferences.putString("manage", password) != sizeof(password) - 1) {
+        setupPassword[24] = '\0';
+        if (preferences.putString("manage", setupPassword) != sizeof(setupPassword) - 1) {
             recordLog("Management password persistence failed");
             return false;
         }
+    }
+    const auto storedAdminLength = preferences.getString(kAdminKey, adminPassword, sizeof(adminPassword));
+    if (!storedAdminLength || !validAdminPassword(adminPassword, strlen(adminPassword))) {
+        memcpy(adminPassword, setupPassword, sizeof(setupPassword));
     }
     if (preferences.getBytesLength("station") == sizeof(station)) {
         preferences.getBytes("station", &station, sizeof(station));
@@ -491,5 +558,9 @@ void recordLog(const char* message) {
     snprintf(entry.message, sizeof(entry.message), "%s", message);
 }
 
-const char* managementPassword() { return password; }
+void copyManagementPassword(char (&output)[65]) {
+    static_assert(sizeof(output) == sizeof(adminPassword));
+    const std::lock_guard lock(adminMutex);
+    snprintf(output, sizeof(output), "%s", adminPassword);
+}
 }

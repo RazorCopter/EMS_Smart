@@ -27,3 +27,16 @@ The 16,777,216-byte original flash was read before upload. SHA-256: 901e8666e5b1
 ### Revised Step 1 bench checkpoint
 
 The remote-access image built and was written/verified via USB. App SHA-256: 6f6fbf8ac7f191a65b6a5bb816dcc4f291540fb9633dad1ccea8ab39931aa74c. USB heartbeat showed reset reason 11, 229,344 bytes free heap, 8,388,608 bytes PSRAM, watchdog on, GPIO47 = 0, and no Modbus activity. The deliberately unconfirmed test image built with SHA-256 1382c341c75e0c2baa5735604d47a11faa2f02f88a34628e949f6fc87a7b3358. STA, HTTP log access, network OTA and rollback must be demonstrated after Wi-Fi setup and before Step 1B.
+
+### Revised Step 1 acceptance — 2026-11-18
+
+| Check | Bench result |
+|---|---|
+| STA and remote logs | Authenticated health and heartbeat log endpoints responded over Wi-Fi. The device moved from 10.0.5.125 to the reserved 10.0.0.110 after OTA reboot. |
+| mDNS | A direct multicast query received the A record for afore-ems.local from 10.0.0.110. The Windows resolver temporarily retained 10.0.5.125 after the reservation changed. |
+| OTA rejection | An unauthenticated upload returned HTTP 401 and an authenticated unsigned upload returned HTTP 400. |
+| Automatic rollback | Signed deliberate-failure image booted in app1 as pending_verify, restarted before confirmation and returned to v5.1-remote-1 on app0. |
+| Successful OTA | Signed v5.1-remote-1 image booted in app1 as pending_verify and transitioned to valid. The remote log recorded the boot confirmation. Follow-up health at 26.3 s uptime returned reset reason 3, RSSI -74 dBm and 227,652 bytes free heap. |
+| SHADOW boundary | All observed health responses reported AUX1 DISABLED, executed=false and zero Modbus writes. Heartbeats reported GPIO47 LOW. The isolated hardware run had no RS485 action. |
+
+Step 1 accepted. Initial bench RSSI reached -80 dBm before the DHCP move; post-OTA samples were -74 dBm at the final verified endpoint. Recheck RSSI, reset reason, uptime and reachability in the installation location. Installation and later firmware changes are pending user confirmation.

@@ -7,7 +7,7 @@
 #include "boards/waveshare_esp32_s3_relay_1ch.h"
 #include "network/rtc_time.h"
 #include "remote.h"
-#include "shadow_core.h"
+#include "ems_runtime.h"
 #include "drivers/afore/v51_reader.h"
 #include <esp_ota_ops.h>
 
@@ -123,19 +123,7 @@ void loop() {
                  state.soc.age(lastHeartbeat).value_or(0), state.grid.age(lastHeartbeat).value_or(0),
                  state.pv.age(lastHeartbeat).value_or(0), state.battery.age(lastHeartbeat).value_or(0));
         v51::recordLog(row);
-        static std::optional<int> previous;
-        static uint32_t previousTick = lastHeartbeat - 1000;
-        const auto decision = v51::arbitrate(state, v51::Strategy::SelfUse, lastHeartbeat,
-                                               previous, lastHeartbeat - previousTick);
-        previousTick = lastHeartbeat;
-        previous = decision.finalWatts;
-        char candidate[16] = "null", simulated[16] = "null";
-        if (decision.candidate) snprintf(candidate, sizeof(candidate), "%d", *decision.candidate);
-        if (decision.finalWatts) snprintf(simulated, sizeof(simulated), "%d", *decision.finalWatts);
-        snprintf(row, sizeof(row), "DecisionAudit v=1 seq=%lu strategy=%s candidate_w=%s simulated_w=%s reason=%s executed=false modbus_write_count=0",
-                 static_cast<unsigned long>(sequence), v51::strategyName(decision.strategy),
-                 candidate, simulated, decision.reason);
-        v51::recordLog(row);
+        v51::tickEms(state,lastHeartbeat,sequence);
     }
     v51::tickRemote(remoteReady && watchdogReady && gpio_get_level(kAux) == 0 &&
                     ESP.getPsramSize() == 8 * 1024 * 1024);

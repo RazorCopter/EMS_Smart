@@ -61,3 +61,13 @@ Host assertions passed for SELF_USE, CHARGE_FIRST, NATIVE_INVERTER and SAFE_MODE
 | V51-11 | SELF_USE is the fixed runtime strategy in this build. SAFE_MODE is selected on unusable inputs. CHARGE_FIRST and NATIVE_INVERTER are implemented and host tested. | Medium | G7/G8 | Expose strategy and threshold selection via authenticated configuration, then verify each strategy on the ESP32. |
 | V51-12 | Simplified decision audit shares the 64-record diagnostic ring. Timestamp uses heartbeat sequence/uptime, with RTC UTC currently unavailable. | Low | G6/G8 | Add a decision-only API and typed, longer-lived records. Replace the missing age placeholder with null. |
 | V51-13 | MQTT, broker and Wi-Fi outage recovery, and the 30-minute observation are still pending. | Medium | G7/G10 | Complete the connectivity and verification steps using the real plant. |
+
+### Mission 3 issues
+
+| ID | Description | Severity | Gate | Proposal |
+|---|---|---|---|---|
+| V51-14 | Battery capacity (5,000 Wh) and charging efficiency (90%) are provisional defaults. Planner feasibility uses the currently available power, which varies with measured surplus. | Medium | G6 | Set validated values after battery identification and compare against battery energy data. |
+| V51-15 | Maintenance hold is simulated. Automatic battery calibration and any battery-specific charge/hold protocol lack verified vendor behavior. | High | G11 | Review battery documentation before implementing any calibration logic. |
+| V51-16 | Relative deadlines and hold timers use monotonic uptime; a reboot or configuration change starts a new session. | Medium | G6 | Qualify checkpointed session recovery and optional UTC deadlines after a trusted clock is available. |
+| V51-17 | SOC/limits are persisted; lead-time and maintenance lifecycle were replayed on the production ESP32 firmware. Fault injection and real battery control remain outside SHADOW. | Low | G10 | Expand coverage of real environmental and communications faults. |
+| V51-18 | Independent load metering and signed battery-to-AC loss calibration are pending. Small discrepancies in the instantaneous balance are expected because the sources have different capture windows. | Medium | G5/G10 | Evaluate separately with synchronized and independently measured reference data. |

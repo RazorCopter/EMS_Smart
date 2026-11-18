@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 #include "remote.h"
+#include "ems_runtime.h"
 
 #include <Arduino.h>
 #include <ESPmDNS.h>
@@ -48,7 +49,7 @@ struct StationSettings {
 struct LogEntry {
     uint32_t sequence = 0;
     uint32_t uptime = 0;
-    char message[240]{};
+    char message[768]{};
 };
 
 Preferences preferences;
@@ -168,7 +169,7 @@ esp_err_t logResponse(httpd_req_t* request) {
             entry = logs[(id - 1) % logs.size()];
         }
         if (entry.sequence != id) continue;
-        char row[300];
+        char row[830];
         snprintf(row, sizeof(row), "%lu %lu %s\n", static_cast<unsigned long>(id),
                  static_cast<unsigned long>(entry.uptime), entry.message);
         if (httpd_resp_sendstr_chunk(request, row) != ESP_OK) return ESP_FAIL;
@@ -336,6 +337,7 @@ bool startHttp() {
     config.stack_size = 10240;
     config.recv_wait_timeout = 5;
     config.send_wait_timeout = 5;
+    config.max_uri_handlers = 10;
     config.lru_purge_enable = true;
     if (httpd_start(&server, &config) != ESP_OK) return false;
     const httpd_uri_t routes[] = {
@@ -352,6 +354,7 @@ bool startHttp() {
             return false;
         }
     }
+    registerEms(server,authorized);
     return true;
 }
 
@@ -426,6 +429,7 @@ bool beginRemote() {
         return false;
     }
 
+    loadPolicy(preferences);
     WiFi.persistent(false);
     WiFi.mode(WIFI_STA);
     if (preferences.getString("manage", password, sizeof(password)) != sizeof(password) ||

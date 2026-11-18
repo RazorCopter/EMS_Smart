@@ -3,59 +3,146 @@
 #include "energy_state.h"
 #include <algorithm>
 #include <cmath>
-#include <cstdlib>
+#include <string_view>
 
 namespace heliograph::v51 {
-enum class Strategy { SelfUse, ChargeFirst, Native, Safe };
+enum class Strategy { SelfUse, ChargeFirst, Native, Safe, Target, Maintenance };
+inline constexpr const char* names[] = {"SELF_USE","CHARGE_FIRST","NATIVE_INVERTER","SAFE_MODE","TARGET_SOC","MAINTENANCE"};
+inline const char* strategyName(Strategy s) { return names[static_cast<int>(s)]; }
+
+struct Policy {
+    int strategy=0, fallback=0, floor=20, ceiling=95, target=80;
+    int charge=1000, discharge=1000, deadband=20, ramp=250, staleMs=5000;
+    int chargeFirstW=1000, surplusOnly=1, gridCharge=0, hysteresis=2, chargeFirstSec=7200;
+    int deadlineSec=14400, capacityWh=5000, efficiencyPct=90, targetW=1000;
+    int maintenanceSoc=90, maintenanceHoldSec=600, maintenanceSec=14400;
+    bool valid() const {
+        return strategy>=0 && strategy<=5 && (fallback==0 || fallback==2 || fallback==3) &&
+            floor>=0 && floor<ceiling && ceiling<=100 && target>floor && target<=ceiling &&
+            maintenanceSoc>floor && maintenanceSoc<=ceiling &&
+            charge>=0 && charge<=20000 && discharge>=0 && discharge<=20000 &&
+            deadband>=0 && deadband<=1000 && ramp>=1 && ramp<=20000 &&
+            staleMs>=500 && staleMs<=30000 && chargeFirstW>=0 && chargeFirstW<=20000 &&
+            targetW>=0 && targetW<=20000 && (surplusOnly==0 || surplusOnly==1) &&
+            (gridCharge==0 || gridCharge==1) && hysteresis>=1 && hysteresis<=10 &&
+            chargeFirstSec>=1 && chargeFirstSec<=604800 && deadlineSec>=1 && deadlineSec<=604800 &&
+            capacityWh>=100 && capacityWh<=100000 && efficiencyPct>=1 && efficiencyPct<=100 &&
+            maintenanceHoldSec>=1 && maintenanceHoldSec<maintenanceSec && maintenanceSec<=604800;
+    }
+};
 
 struct Decision {
-    Strategy strategy;
-    std::optional<int> candidate;
-    std::optional<int> finalWatts;
-    const char* reason;
-    static constexpr bool executed = false;
+    Strategy strategy=Strategy::Safe, configured=Strategy::SelfUse, previous=Strategy::Safe;
+    std::optional<int> candidate, finalWatts, lower, upper, averageW;
+    std::optional<double> missingWh;
+    const char* state="SAFE", *reason="INPUT_INVALID", *transition="UNCHANGED";
+    bool unreachable=false;
+    static constexpr bool executed=false;
 };
+struct ShadowExecutor { static Decision simulate(Decision d) { return d; } };
 
-inline const char* strategyName(Strategy strategy) {
-    switch (strategy) {
-        case Strategy::SelfUse: return "SELF_USE";
-        case Strategy::ChargeFirst: return "CHARGE_FIRST";
-        case Strategy::Native: return "NATIVE_INVERTER";
-        case Strategy::Safe: return "SAFE_MODE";
-    }
-    return "SAFE_MODE";
+inline std::optional<double> essential(const Sample& s, uint32_t now, uint32_t timeout) {
+    if (s.status != Quality::Valid || now-s.stamp > timeout || !s.value || !std::isfinite(*s.value))
+        return {};
+    return s.value;
 }
 
-struct ShadowExecutor {
-    static Decision simulate(Decision decision) { return decision; }
+class StrategyManager {
+public:
+    Decision tick(const EnergyState& e, const Policy& p, uint32_t revision, uint32_t now) {
+        if (revision_ != revision) {
+            revision_=revision;
+            start_=now;
+            holdSince_.reset();
+            priorW_.reset();
+            done_=false;
+            exit_="UNCHANGED";
+        }
+        Decision d;
+        d.configured=static_cast<Strategy>(p.strategy);
+        d.previous=effective_;
+        const auto soc=essential(e.soc,now,p.staleMs);
+        const auto grid=essential(e.grid,now,p.staleMs);
+        const auto batt=essential(e.battery,now,p.staleMs);
+        const bool healthy=!e.readHalted && e.goodReads && soc && grid && batt &&
+            *soc>=0 && *soc<=100 && std::abs(*grid)<=30000 && std::abs(*batt)<=30000 &&
+            std::abs(double(int32_t(e.grid.stamp-e.battery.stamp)))<=std::min(p.staleMs,2000);
+        const bool temporary=p.strategy==1 || p.strategy>=4;
+        if (!healthy && temporary) {
+            holdSince_.reset();
+            if (p.strategy==5 && e.readHalted) finish("MAINTENANCE_FAULT_ABORT");
+        }
+        if (!healthy) return complete(d,now);
+        const uint32_t elapsed=(now-start_)/1000;
+        const int limit=p.strategy==1 ? p.chargeFirstSec : p.strategy==4 ? p.deadlineSec : p.maintenanceSec;
+        const int goal=p.strategy==5 ? p.maintenanceSoc : p.target;
+        if (temporary && !done_) {
+            if (elapsed>=uint32_t(limit)) finish("DEADLINE_EXPIRED");
+            else if (p.strategy!=5 && *soc>=goal) finish("TARGET_REACHED");
+            else if (p.strategy==5) {
+                if (*soc>=goal && !holdSince_) holdSince_=now;
+                if (holdSince_ && *soc<goal-p.hysteresis) holdSince_.reset();
+                if (holdSince_ && (now-*holdSince_)/1000>=uint32_t(p.maintenanceHoldSec))
+                    finish("MAINTENANCE_COMPLETE");
+            }
+        }
+        d.strategy=done_ ? (p.strategy==1 ? Strategy::SelfUse : static_cast<Strategy>(p.fallback)) : d.configured;
+        d.transition=done_ ? exit_ : "UNCHANGED";
+        if (d.strategy==Strategy::Native || d.strategy==Strategy::Safe) {
+            d.state=d.strategy==Strategy::Native ? "OBSERVE" : "SAFE";
+            d.reason=d.strategy==Strategy::Native ? "NATIVE_OBSERVATION" : "SAFE_REQUESTED";
+            return complete(d,now);
+        }
+
+        const int balance=int(std::lround(*batt-*grid));
+        const bool charging=d.strategy!=Strategy::SelfUse;
+        const bool holding=d.strategy==Strategy::Maintenance && holdSince_.has_value();
+        const bool permitGrid=charging && p.gridCharge && !(d.strategy==Strategy::ChargeFirst && p.surplusOnly);
+        const int cap=std::min(p.charge,d.strategy==Strategy::ChargeFirst ? p.chargeFirstW : charging ? p.targetW : p.charge);
+        d.lower=*soc<=p.floor || charging ? 0 : -p.discharge;
+        d.upper=*soc>=p.ceiling ? 0 : std::min(cap,permitGrid ? cap : std::max(0,balance));
+        d.state=holding ? "HOLD" : "RUN";
+        if (d.strategy==Strategy::Target || d.strategy==Strategy::Maintenance) {
+            d.missingWh=std::max(0.0,goal-*soc)*p.capacityWh/p.efficiencyPct;
+            const uint32_t reserve=d.strategy==Strategy::Maintenance ? p.maintenanceHoldSec : 0;
+            const uint32_t remaining=uint32_t(limit)-elapsed;
+            const uint32_t available=remaining>reserve ? remaining-reserve : 0;
+            if (available) d.averageW=int(std::min(100000000.,std::ceil(*d.missingWh*3600/available)));
+            d.unreachable=*d.missingWh>0 && (!d.averageW || *d.averageW>*d.upper);
+            d.candidate=holding ? (*soc<goal ? cap : 0) : d.averageW.value_or(cap);
+        } else {
+            d.candidate=charging ? (*soc>=goal-p.hysteresis ? std::min(cap,250) : cap) : balance;
+        }
+        int selected=std::clamp(*d.candidate,*d.lower,*d.upper);
+        const int bounded=selected;
+        if (priorW_ && effective_==d.strategy) {
+            const int step=int(p.ramp*std::min(now-last_,uint32_t(4000))/1000);
+            selected=std::abs(selected-*priorW_)<p.deadband ? *priorW_
+                : std::clamp(selected,*priorW_-step,*priorW_+step);
+        }
+        d.finalWatts=std::clamp(selected,*d.lower,*d.upper);
+        d.reason=d.unreachable ? "UNREACHABLE_AT_CURRENT_LIMIT" : holding ? "MAINTENANCE_HOLD" :
+            selected!=*d.finalWatts ? "SAFETY_RECLAMP" : bounded!=*d.candidate ? "SAFETY_LIMIT" :
+            bounded!=*d.finalWatts ? "DEADBAND_OR_RAMP" : charging ? "CHARGE_REQUEST" : "GRID_BALANCE";
+        return complete(d,now);
+    }
+private:
+    void finish(const char* why) { done_=true; exit_=why; }
+    Decision complete(Decision d,uint32_t now) {
+        if (d.transition==std::string_view("UNCHANGED") && (d.strategy!=effective_ || d.state!=state_))
+            d.transition=d.state==std::string_view("HOLD") ? "HOLD_STARTED" :
+                d.strategy==Strategy::Safe ? "ENTER_SAFE" : "STRATEGY_OR_STATE_CHANGED";
+        effective_=d.strategy;
+        state_=d.state;
+        last_=now;
+        priorW_=d.finalWatts;
+        return ShadowExecutor::simulate(d);
+    }
+    uint32_t revision_=0, start_=0, last_=0;
+    std::optional<uint32_t> holdSince_;
+    std::optional<int> priorW_;
+    Strategy effective_=Strategy::Safe;
+    const char* state_="SAFE", *exit_="UNCHANGED";
+    bool done_=false;
 };
-
-inline Decision arbitrate(const EnergyState& state, Strategy strategy, uint32_t now,
-                          std::optional<int> previous, uint32_t elapsedMs) {
-    const auto soc = state.soc.usable(now);
-    const auto grid = state.grid.usable(now);
-    const auto battery = state.battery.usable(now);
-    if (strategy == Strategy::Safe || state.readHalted || !state.goodReads || !soc || !grid ||
-        !battery || std::abs(int32_t(state.grid.stamp - state.battery.stamp)) > 2000) {
-        return ShadowExecutor::simulate({Strategy::Safe, {}, {}, "INPUT_UNAVAILABLE_OR_STALE"});
-    }
-    if (strategy == Strategy::Native) {
-        return ShadowExecutor::simulate({strategy, {}, {}, "NATIVE_OBSERVATION"});
-    }
-
-    constexpr int capW = 1000;
-    const auto balance = static_cast<int>(std::lround(*battery - *grid));
-    const int candidate = strategy == Strategy::ChargeFirst ? std::max(0, balance) : balance;
-    const int minimum = *soc <= 20 || strategy == Strategy::ChargeFirst ? 0 : -capW;
-    const int maximum = *soc >= 95 ? 0 : std::clamp(balance, 0, capW);
-    int result = std::clamp(candidate, minimum, maximum);
-    if (previous) {
-        const int step = int(250 * std::min(elapsedMs, uint32_t(4000)) / 1000);
-        result = std::abs(result - *previous) < 20 ? *previous :
-                 std::clamp(result, *previous - step, *previous + step);
-    }
-    result = std::clamp(result, minimum, maximum);
-    return ShadowExecutor::simulate({strategy, candidate, result,
-                                     result == candidate ? "BALANCE" : "SAFETY_OR_SMOOTHING"});
-}
 }

@@ -40,3 +40,14 @@ The remote-access image built and was written/verified via USB. App SHA-256: 6f6
 | SHADOW boundary | All observed health responses reported AUX1 DISABLED, executed=false and zero Modbus writes. Heartbeats reported GPIO47 LOW. The isolated hardware run had no RS485 action. |
 
 Step 1 accepted. Initial bench RSSI reached -80 dBm before the DHCP move; post-OTA samples were -74 dBm at the final verified endpoint. Recheck RSSI, reset reason, uptime and reachability in the installation location. Installation and later firmware changes are pending user confirmation.
+
+### Step 1B and Step 2 acceptance
+
+Installed STA 10.0.0.110 showed -69 to -68 dBm, reset reason 1, 227,548 B free heap and 8 MiB PSRAM. The existing image was valid on app1 and previous bench rollback was verified. The signed FC04 image booted valid on app0 with -70 dBm. SHA-256 7a633afb300cd825f072f6a69214dd440ce2900c4f702618f9f44f8c00c2387e.
+
+After five seconds of passive listening, the unit read FC04 2002/1 followed by 507/24, 552/9, 2000/9 and 2515/1. Zero initial errors. Raw SOC 0018 -> 24%, grid ffff fffd -> -3 W, PV 0000 001a -> 26 W, battery 0000 0275 scaled -1 -> -629 W, voltage 0916 x0.1 -> 232.6 V, frequency 1385 x0.01 -> 49.97 Hz, heatsink 014d x0.1 -> 33.3 C. The load value of 543 W is derived from the AC balance and requires meter comparison. Remote evidence is saved in .pio/step2-fc04.log within the prototype worktree.
+
+| ID | Description | Severity | Gate | Proposal |
+|---|---|---|---|---|
+| V51-09 | Passive detection stops on unscheduled traffic or foreign frames, but a quiet second master and wire-level proof require capture. | Medium | G4 | Validate topology and add independent capture in qualification. |
+| V51-10 | Raw words and corresponding scale are logged for the initial block round. Ongoing logs contain decoded snapshots. | Low | G5 | Add bounded raw diagnostic history if needed. |

@@ -51,8 +51,8 @@ stop_bits = 1
 
 [[block]]
 space = "input"
-start = 512                       # 0x0200–0x0212 (19 regs): Inverter status, temperature, output power, grid
-count = 19
+start = 507                       # Vendor VgridR through PgridR, inclusive
+count = 24
 
 [[block]]
 space = "input"
@@ -64,6 +64,11 @@ space = "input"
 start = 2000                      # 0x07D0–0x07D8 (9 regs): Battery state, SOC, voltage, current, power
 count = 9
 
+[[block]]
+space = "input"
+start = 2515                     # Vendor radiator temperature
+count = 1
+
 # ------------------------------------------------------------------------------------------
 # PV Telemetry — String Power
 # ------------------------------------------------------------------------------------------
@@ -72,8 +77,8 @@ count = 9
 measurement = "dc.power.total"
 display_name = "Total PV Power"
 space = "input"
-address = 554                     # 0x022A
-type = "u16"
+address = 553                     # Vendor register table v3.4, decimal address
+type = "u32"
 scale = 1
 unit = "W"
 
@@ -103,7 +108,7 @@ unit = "W"
 measurement = "dc.mppt_1.voltage"
 display_name = "PV1 Voltage"
 space = "input"
-address = 552                     # 0x0228
+address = 555                     # Vendor register table v3.4, decimal address
 type = "u16"
 scale = 0.1
 unit = "V"
@@ -112,9 +117,9 @@ unit = "V"
 measurement = "dc.mppt_1.current"
 display_name = "PV1 Current"
 space = "input"
-address = 553                     # 0x0229
+address = 556                     # Vendor register table v3.4, decimal address
 type = "u16"
-scale = 0.1
+scale = 0.01
 unit = "A"
 
 [[register]]                      # UNVERIFIED: Vendor table offset; confirm via inverter display
@@ -130,9 +135,9 @@ unit = "V"
 measurement = "dc.mppt_2.current"
 display_name = "PV2 Current"
 space = "input"
-address = 559                     # 0x022F
+address = 559                     # Vendor register table v3.4, decimal address
 type = "u16"
-scale = 0.1
+scale = 0.01
 unit = "A"
 
 # ------------------------------------------------------------------------------------------
@@ -176,9 +181,9 @@ unit = "A"
 measurement = "battery.power"
 display_name = "Battery Power"
 space = "input"
-address = 2008                    # 0x07D8
-type = "s16"
-scale = -1                        # Inverts Afore sign: positive = charging, negative = discharging
+address = 2007                     # Vendor register table v3.4, decimal address
+type = "s32"
+scale = -1
 unit = "W"
 
 # Battery state enum: 4 = Charge, 5 = Discharge, 6 = Standby per Roadmap §4.
@@ -205,17 +210,17 @@ unit = "W"
 measurement = "grid.power"
 display_name = "Grid Power"
 space = "input"
-address = 530                     # 0x0212
-type = "s16"
-scale = 1                         # Sign convention: positive = import, negative = export (TO VERIFY)
+address = 529                     # Vendor register table v3.4, decimal address
+type = "s32"
+scale = 1
 unit = "W"
 
 [[register]]                      # VERIFIED (B, C): Roadmap + Solarman
 measurement = "ac.power.total"
 display_name = "Inverter Output Power"
 space = "input"
-address = 523                     # 0x020B
-type = "s16"
+address = 522                     # Vendor register table v3.4, decimal address
+type = "s32"
 scale = 1
 unit = "W"
 
@@ -228,7 +233,7 @@ unit = "W"
 measurement = "ac.phase_l1.voltage"
 display_name = "Grid Voltage"
 space = "input"
-address = 515                     # 0x0203
+address = 507                     # Vendor register table v3.4, decimal address
 type = "u16"
 scale = 0.1
 unit = "V"
@@ -237,7 +242,7 @@ unit = "V"
 measurement = "ac.frequency"
 display_name = "Grid Frequency"
 space = "input"
-address = 517                     # 0x0205
+address = 513                     # Vendor register table v3.4, decimal address
 type = "u16"
 scale = 0.01
 unit = "Hz"
@@ -262,7 +267,7 @@ unit = "Hz"
 measurement = "inverter.temperature"
 display_name = "Inverter Temperature"
 space = "input"
-address = 524                     # 0x020C
+address = 2515                     # Vendor register table v3.4, decimal address
 type = "s16"
 scale = 0.1
 unit = "°C"

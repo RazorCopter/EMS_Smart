@@ -7,6 +7,8 @@
 #include "boards/waveshare_esp32_s3_relay_1ch.h"
 #include "network/rtc_time.h"
 #include "remote.h"
+#include "drivers/afore/v51_reader.h"
+#include <esp_ota_ops.h>
 
 namespace {
 using namespace heliograph;
@@ -20,6 +22,16 @@ void disableAux() {
 
 bool watchdogReady = false;
 bool remoteReady = false;
+v51::AforeReader reader;
+bool readsStarted = false;
+
+const char* sampleValue(const v51::Sample& sample, uint32_t now, char (&out)[20]) {
+    const auto value = sample.usable(now);
+    if (!value) return "null";
+    snprintf(out, sizeof(out), "%.5g", *value);
+    return out;
+}
+
 
 const char* readRtc(time_t& utc) {
     Wire.beginTransmission(board::kRtcI2cAddress);
@@ -77,6 +89,16 @@ void loop() {
     static uint32_t sequence = 0;
     static uint32_t lastHeartbeat = millis() - 1000;
     serialSetup();
+    if (!readsStarted && millis() >= 11000) {
+        esp_ota_img_states_t otaState{};
+        const auto* running = esp_ota_get_running_partition();
+        if (running && esp_ota_get_state_partition(running, &otaState) == ESP_OK &&
+            otaState == ESP_OTA_IMG_VALID) {
+            readsStarted = true;
+            reader.start(millis());
+        }
+    }
+    reader.tick(millis());
     if (millis() - lastHeartbeat >= 1000) {
         lastHeartbeat = millis();
         time_t utc = 0;
@@ -88,6 +110,17 @@ void loop() {
                  static_cast<unsigned long>(++sequence), int(esp_reset_reason()), ESP.getFreeHeap(),
                  ESP.getMinFreeHeap(), ESP.getPsramSize(), ESP.getFreePsram(), rtcStatus,
                  static_cast<long long>(utc), watchdogReady ? "on" : "error", gpio_get_level(kAux));
+        v51::recordLog(row);
+        const auto& state = reader.state();
+        char soc[20], grid[20], pv[20], battery[20], load[20], temperature[20], voltage[20], frequency[20];
+        snprintf(row, sizeof(row), "EnergyState reads=%u errors=%u halted=%d soc=%s grid_w=%s pv_w=%s battery_w=%s load_w=%s temp_c=%s grid_v=%s hz=%s ages_ms=%u/%u/%u/%u",
+                 state.goodReads, state.errors, state.readHalted,
+                 sampleValue(state.soc, lastHeartbeat, soc), sampleValue(state.grid, lastHeartbeat, grid),
+                 sampleValue(state.pv, lastHeartbeat, pv), sampleValue(state.battery, lastHeartbeat, battery),
+                 sampleValue(state.load, lastHeartbeat, load), sampleValue(state.temperature, lastHeartbeat, temperature),
+                 sampleValue(state.voltage, lastHeartbeat, voltage), sampleValue(state.frequency, lastHeartbeat, frequency),
+                 state.soc.age(lastHeartbeat).value_or(0), state.grid.age(lastHeartbeat).value_or(0),
+                 state.pv.age(lastHeartbeat).value_or(0), state.battery.age(lastHeartbeat).value_or(0));
         v51::recordLog(row);
     }
     v51::tickRemote(remoteReady && watchdogReady && gpio_get_level(kAux) == 0 &&

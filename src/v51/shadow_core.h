@@ -11,6 +11,22 @@ enum class Strategy { SelfUse, ChargeFirst, Native, Safe, Target, Maintenance };
 inline constexpr const char* names[] = {"SELF_USE","CHARGE_FIRST","NATIVE_INVERTER","SAFE_MODE","TARGET_SOC","MAINTENANCE"};
 inline const char* strategyName(Strategy s) { return names[static_cast<int>(s)]; }
 
+struct PredictiveInputs {
+    bool forecastValid = false;
+    double remainingForecastKwh = 0.0;
+    double todayTotalKwh = 0.0;
+    double tomorrowTotalKwh = 0.0;
+    bool ratioValid = false;
+    double ratio = 1.0;
+    bool weatherValid = false;
+    bool fog = false;
+    double spreadC = 99.0;
+    double radiationWm2 = 0.0;
+    bool loadProfileValid = false;
+    double loadTodayKw = 0.0;
+    double loadTomorrowKw = 0.0;
+};
+
 struct Policy {
     int strategy=0, fallback=0, floor=20, ceiling=100, target=100;
     int charge=1000, discharge=1000, deadband=20, ramp=250, staleMs=5000;
@@ -19,7 +35,16 @@ struct Policy {
     int chargeA=50,dischargeA=50,minVolt=0,maxVolt=0,resumeSoc=20,gridTarget=0,exportLimit=3300;
     int maintenanceSoc=90, maintenanceHoldSec=600, maintenanceSec=14400;
     int nominalMv=51200, daily=1, deadlineMinute=930;
+    // Predictive & seasonal extensions (v5.1-predictive)
+    int predictive=0, autoSeason=1, summerFloor=10, winterFloor=20, fullHoldSec=300;
+    int weekdayLoadW=600, weekendLoadW=900, winterStart=1025, winterEnd=228;
+    int lowSunKwh=8, anticipationMin=20, safetyMarginPct=115;
+
     bool valid() const {
+        auto validMmDd = [](int mmdd) {
+            const int m = mmdd / 100, d = mmdd % 100;
+            return m >= 1 && m <= 12 && d >= 1 && d <= 31;
+        };
         return nominalMv>=1000 && nominalMv<=1000000 && (daily==0 || daily==1) && deadlineMinute>=0 && deadlineMinute<1440 && chargeA>=0 && chargeA<=500 && dischargeA>=0 && dischargeA<=500 &&
             minVolt>=0 && maxVolt>=0 && minVolt<=1000 && maxVolt<=1000 && (!maxVolt || minVolt<maxVolt) &&
             resumeSoc>=0 && resumeSoc<=ceiling && gridTarget>=-20000 && gridTarget<=20000 &&
@@ -33,7 +58,13 @@ struct Policy {
             (gridCharge==0 || gridCharge==1) && hysteresis>=1 && hysteresis<=10 &&
             chargeFirstSec>=1 && chargeFirstSec<=604800 && deadlineSec>=1 && deadlineSec<=604800 &&
             capacityWh>=100 && capacityWh<=100000 && efficiencyPct>=1 && efficiencyPct<=100 &&
-            maintenanceHoldSec>=1 && maintenanceHoldSec<maintenanceSec && maintenanceSec<=604800;
+            maintenanceHoldSec>=1 && maintenanceHoldSec<maintenanceSec && maintenanceSec<=604800 &&
+            (predictive==0 || predictive==1) && (autoSeason==0 || autoSeason==1) &&
+            summerFloor>=0 && summerFloor<ceiling && winterFloor>=0 && winterFloor<ceiling &&
+            fullHoldSec>=1 && fullHoldSec<=86400 && weekdayLoadW>=0 && weekdayLoadW<=20000 &&
+            weekendLoadW>=0 && weekendLoadW<=20000 && validMmDd(winterStart) && validMmDd(winterEnd) &&
+            lowSunKwh>=0 && lowSunKwh<=100 && anticipationMin>=0 && anticipationMin<=180 &&
+            safetyMarginPct>=100 && safetyMarginPct<=200;
     }
 };
 
@@ -45,6 +76,12 @@ struct Decision {
     const char* safetyReason="NONE";
     bool unreachable=false;
     static constexpr bool executed=false;
+    int effectiveFloor=20;
+    int recommendedChargeA=0;
+    bool fogActive=false, winterSeason=false, lowSunMode=false;
+    bool usedForecast=false, usedRatio=false, usedWeather=false, usedLoadProfile=false;
+    const char* phase="MANUAL";
+    const char* seasonName="UNKNOWN";
 };
 struct CommandExecutor {
     virtual ~CommandExecutor() = default;
@@ -95,9 +132,14 @@ inline std::optional<int> dailySeconds(time_t now,const tm& local,int minute) {
     else if(afterGap)deadline=afterGap;
     return int(std::clamp(difftime(deadline,now),0.0,172800.0));
 }
+
 class StrategyManager {
 public:
-    Decision tick(const EnergyState& e, const Policy& p, uint32_t revision, uint32_t now, const tm* local=nullptr, std::optional<int> dailyRemaining={}) {
+    enum class CyclePhase { SelfUse, GentleCharge, CaptureChargeFirst, FullHold };
+
+    Decision tick(const EnergyState& e, const Policy& p, uint32_t revision, uint32_t now,
+                  const tm* local=nullptr, std::optional<int> dailyRemaining={},
+                  const PredictiveInputs* pred=nullptr) {
         if (revision_ != revision) {
             revision_=revision;
             start_=now;
@@ -107,6 +149,11 @@ public:
             done_=false;
             nearTarget_=false;
             exit_="UNCHANGED";
+            predInit_=false;
+            fullHoldAccumMs_=0;
+            fullHoldLastTick_=now;
+            dischargingCycle_=false;
+            fogSticky_=false;
         }
         Decision d;
         d.configured=static_cast<Strategy>(p.strategy);
@@ -133,6 +180,19 @@ public:
             d.safetyReason=stale(e.soc)||stale(e.grid)||stale(e.battery)?"STALE_TELEMETRY":"ESSENTIAL_DATA_UNAVAILABLE";
             return complete(d,now);
         }
+
+        const auto volt=essential(e.batteryVoltage,now,p.staleMs);
+        const bool haveVoltage=volt && *volt>0 && *volt<=1000;
+        const bool voltageSafe=(!p.minVolt && !p.maxVolt) ||
+            (haveVoltage && *volt>=p.minVolt && (!p.maxVolt || *volt<=p.maxVolt));
+        const int surplus=int(std::lround(*batt-*grid));
+        const int balance=surplus+p.gridTarget;
+
+        // Predictive & seasonal autonomous layer (ACTIVE in SHADOW when p.predictive==1 and mode is SelfUse or ChargeFirst)
+        if (p.predictive && (p.strategy == 0 || p.strategy == 1)) {
+            return tickPredictive(*soc, surplus, balance, volt, haveVoltage, voltageSafe, p, now, local, pred, d);
+        }
+
         uint32_t elapsed=(now-start_)/1000;
         int limit=p.strategy==1 ? p.chargeFirstSec : p.strategy==4 ? p.deadlineSec : p.maintenanceSec;
         if (p.strategy==4 && p.daily && local) {
@@ -166,12 +226,7 @@ public:
             return complete(d,now);
         }
 
-        const int surplus=int(std::lround(*batt-*grid));
-        const int balance=surplus+p.gridTarget;
-        const auto volt=essential(e.batteryVoltage,now,p.staleMs);
-        const bool haveVoltage=volt && *volt>0 && *volt<=1000;
-        const bool voltageSafe=(!p.minVolt && !p.maxVolt) ||
-            (haveVoltage && *volt>=p.minVolt && (!p.maxVolt || *volt<=p.maxVolt));
+        d.effectiveFloor = p.floor;
         if (*soc<=p.floor) reserve_=true;
         else if (*soc>std::max(p.floor,p.resumeSoc)) reserve_=false;
         const bool charging=d.strategy!=Strategy::SelfUse;
@@ -185,6 +240,7 @@ public:
         if(p.exportLimit) d.lower=std::min(*d.upper,std::max(*d.lower,surplus-p.exportLimit));
         if(!voltageSafe) {d.lower=0;d.upper=0;}
         d.state=holding ? "HOLD" : d.strategy==Strategy::ChargeFirst && nearTarget_ ? "TAPER" : "RUN";
+        d.recommendedChargeA = p.chargeA;
         if (d.strategy==Strategy::Target || d.strategy==Strategy::Maintenance) {
             d.missingWh=std::max(0.0,goal-*soc)*p.capacityWh/p.efficiencyPct;
             const uint32_t reserve=d.strategy==Strategy::Maintenance ? p.maintenanceHoldSec : 0;
@@ -196,26 +252,259 @@ public:
         } else {
             d.candidate=charging ? (nearTarget_ ? std::min(cap,250) : cap) : balance;
         }
-        int selected=std::clamp(*d.candidate,*d.lower,*d.upper);
-        const int bounded=selected;
-        d.limited=bounded;
-        if(!voltageSafe)d.safetyReason="VOLTAGE_LIMIT";
-        else if(*d.candidate<0 && reserve_)d.safetyReason="SOC_RESERVE";
-        else if(*d.candidate>0 && *soc>=p.ceiling)d.safetyReason="SOC_CEILING";
-        else if(bounded!=*d.candidate)d.safetyReason="POWER_LIMIT";
-        if (priorW_ && effective_==d.strategy) {
-            const int step=int(p.ramp*std::min(now-last_,uint32_t(4000))/1000);
-            selected=std::abs(selected-*priorW_)<p.deadband ? *priorW_
-                : std::clamp(selected,*priorW_-step,*priorW_+step);
-        }
-        d.finalWatts=std::clamp(selected,*d.lower,*d.upper);
-        if(selected!=*d.finalWatts && d.safetyReason==std::string_view("NONE"))d.safetyReason="POWER_LIMIT";
-        d.reason=d.unreachable ? "UNREACHABLE_AT_CURRENT_LIMIT" : holding ? "MAINTENANCE_HOLD" :
-            selected!=*d.finalWatts ? "SAFETY_RECLAMP" : bounded!=*d.candidate ? "SAFETY_LIMIT" :
-            bounded!=*d.finalWatts ? "DEADBAND_OR_RAMP" : charging ? "CHARGE_REQUEST" : "GRID_BALANCE";
-        return complete(d,now);
+        return clampAndFinalize(*soc, d, p, voltageSafe, now);
     }
+
 private:
+    static bool isWinterDate(const Policy& p, const tm* local) {
+        if (!local) return p.floor >= 20;
+        const int mmdd = (local->tm_mon + 1) * 100 + local->tm_mday;
+        if (p.winterStart <= p.winterEnd) return mmdd >= p.winterStart && mmdd <= p.winterEnd;
+        return mmdd >= p.winterStart || mmdd <= p.winterEnd;
+    }
+
+    Decision tickPredictive(double soc, int surplus, int balance,
+                            std::optional<double> volt, bool haveVoltage, bool voltageSafe,
+                            const Policy& p, uint32_t now, const tm* local,
+                            const PredictiveInputs* pred, Decision d) {
+        const PredictiveInputs emptyPred{};
+        const PredictiveInputs& ha = pred ? *pred : emptyPred;
+
+        // 1. Seasonal minimum SOC: 20% autumn/winter, 10% spring/summer
+        const bool isWinter = isWinterDate(p, local);
+        const int effectiveFloor = p.autoSeason ? (isWinter ? p.winterFloor : p.summerFloor) : p.floor;
+        d.effectiveFloor = effectiveFloor;
+        d.winterSeason = isWinter;
+        d.seasonName = isWinter ? "WINTER" : "SUMMER";
+
+        const int resumeThreshold = std::max(effectiveFloor + p.hysteresis, std::min(effectiveFloor + p.hysteresis, p.resumeSoc));
+        if (soc <= effectiveFloor) reserve_ = true;
+        else if (soc > resumeThreshold) reserve_ = false;
+
+        // 2. Fog / weather / ratio correction
+        if (ha.weatherValid) {
+            d.usedWeather = true;
+            if (ha.fog) fogSticky_ = true;
+            else if (ha.spreadC <= 1.5 && ha.radiationWm2 < 100.0 && (!local || local->tm_hour < 12)) fogSticky_ = true;
+            else if (!fogSticky_) fogSticky_ = false;
+            else if (ha.spreadC >= 2.5 && ha.radiationWm2 >= 180.0 && (!ha.ratioValid || ha.ratio >= 0.75)) fogSticky_ = false;
+        }
+        const bool fogActive = fogSticky_;
+        d.fogActive = fogActive;
+
+        double factor = 1.0;
+        if (ha.ratioValid) {
+            d.usedRatio = true;
+            factor = std::clamp(ha.ratio, 0.35, 1.0);
+        }
+        if (fogActive) factor *= 0.30;
+
+        // 3. Weekday vs Weekend load profile
+        const bool isWeekend = local ? (local->tm_wday == 0 || local->tm_wday == 6) : false;
+        double loadKw = isWeekend ? (p.weekendLoadW / 1000.0) : (p.weekdayLoadW / 1000.0);
+        if (ha.loadProfileValid && ha.loadTodayKw > 0.0) {
+            loadKw = ha.loadTodayKw;
+            d.usedLoadProfile = true;
+        }
+
+        // 4. Target deadline window (default 15:30 - 20 min = 15:10)
+        const int localMin = local ? (local->tm_hour * 60 + local->tm_min) : 12 * 60;
+        const int effTargetMin = std::max(0, p.deadlineMinute - p.anticipationMin);
+        const double remainingHours = local && localMin < effTargetMin ? (effTargetMin - localMin) / 60.0 : 0.0;
+
+        double expectedPvKwh = 0.0;
+        if (ha.forecastValid) {
+            d.usedForecast = true;
+            expectedPvKwh = ha.remainingForecastKwh * factor;
+        }
+        const double expectedSurplusKwh = std::max(0.0, expectedPvKwh - loadKw * remainingHours);
+        const double deficitFullKwh = std::max(0.0, (double(p.target) - soc) * p.capacityWh / 100000.0);
+        const double requiredInputKwh = deficitFullKwh * (100.0 / p.efficiencyPct) * (p.safetyMarginPct / 100.0);
+
+        const bool tomorrowFavorable = ha.forecastValid && ha.tomorrowTotalKwh >= 7.0 && soc >= 40.0;
+        const bool poorSolar = !ha.forecastValid || fogActive ||
+            expectedSurplusKwh < requiredInputKwh ||
+            (ha.todayTotalKwh > 0.0 && ha.todayTotalKwh < double(p.lowSunKwh));
+        const bool lowSunMode = isWinter ? (poorSolar || !tomorrowFavorable) : (poorSolar && !tomorrowFavorable);
+        d.lowSunMode = lowSunMode;
+
+        const double refVolt = haveVoltage ? *volt : (p.nominalMv / 1000.0);
+        const int maxAmpW = p.chargeA ? (haveVoltage ? int(p.chargeA * *volt) : int(p.chargeA * (p.nominalMv / 1000.0))) : p.charge;
+        int fullChargeCap = p.charge;
+        if (p.chargeA) fullChargeCap = std::min(fullChargeCap, maxAmpW);
+
+        // 5. Closed-loop phase transitions
+        if (!predInit_) {
+            predInit_ = true;
+            if (soc >= double(p.target) - 0.5) {
+                cyclePhase_ = CyclePhase::FullHold;
+                fullHoldAccumMs_ = 0;
+                fullHoldLastTick_ = now;
+            } else if (lowSunMode || soc <= effectiveFloor) {
+                cyclePhase_ = CyclePhase::CaptureChargeFirst;
+            } else if (remainingHours > 0.0) {
+                cyclePhase_ = CyclePhase::GentleCharge;
+            } else {
+                cyclePhase_ = CyclePhase::SelfUse;
+            }
+        }
+
+        if (soc <= effectiveFloor) {
+            dischargingCycle_ = false;
+        }
+
+        bool justCompleted5MinHold = false;
+        const uint32_t dtMs = now >= fullHoldLastTick_ ? std::min<uint32_t>(now - fullHoldLastTick_, 5000u) : 0u;
+        fullHoldLastTick_ = now;
+
+        switch (cyclePhase_) {
+        case CyclePhase::FullHold:
+            if (soc < double(p.target - p.hysteresis)) {
+                fullHoldAccumMs_ = 0;
+                cyclePhase_ = CyclePhase::CaptureChargeFirst;
+                d.transition = "HOLD_ABORTED_CHARGE";
+            } else {
+                if (soc >= double(p.target) - 0.5) {
+                    fullHoldAccumMs_ += dtMs;
+                }
+                if (fullHoldAccumMs_ >= uint32_t(p.fullHoldSec) * 1000u) {
+                    fullHoldAccumMs_ = 0;
+                    dischargingCycle_ = true;
+                    cyclePhase_ = CyclePhase::SelfUse;
+                    d.transition = "CALIBRATION_COMPLETE_SELF_USE";
+                    justCompleted5MinHold = true;
+                }
+            }
+            break;
+
+        case CyclePhase::CaptureChargeFirst:
+            if (soc >= double(p.target) - 0.5) {
+                cyclePhase_ = CyclePhase::FullHold;
+                fullHoldAccumMs_ = 0;
+                d.transition = "FULL_HOLD_STARTED";
+            } else if (!lowSunMode && soc >= 45.0 && remainingHours > 1.5 && ha.forecastValid && expectedSurplusKwh >= requiredInputKwh * 1.15) {
+                cyclePhase_ = CyclePhase::GentleCharge;
+                d.transition = "SWITCH_GENTLE_TARGET";
+            }
+            break;
+
+        case CyclePhase::GentleCharge:
+            if (soc >= double(p.target) - 0.5) {
+                cyclePhase_ = CyclePhase::FullHold;
+                fullHoldAccumMs_ = 0;
+                d.transition = "FULL_HOLD_STARTED";
+            } else if (lowSunMode) {
+                cyclePhase_ = CyclePhase::CaptureChargeFirst;
+                d.transition = "CYCLE_CHARGE_FIRST";
+            } else if (local && localMin >= p.deadlineMinute) {
+                // Target deadline passed: fall back to SelfUse until next cycle
+                cyclePhase_ = CyclePhase::SelfUse;
+                d.transition = "DEADLINE_REACHED_SELF_USE";
+            }
+            break;
+
+        case CyclePhase::SelfUse:
+            if (soc <= effectiveFloor) {
+                dischargingCycle_ = false;
+                if (lowSunMode || isWinter || fogActive || !ha.forecastValid || remainingHours <= 0.0) {
+                    cyclePhase_ = CyclePhase::CaptureChargeFirst;
+                    d.transition = "CYCLE_CHARGE_FIRST";
+                } else {
+                    cyclePhase_ = CyclePhase::GentleCharge;
+                    d.transition = "CYCLE_GENTLE_TARGET";
+                }
+            } else if (!dischargingCycle_) {
+                if (lowSunMode) {
+                    cyclePhase_ = CyclePhase::CaptureChargeFirst;
+                    d.transition = "CYCLE_CHARGE_FIRST";
+                } else if (soc < double(p.target) && remainingHours > 0.0) {
+                    cyclePhase_ = CyclePhase::GentleCharge;
+                    d.transition = "CYCLE_GENTLE_TARGET";
+                }
+            }
+            break;
+        }
+
+        // 6. Execute phase policy bounds & candidate
+        if (cyclePhase_ == CyclePhase::CaptureChargeFirst || cyclePhase_ == CyclePhase::FullHold) {
+            d.strategy = Strategy::ChargeFirst;
+            const bool holding100 = (cyclePhase_ == CyclePhase::FullHold);
+            d.phase = holding100 ? "FULL_HOLD_5M" : "CAPTURE_CHARGE_FIRST";
+            d.state = holding100 ? "HOLD_100" : "CAPTURE";
+            const int cap = std::min(fullChargeCap, p.chargeFirstW);
+            const bool permitGrid = p.gridCharge && !p.surplusOnly;
+            d.lower = 0; // Block battery discharge strictly while capturing solar / holding 100%
+            d.upper = soc >= p.ceiling ? 0 : std::min(cap, permitGrid ? cap : std::max(0, surplus));
+            d.candidate = cap;
+            d.missingWh = deficitFullKwh * 1000.0;
+            d.recommendedChargeA = p.chargeA;
+            d.reason = holding100 ? "FULL_SOC_HOLD_5M" : "CAPTURE_CHARGE_FIRST";
+        } else if (cyclePhase_ == CyclePhase::GentleCharge) {
+            d.strategy = Strategy::Target;
+            d.phase = "GENTLE_TARGET";
+            const int cap = std::min(fullChargeCap, p.targetW);
+            const double effHours = std::max(0.25, remainingHours);
+            const int rawGentleW = int(std::ceil(requiredInputKwh * 1000.0 / effHours));
+            const int minGentleW = std::min(cap, std::max(200, int(std::lround(refVolt * 4.0))));
+            const int gentleW = std::clamp(rawGentleW, minGentleW, cap);
+            const bool inRecovery = (local && localMin < p.deadlineMinute && (p.deadlineMinute - localMin) <= 60) ||
+                                    rawGentleW >= int(cap * 0.9);
+            const int targetCapW = inRecovery ? cap : gentleW;
+            const bool permitGrid = p.gridCharge;
+
+            d.state = inRecovery ? "RECOVERY" : "GENTLE";
+            d.missingWh = deficitFullKwh * 1000.0;
+            d.averageW = gentleW;
+            d.unreachable = deficitFullKwh > 0.0 && rawGentleW > cap;
+            d.recommendedChargeA = std::max(1, int(std::ceil(targetCapW / std::max(10.0, refVolt))));
+            d.lower = 0;
+            d.upper = soc >= p.ceiling ? 0 : std::min(targetCapW, permitGrid ? targetCapW : std::max(0, surplus));
+            d.candidate = targetCapW;
+            d.reason = "GENTLE_TARGET_CHARGE";
+        } else {
+            d.strategy = Strategy::SelfUse;
+            d.phase = "SELF_USE";
+            d.state = "RUN";
+            d.lower = reserve_ ? 0 : -p.discharge;
+            if (p.dischargeA) d.lower = std::max(*d.lower, haveVoltage ? -int(p.dischargeA * *volt) : 0);
+            d.upper = soc >= p.ceiling ? 0 : std::min(fullChargeCap, std::max(0, surplus));
+            if (p.exportLimit) d.lower = std::min(*d.upper, std::max(*d.lower, surplus - p.exportLimit));
+            d.candidate = balance;
+            d.recommendedChargeA = p.chargeA;
+            if (justCompleted5MinHold) d.reason = "FULL_SOC_5MIN_COMPLETE";
+        }
+
+        return clampAndFinalize(soc, d, p, voltageSafe, now, justCompleted5MinHold || (cyclePhase_ != CyclePhase::SelfUse));
+    }
+
+    Decision clampAndFinalize(double soc, Decision d, const Policy& p, bool voltageSafe, uint32_t now, bool keepCustomReason=false) {
+        if (!voltageSafe) { d.lower = 0; d.upper = 0; }
+        int selected = std::clamp(*d.candidate, *d.lower, *d.upper);
+        const int bounded = selected;
+        d.limited = bounded;
+        if (!voltageSafe) d.safetyReason = "VOLTAGE_LIMIT";
+        else if (*d.candidate < 0 && reserve_) d.safetyReason = "SOC_RESERVE";
+        else if (*d.candidate > 0 && soc >= p.ceiling) d.safetyReason = "SOC_CEILING";
+        else if (!keepCustomReason && bounded != *d.candidate) d.safetyReason = "POWER_LIMIT";
+
+        if (priorW_ && effective_ == d.strategy) {
+            const int step = int(p.ramp * std::min(now - last_, uint32_t(4000)) / 1000);
+            selected = std::abs(selected - *priorW_) < p.deadband ? *priorW_
+                : std::clamp(selected, *priorW_ - step, *priorW_ + step);
+        }
+        d.finalWatts = std::clamp(selected, *d.lower, *d.upper);
+        if (selected != *d.finalWatts && d.safetyReason == std::string_view("NONE")) d.safetyReason = "POWER_LIMIT";
+
+        if (!keepCustomReason || d.unreachable) {
+            const bool charging = d.strategy != Strategy::SelfUse;
+            const bool holding = d.strategy == Strategy::Maintenance && holdSince_.has_value();
+            d.reason = d.unreachable ? "UNREACHABLE_AT_CURRENT_LIMIT" : holding ? "MAINTENANCE_HOLD" :
+                selected != *d.finalWatts ? "SAFETY_RECLAMP" : bounded != *d.candidate ? "SAFETY_LIMIT" :
+                bounded != *d.finalWatts ? "DEADBAND_OR_RAMP" : charging ? "CHARGE_REQUEST" : "GRID_BALANCE";
+        }
+        return complete(d, now);
+    }
+
     void finish(const char* why) { done_=true; exit_=why; }
     Decision complete(Decision d,uint32_t now) {
         if (d.transition==std::string_view("UNCHANGED") && (d.strategy!=effective_ || d.state!=state_))
@@ -234,5 +523,9 @@ private:
     Strategy effective_=Strategy::Safe;
     const char* state_="SAFE", *exit_="UNCHANGED";
     bool done_=false, nearTarget_=false, reserve_=true;
+    // Predictive state
+    bool predInit_=false, dischargingCycle_=false, fogSticky_=false;
+    CyclePhase cyclePhase_=CyclePhase::SelfUse;
+    uint32_t fullHoldAccumMs_=0, fullHoldLastTick_=0;
 };
 }

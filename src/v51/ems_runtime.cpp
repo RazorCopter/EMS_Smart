@@ -29,6 +29,12 @@ constexpr Field fields[]={
     {"maintenance_soc",&Policy::maintenanceSoc},{"hold_s",&Policy::maintenanceHoldSec},
     {"maintenance_timeout_s",&Policy::maintenanceSec},
     {"nominal_mv",&Policy::nominalMv},{"daily_deadline",&Policy::daily},{"deadline_minute",&Policy::deadlineMinute},
+    {"predictive",&Policy::predictive},{"auto_season",&Policy::autoSeason},
+    {"summer_soc_min",&Policy::summerFloor},{"winter_soc_min",&Policy::winterFloor},
+    {"full_hold_s",&Policy::fullHoldSec},{"weekday_load_w",&Policy::weekdayLoadW},
+    {"weekend_load_w",&Policy::weekendLoadW},{"winter_start",&Policy::winterStart},
+    {"winter_end",&Policy::winterEnd},{"low_sun_kwh",&Policy::lowSunKwh},
+    {"anticipation_min",&Policy::anticipationMin},{"safety_margin_pct",&Policy::safetyMarginPct},
 };
 std::mutex lock;
 Policy current;
@@ -66,6 +72,10 @@ std::string audit(const EnergyState& e,const Policy& p,const Decision& d,
     out<<",\"missing_wh\":"; number(out,d.missingWh);
     out<<",\"average_w\":"; number(out,d.averageW);
     out<<",\"unreachable\":"<<(d.unreachable ? "true":"false");
+    out<<",\"effective_soc_min\":"<<d.effectiveFloor;
+    out<<",\"recommended_charge_a\":"<<d.recommendedChargeA;
+    out<<",\"season\":\""<<d.seasonName<<"\",\"predictive_phase\":\""<<d.phase<<"\"";
+    out<<",\"fog_active\":"<<(d.fogActive ? "true":"false")<<",\"low_sun_mode\":"<<(d.lowSunMode ? "true":"false");
     out<<",\"reason\":\""<<d.reason<<"\",\"executed\":false,\"applied\":null,\"aux1\":\""<<(auxOn()?"ON":"OFF")<<"\",\"modbus_write_count\":0}";
     return out.str();
 }
@@ -84,7 +94,7 @@ esp_err_t getPolicy(httpd_req_t* r) {
 }
 esp_err_t setPolicy(httpd_req_t* r) {
     if (!checkAuth(r)) return ESP_OK;
-    char body[768]{};
+    char body[1024]{};
     if (!r->content_len || r->content_len>=sizeof(body))
         return httpd_resp_send_err(r,HTTPD_400_BAD_REQUEST,"Expected bounded form key=value");
     size_t offset=0;
@@ -146,16 +156,16 @@ bool applyPolicy(const std::string& form,uint32_t leaseMs,int cancel) {
     if (cancel) {
         if (cancel==3) {
             Policy previous;
-            if (!storage || storage->getBytesLength("ems-v2-prev")!=sizeof(previous) ||
-                storage->getBytes("ems-v2-prev",&previous,sizeof(previous))!=sizeof(previous) ||
-                !previous.valid() || storage->putBytes("ems-policy-v2",&previous,sizeof(previous))!=sizeof(previous))
+            if (!storage || storage->getBytesLength("ems-v3-prev")!=sizeof(previous) ||
+                storage->getBytes("ems-v3-prev",&previous,sizeof(previous))!=sizeof(previous) ||
+                !previous.valid() || storage->putBytes("ems-policy-v3",&previous,sizeof(previous))!=sizeof(previous))
                 return false;
             current=previous;
         }
         if (cancel==2 && (current.strategy==1 || current.strategy>=4)) {
             Policy next=current;
             next.strategy=current.strategy==1 ? 0 : current.fallback;
-            if (!storage || storage->putBytes("ems-policy-v2",&next,sizeof(next))!=sizeof(next))
+            if (!storage || storage->putBytes("ems-policy-v3",&next,sizeof(next))!=sizeof(next))
                 return false;
             current=next;
         }
@@ -165,8 +175,8 @@ bool applyPolicy(const std::string& form,uint32_t leaseMs,int cancel) {
         }
         return true;
     }
-    if (form.empty() || form.size()>=768) return false;
-    char body[768];
+    if (form.empty() || form.size()>=1024) return false;
+    char body[1024];
     memcpy(body,form.c_str(),form.size()+1);
     Policy next;
     next=current;
@@ -199,8 +209,8 @@ bool applyPolicy(const std::string& form,uint32_t leaseMs,int cancel) {
         leaseStart=millis();
         leaseDuration=leaseMs;
     } else {
-        if (!storage || storage->putBytes("ems-v2-prev",&current,sizeof(current))!=sizeof(current) ||
-            storage->putBytes("ems-policy-v2",&next,sizeof(next))!=sizeof(next))
+        if (!storage || storage->putBytes("ems-v3-prev",&current,sizeof(current))!=sizeof(current) ||
+            storage->putBytes("ems-policy-v3",&next,sizeof(next))!=sizeof(next))
             return false;
         current=next;
         overridePolicy.reset();
@@ -210,24 +220,51 @@ bool applyPolicy(const std::string& form,uint32_t leaseMs,int cancel) {
 }
 void loadPolicy(Preferences& preferences) {
     storage=&preferences;
-    Policy old;
-    constexpr size_t oldSize=offsetof(Policy,nominalMv);
-    if(preferences.getBytesLength("ems-policy-v1")==oldSize &&
-       preferences.getBytes("ems-policy-v1",&old,oldSize)==oldSize && old.valid())current=old;
-    struct LegacyPolicy { int fields[22]; };
-    LegacyPolicy legacy{};
+    constexpr size_t v2Size = offsetof(Policy, predictive);
     Policy saved;
-    if (preferences.getBytesLength("ems-policy-v1")==sizeof(legacy) &&
-        preferences.getBytes("ems-policy-v1",&legacy,sizeof(legacy))==sizeof(legacy)) {
-        for(size_t i=0;i<22;++i) saved.*(fields[i+7].member)=legacy.fields[i];
-        if(saved.valid()) current=saved;
+    if (preferences.getBytesLength("ems-policy-v3") == sizeof(saved) &&
+        preferences.getBytes("ems-policy-v3", &saved, sizeof(saved)) == sizeof(saved) && saved.valid()) {
+        current = saved;
+        return;
     }
-    if (preferences.getBytesLength("ems-policy-v2")==sizeof(saved) &&
-        preferences.getBytes("ems-policy-v2",&saved,sizeof(saved))==sizeof(saved) && saved.valid())
-        current=saved;
-    else if (preferences.getBytesLength("ems-v2-prev")==sizeof(saved) &&
-             preferences.getBytes("ems-v2-prev",&saved,sizeof(saved))==sizeof(saved) && saved.valid())
-        current=saved;
+    if (preferences.getBytesLength("ems-v3-prev") == sizeof(saved) &&
+        preferences.getBytes("ems-v3-prev", &saved, sizeof(saved)) == sizeof(saved) && saved.valid()) {
+        current = saved;
+        return;
+    }
+    // Migrate v2 policy into predictive-capable v3 preserving all user parameters
+    Policy migrated;
+    if (preferences.getBytesLength("ems-policy-v2") == v2Size &&
+        preferences.getBytes("ems-policy-v2", &migrated, v2Size) == v2Size && migrated.valid()) {
+        migrated.predictive = 1;
+        migrated.autoSeason = 1;
+        migrated.summerFloor = 10;
+        migrated.winterFloor = 20;
+        migrated.fullHoldSec = 300;
+        migrated.weekdayLoadW = 600;
+        migrated.weekendLoadW = 900;
+        migrated.lowSunKwh = 8;
+        migrated.anticipationMin = 20;
+        migrated.safetyMarginPct = 115;
+        // Unlock watt ceiling up to chargeA * nominalV when legacy default was stuck at 1000W
+        const int ampCapW = migrated.chargeA > 0 ? int(migrated.chargeA * (migrated.nominalMv / 1000.0)) : 2600;
+        if (migrated.charge <= 1000 && ampCapW > 1000) migrated.charge = ampCapW;
+        if (migrated.chargeFirstW <= 1000 && ampCapW > 1000) migrated.chargeFirstW = ampCapW;
+        if (migrated.targetW <= 1000 && ampCapW > 1000) migrated.targetW = ampCapW;
+        if (migrated.chargeFirstSec < 43200) migrated.chargeFirstSec = 43200;
+        if (migrated.valid()) {
+            current = migrated;
+            preferences.putBytes("ems-policy-v3", &current, sizeof(current));
+            return;
+        }
+    }
+    // Fresh board fallback
+    current.predictive = 1;
+    const int ampCapW = current.chargeA > 0 ? int(current.chargeA * (current.nominalMv / 1000.0)) : 2600;
+    current.charge = std::max(current.charge, ampCapW);
+    current.chargeFirstW = std::max(current.chargeFirstW, ampCapW);
+    current.targetW = std::max(current.targetW, ampCapW);
+    current.chargeFirstSec = 43200;
 }
 void tickEms(const EnergyState& state,uint32_t now,uint32_t seq) {
     static StrategyManager manager;
@@ -245,8 +282,17 @@ void tickEms(const EnergyState& state,uint32_t now,uint32_t seq) {
     const auto wall=clockStamp().utc;
     tm local{};
     const auto* calendar=wall ? localtime_r(&wall,&local) : nullptr;
+    std::optional<int> dailyRem = calendar && p.daily ? dailySeconds(wall, local, p.deadlineMinute) : std::nullopt;
+    PredictiveInputs pred{};
+    if (p.predictive && wall) {
+        const int effMin = std::max(0, p.deadlineMinute - p.anticipationMin);
+        const int remS = dailySeconds(wall, local, effMin).value_or(0);
+        pred = readPredictiveInputs(wall, wall + remS);
+    }
     const auto result=manager.tick(state,p,version,now,calendar,
-        calendar && p.strategy==4 && p.daily ? dailySeconds(wall,local,p.deadlineMinute) : std::nullopt);
+        calendar && p.strategy==4 && p.daily ? dailyRem : std::nullopt,
+        p.predictive ? &pred : nullptr);
+    setHaUsage({result.usedForecast, result.usedRatio, result.usedWeather, result.usedLoadProfile});
     auto line=audit(state,p,result,now,seq,"MEASURED");
     line.pop_back();
     line+=",\"ha_inputs\":"+haSummary(false)+"}";

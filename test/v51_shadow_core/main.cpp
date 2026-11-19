@@ -77,4 +77,110 @@ int main() {
     assert(lateClock.tick(sample(50,-2000,4000),daily,1,4000,&time,3600).strategy==Strategy::SelfUse);
     p.ceiling=10;
     assert(!p.valid());
+
+    // === Predictive & Seasonal EMS tests ===
+    Policy pred;
+    pred.predictive = 1;
+    pred.autoSeason = 1;
+    pred.summerFloor = 10;
+    pred.winterFloor = 20;
+    pred.charge = 3000;
+    pred.chargeFirstW = 3000;
+    pred.targetW = 3000;
+    pred.chargeA = 50;
+    pred.dischargeA = 50;
+    pred.fullHoldSec = 300;
+    pred.ramp = 5000; // fast step in unit tests
+    assert(pred.valid());
+
+    tm winterDay{};
+    winterDay.tm_year = 126; winterDay.tm_mon = 10; winterDay.tm_mday = 19; // Nov 19
+    winterDay.tm_wday = 4; winterDay.tm_hour = 10; winterDay.tm_min = 10;
+
+    tm summerDay{};
+    summerDay.tm_year = 126; summerDay.tm_mon = 6; summerDay.tm_mday = 15; // Jul 15
+    summerDay.tm_wday = 3; summerDay.tm_hour = 10; summerDay.tm_min = 10;
+
+    // 1. Sunny day: gentle charging modulates amps below 50A to hit 15:30 target
+    StrategyManager gentleMgr;
+    PredictiveInputs sunny{};
+    sunny.forecastValid = true;
+    sunny.remainingForecastKwh = 16.0;
+    sunny.todayTotalKwh = 18.0;
+    sunny.tomorrowTotalKwh = 16.0;
+    sunny.loadProfileValid = true;
+    sunny.loadTodayKw = 0.6;
+    auto eSunny = sample(40, -2500, 10000);
+    eSunny.batteryVoltage = {52.0, 10000, Quality::Valid};
+    auto dSunny = gentleMgr.tick(eSunny, pred, 1, 10000, &summerDay, std::nullopt, &sunny);
+    assert(dSunny.strategy == Strategy::Target);
+    assert(dSunny.effectiveFloor == 10);
+    assert(!dSunny.winterSeason);
+    assert(dSunny.recommendedChargeA > 0 && dSunny.recommendedChargeA < 50);
+    assert(dSunny.finalWatts.has_value() && *dSunny.finalWatts < 2500);
+
+    // 2. Rainy/foggy multi-day: captures 100% surplus PV up to 50A and blocks discharge at night
+    StrategyManager rainyMgr;
+    PredictiveInputs rainy{};
+    rainy.forecastValid = true;
+    rainy.remainingForecastKwh = 2.5;
+    rainy.todayTotalKwh = 4.77;
+    rainy.tomorrowTotalKwh = 5.0;
+    rainy.weatherValid = true;
+    rainy.fog = true;
+    auto eRainy = sample(25, -1800, 20000);
+    eRainy.batteryVoltage = {52.0, 20000, Quality::Valid};
+    auto dRainy = rainyMgr.tick(eRainy, pred, 1, 20000, &winterDay, std::nullopt, &rainy);
+    assert(dRainy.strategy == Strategy::ChargeFirst);
+    assert(dRainy.effectiveFloor == 20);
+    assert(dRainy.winterSeason);
+    assert(dRainy.lowSunMode);
+    assert(dRainy.lower == 0);
+    assert(dRainy.recommendedChargeA == 50);
+    assert(dRainy.finalWatts == 1800);
+
+    // Night cloud/load during rainy ChargeFirst: zero discharge, protects state
+    auto eNight = sample(25, 500, 25000);
+    eNight.batteryVoltage = {52.0, 25000, Quality::Valid};
+    auto dNight = rainyMgr.tick(eNight, pred, 1, 25000, &winterDay, std::nullopt, &rainy);
+    assert(dNight.strategy == Strategy::ChargeFirst);
+    assert(dNight.lower == 0 && dNight.finalWatts == 0);
+
+    // 3 & 4. Closed loop: CHARGE_FIRST -> 100% held for 5 min (300s) -> SELF_USE down to 20% -> CHARGE_FIRST
+    StrategyManager loopMgr;
+    uint32_t t = 100000;
+    auto dLoop = loopMgr.tick(sample(25, -2000, t), pred, 1, t, &winterDay, std::nullopt, &rainy);
+    assert(dLoop.strategy == Strategy::ChargeFirst);
+
+    // Reach 100%, start 5-minute hold
+    t += 4000;
+    dLoop = loopMgr.tick(sample(100, -500, t), pred, 1, t, &winterDay, std::nullopt, &rainy);
+    assert(dLoop.strategy == Strategy::ChargeFirst);
+    assert(std::string_view(dLoop.phase) == "FULL_HOLD_5M");
+
+    // Advance 296s in 4s steps (still < 300s): must remain in ChargeFirst
+    for (int i = 0; i < 74; ++i) {
+        t += 4000;
+        dLoop = loopMgr.tick(sample(100, -200, t), pred, 1, t, &winterDay, std::nullopt, &rainy);
+        assert(dLoop.strategy == Strategy::ChargeFirst);
+    }
+    // At 300s+: transitions to SelfUse
+    t += 4000;
+    dLoop = loopMgr.tick(sample(100, 600, t), pred, 1, t, &winterDay, std::nullopt, &rainy);
+    assert(dLoop.strategy == Strategy::SelfUse);
+    assert(std::string_view(dLoop.reason) == "FULL_SOC_5MIN_COMPLETE");
+
+    // Discharging through 60% and 25%: remains SelfUse and allows discharge
+    t += 4000;
+    dLoop = loopMgr.tick(sample(60, 600, t), pred, 1, t, &winterDay, std::nullopt, &rainy);
+    assert(dLoop.strategy == Strategy::SelfUse && dLoop.lower < 0 && dLoop.finalWatts == -600);
+    t += 4000;
+    dLoop = loopMgr.tick(sample(25, 600, t), pred, 1, t, &winterDay, std::nullopt, &rainy);
+    assert(dLoop.strategy == Strategy::SelfUse && dLoop.finalWatts == -600);
+
+    // Hits winter minimum 20%: blocks discharge and loops back to ChargeFirst!
+    t += 4000;
+    dLoop = loopMgr.tick(sample(20, 600, t), pred, 1, t, &winterDay, std::nullopt, &rainy);
+    assert(dLoop.strategy == Strategy::ChargeFirst);
+    assert(dLoop.lower == 0);
 }

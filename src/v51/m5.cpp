@@ -8,6 +8,7 @@
 #include <esp_timer.h>
 #include <array>
 #include <algorithm>
+#include <atomic>
 #include <cmath>
 #include <cstring>
 #include <mutex>
@@ -15,6 +16,7 @@
 namespace heliograph::v51 {
 namespace {
 std::mutex auxMutex, inputMutex;
+std::atomic<uint8_t> lastUsageMask{0};
 bool commanded=false, permitted=false;
 uint32_t until=0;
 bool timed=false;
@@ -22,6 +24,10 @@ const char* lastAuxOrigin=nullptr;
 const char* lastAuxAction=nullptr;
 const char* lastAuxReason=nullptr;
 constexpr auto kAux=GPIO_NUM_47;
+struct ForecastSlotBrief {
+    int64_t start = 0;
+    double kwh = 0.0;
+};
 struct Input {
     const char* name;
     unsigned ttl;
@@ -31,6 +37,20 @@ struct Input {
     std::string payload, brief, source, messageId, quality, units;
     uint32_t accepted=0, rejected=0;
     const char* rejection=nullptr;
+    // Parsed typed fields populated upon acceptHaInput (zero JSON parsing in 1 Hz EMS loop)
+    ForecastSlotBrief forecastSlots[50]{};
+    size_t forecastSlotCount = 0;
+    double todayTotalKwh = 0.0;
+    double tomorrowTotalKwh = 0.0;
+    double ratioVal = 1.0;
+    bool hasRatio = false;
+    bool fogVal = false;
+    bool hasFog = false;
+    double spreadC = 99.0;
+    double radiationWm2 = 0.0;
+    double loadTodayKw = 0.0;
+    double loadTomorrowKw = 0.0;
+    bool hasLoad = false;
 };
 std::array<Input,5> inputs{{{"forecast_solar",50400},{"forecast_ratio",1800},
     {"weather",1800},{"load_profile",172800},{"heartbeat",90}}};
@@ -248,7 +268,79 @@ bool acceptHaInput(const char* kind,const char* data,size_t size) {
     it->acceptedAt=esp_timer_get_time()/1000;it->validityMs=uint32_t(until-now)*1000;
     it->initialAge=std::max<int64_t>(0,now-sourceTime);
     it->payload=std::move(payload);it->brief=std::move(brief);
+    if(strcmp(kind,"forecast_solar")==0) {
+        it->forecastSlotCount = 0;
+        for(auto row:v["today"].as<JsonArrayConst>()) {
+            if(it->forecastSlotCount>=50) break;
+            const int64_t s = row["start"].as<int64_t>();
+            const double kwh = row["kwh"].is<double>() ? row["kwh"].as<double>() : row["kw"].as<double>() * 0.5;
+            it->forecastSlots[it->forecastSlotCount++] = {s, kwh};
+        }
+        it->todayTotalKwh = v["today_total_kwh"].is<double>() ? v["today_total_kwh"].as<double>() : 0.0;
+        it->tomorrowTotalKwh = v["tomorrow_total_kwh"].is<double>() ? v["tomorrow_total_kwh"].as<double>() : 0.0;
+    } else if(strcmp(kind,"forecast_ratio")==0) {
+        it->hasRatio = range(v["ratio"], 0, 10);
+        it->ratioVal = it->hasRatio ? v["ratio"].as<double>() : 1.0;
+    } else if(strcmp(kind,"weather")==0) {
+        it->hasFog = v["fog"].is<bool>();
+        it->fogVal = it->hasFog ? v["fog"].as<bool>() : false;
+        it->spreadC = v["spread_c"].is<double>() ? v["spread_c"].as<double>() : 99.0;
+        it->radiationWm2 = v["radiation_w_m2"].is<double>() ? v["radiation_w_m2"].as<double>() : 0.0;
+    } else if(strcmp(kind,"load_profile")==0) {
+        it->hasLoad = true;
+        it->loadTodayKw = v["today_kw"].as<double>();
+        it->loadTomorrowKw = v["tomorrow_kw"].as<double>();
+    }
     return true;
+}
+void setHaUsage(HaUsageFlags usage) {
+    uint8_t mask = 0;
+    if (usage.forecast) mask |= 1;
+    if (usage.ratio) mask |= 2;
+    if (usage.weather) mask |= 4;
+    if (usage.loadProfile) mask |= 8;
+    lastUsageMask.store(mask);
+}
+PredictiveInputs readPredictiveInputs(time_t nowUtc, time_t targetDeadlineUtc) {
+    PredictiveInputs out{};
+    const std::lock_guard guard(inputMutex);
+    const uint64_t nowMs = esp_timer_get_time() / 1000;
+    const auto freshAt = [nowMs](const Input& inp) {
+        return inp.timestamp && nowMs - inp.acceptedAt < inp.validityMs;
+    };
+    if (freshAt(inputs[0])) {
+        out.forecastValid = true;
+        out.todayTotalKwh = inputs[0].todayTotalKwh;
+        out.tomorrowTotalKwh = inputs[0].tomorrowTotalKwh;
+        double sum = 0.0;
+        for (size_t i = 0; i < inputs[0].forecastSlotCount; ++i) {
+            const auto& slot = inputs[0].forecastSlots[i];
+            const int64_t slotEnd = slot.start + 1800;
+            if (slotEnd <= nowUtc || slot.start >= targetDeadlineUtc || slot.kwh <= 0.0) continue;
+            const int64_t overlapStart = std::max<int64_t>(slot.start, nowUtc);
+            const int64_t overlapEnd = std::min<int64_t>(slotEnd, targetDeadlineUtc);
+            if (overlapEnd > overlapStart) {
+                sum += slot.kwh * (double(overlapEnd - overlapStart) / 1800.0);
+            }
+        }
+        out.remainingForecastKwh = sum;
+    }
+    if (freshAt(inputs[1]) && inputs[1].hasRatio) {
+        out.ratioValid = true;
+        out.ratio = inputs[1].ratioVal;
+    }
+    if (freshAt(inputs[2])) {
+        out.weatherValid = true;
+        out.fog = inputs[2].hasFog ? inputs[2].fogVal : false;
+        out.spreadC = inputs[2].spreadC;
+        out.radiationWm2 = inputs[2].radiationWm2;
+    }
+    if (freshAt(inputs[3]) && inputs[3].hasLoad) {
+        out.loadProfileValid = true;
+        out.loadTodayKw = inputs[3].loadTodayKw;
+        out.loadTomorrowKw = inputs[3].loadTomorrowKw;
+    }
+    return out;
 }
 void rejectRetainedHaInput(const char* kind) {
     acceptHaInput(kind,nullptr,0);
@@ -256,16 +348,18 @@ void rejectRetainedHaInput(const char* kind) {
 std::string haSummary(bool contents, bool dashboard) {
     const std::lock_guard guard(inputMutex);
     const uint64_t now=esp_timer_get_time()/1000;
+    const uint8_t usage = lastUsageMask.load();
     JsonDocument d;
     const auto freshAt=[now](const Input& input){return input.timestamp && now-input.acceptedAt<input.validityMs;};
     d["ha_online"]=freshAt(inputs.back());
-    for(const auto& input:inputs) {
+    for(size_t idx=0; idx<inputs.size(); ++idx) {
+        const auto& input=inputs[idx];
         auto row=d[input.name].to<JsonObject>();
         const bool fresh=freshAt(input);
         row["status"]=fresh?"valid":input.timestamp?"stale":"unavailable";
         if(input.timestamp) row["age_s"]=input.initialAge+(now-input.acceptedAt)/1000;
         else row["age_s"]=nullptr;
-        row["used"]=false;
+        row["used"]=fresh && ((usage & (1u << idx)) != 0);
         row["accepted"]=input.accepted;row["rejected"]=input.rejected;
         row["last_rejection"]=input.rejection;
         if((contents||dashboard) && input.timestamp) {

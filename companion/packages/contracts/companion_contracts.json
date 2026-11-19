@@ -1,0 +1,36 @@
+{
+  "schema_version": 1,
+  "companion_version": "0.1.0",
+  "operating_mode": "SHADOW",
+  "mqtt_topics": {
+    "availability": "afore/afore-ems/v1/availability",
+    "telemetry": "afore/afore-ems/v1/telemetry",
+    "ems_state": "afore/afore-ems/v1/ems/state",
+    "ems_decision": "afore/afore-ems/v1/ems/decision",
+    "ems_ack": "afore/afore-ems/v1/ems/ack",
+    "config_state": "afore/afore-ems/v1/config/state",
+    "diagnostics": "afore/afore-ems/v1/diagnostics",
+    "manual": "afore/afore-ems/v1/system/manual",
+    "ha_inputs": "afore/afore-ems/v1/system/ha_inputs",
+    "input_wildcard": "afore/afore-ems/v1/input/#",
+    "forecast_solar": "afore/afore-ems/v1/forecast/solar",
+    "sem_wildcard": "afore/afore-ems/v1/sem/#"
+  },
+  "esp32_read_only_routes": [
+    "/api/v1/health",
+    "/api/v1/system",
+    "/api/v1/telemetry",
+    "/api/v1/ems/decision",
+    "/api/v1/ems/decisions",
+    "/api/v1/ems/config",
+    "/api/v1/mqtt",
+    "/api/v1/manual",
+    "/api/v1/ha/inputs",
+    "/api/v1/time"
+  ],
+  "shadow_invariants": {
+    "executed": false,
+    "applied": null,
+    "modbus_write_count": 0
+  }
+}

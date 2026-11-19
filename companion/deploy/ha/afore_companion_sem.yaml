@@ -1,0 +1,40 @@
+# Optional Home Assistant read-only package to publish SEM state to MQTT
+# for real-time SEM vs ESP SHADOW comparison in Afore EMS Companion.
+# Place in /config/packages/afore_companion_sem.yaml and reload templates/automations.
+
+automation:
+  - id: afore_companion_publish_sem_snapshot
+    alias: Afore Companion · Pubblica stato SEM su MQTT
+    mode: single
+    triggers:
+      - trigger: time_pattern
+        seconds: "/30"
+      - trigger: state
+        entity_id:
+          - sensor.sem_decisione_prevista
+          - sensor.sem_corrente_calcolata
+          - select.solarman_modalita_ems
+          - number.solarman_corrente_max_carica
+    actions:
+      - action: mqtt.publish
+        data:
+          topic: afore/afore-ems/v1/sem/snapshot
+          qos: 1
+          retain: false
+          payload: >-
+            {% set stamp = utcnow() %}
+            {% set d = state_attr('sensor.sem_calcoli','dati') or {} %}
+            {{ dict(
+              timestamp=stamp.strftime('%Y-%m-%dT%H:%M:%SZ'),
+              sem_decision=states('sensor.sem_decisione_prevista'),
+              sem_amps=states('sensor.sem_corrente_calcolata') | float(none),
+              sem_reason=state_attr('sensor.sem_corrente_calcolata','motivo'),
+              solarman_mode=states('select.solarman_modalita_ems'),
+              solarman_charge_a=states('number.solarman_corrente_max_carica') | float(none),
+              sem_automation_enabled=(states('automation.solarman_smart_energy_manager') == 'on'),
+              forecast_ok=d.get('forecast_ok'),
+              today_ok=d.get('today_ok'),
+              tomorrow_ok=d.get('tomorrow_ok'),
+              fog=d.get('fog'),
+              soc=states('sensor.solarman_battery_soc') | float(none)
+            ) | to_json }}

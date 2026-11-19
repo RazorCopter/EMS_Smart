@@ -1,0 +1,18 @@
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "afore-companion-db"
+version = "0.1.0"
+description = "SQLAlchemy 2 models and TimescaleDB Alembic migrations for Afore EMS Companion"
+requires-python = ">=3.12"
+dependencies = [
+    "sqlalchemy[asyncio]>=2.0.30,<3.0",
+    "asyncpg>=0.29.0",
+    "psycopg[binary]>=3.1.18",
+    "alembic>=1.13.1",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]

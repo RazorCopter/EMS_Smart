@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Mockup · Dashboard Mobile 390x844 · Afore EMS Companion</title>
+  <link rel="stylesheet" href="_tokens.css" />
+  <style>
+    body { max-width: 390px; margin: 0 auto; border-x: 1px solid var(--border-subtle); background: var(--bg-canvas); }
+    .mob-shell { display: flex; flex-direction: column; min-height: 100vh; padding-bottom: 68px; }
+    .mob-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 12px 14px; background: var(--bg-sidebar); border-bottom: 1px solid var(--border-subtle);
+    }
+    .mob-content { padding: 12px 14px; display: flex; flex-direction: column; gap: 12px; }
+    .mob-kpi-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+    .mob-kpi { background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: 12px; padding: 11px 12px; }
+    .mob-nav {
+      position: fixed; bottom: 0; left: 50%; transform: translateX(-50%); width: 390px;
+      background: var(--bg-sidebar); border-top: 1px solid var(--border-subtle);
+      display: grid; grid-template-columns: repeat(5, 1fr); padding: 6px 4px;
+    }
+    .mob-nav-item { text-align: center; font-size: 11px; color: var(--text-secondary); padding: 6px 2px; border-radius: 8px; }
+    .mob-nav-item.active { color: var(--accent-teal); font-weight: 700; background: var(--accent-teal-soft); }
+  </style>
+</head>
+<body>
+<div class="mob-shell">
+  <header class="mob-header">
+    <div style="display:flex;align-items:center;gap:9px;">
+      <div class="brand-mark" style="width:30px;height:30px;border-radius:8px;">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2dd4bf" stroke-width="2"><circle cx="17" cy="6" r="3" fill="#f5b942" stroke="#f5b942"/><path d="M3 18h14l3-7H6l-3 7z"/></svg>
+      </div>
+      <div>
+        <div style="font-weight:700;font-size:14px;">Afore EMS</div>
+        <div style="font-size:10px;color:var(--battery-color);">● ESP32 · MQTT · HA Online</div>
+      </div>
+    </div>
+    <span class="chip shadow" style="padding:4px 9px;font-size:11px;">SHADOW</span>
+  </header>
+
+  <div class="mob-content">
+    <div class="shadow-banner" style="padding:8px 11px;">
+      <div>
+        <strong style="font-size:12px;">SHADOW – Decisioni simulate</strong><br/>
+        <span style="font-size:11px;">Nessun comando applicato all'inverter</span>
+      </div>
+    </div>
+
+    <article class="card" style="padding:12px;">
+      <div class="card-header" style="margin-bottom:8px;">
+        <h2 class="card-title" style="font-size:14px;">Flusso Istantaneo</h2>
+        <span class="badge measured">1 s fa</span>
+      </div>
+      <svg viewBox="0 0 330 190" width="100%" style="display:block;">
+        <defs>
+          <marker id="m-pv" markerWidth="5" markerHeight="5" refX="4" refY="2.5" orient="auto"><path d="M0 0L5 2.5L0 5Z" fill="#f5b942"/></marker>
+          <marker id="m-grid" markerWidth="5" markerHeight="5" refX="4" refY="2.5" orient="auto"><path d="M0 0L5 2.5L0 5Z" fill="#60a5fa"/></marker>
+          <marker id="m-home" markerWidth="5" markerHeight="5" refX="4" refY="2.5" orient="auto"><path d="M0 0L5 2.5L0 5Z" fill="#a78bfa"/></marker>
+          <marker id="m-batt" markerWidth="5" markerHeight="5" refX="4" refY="2.5" orient="auto"><path d="M0 0L5 2.5L0 5Z" fill="#34d399"/></marker>
+        </defs>
+        <path d="M165 56 L165 72" stroke="#f5b942" stroke-width="3" marker-end="url(#m-pv)"/>
+        <path d="M141 95 L102 95" stroke="#60a5fa" stroke-width="2" marker-end="url(#m-grid)"/>
+        <path d="M189 95 L228 95" stroke="#a78bfa" stroke-width="2.5" stroke-dasharray="4 3" marker-end="url(#m-home)"/>
+        <path d="M165 118 L165 131" stroke="#34d399" stroke-width="2.5" marker-end="url(#m-batt)"/>
+        <rect x="115" y="4" width="100" height="50" rx="10" fill="#132224" stroke="#f5b942"/>
+        <text x="165" y="23" text-anchor="middle" fill="#98b0ad" font-size="10">FV</text>
+        <text x="165" y="42" text-anchor="middle" fill="#f5b942" font-size="15" font-weight="700">2,86 kW</text>
+        <rect x="4" y="70" width="94" height="50" rx="10" fill="#132224" stroke="#60a5fa"/>
+        <text x="51" y="89" text-anchor="middle" fill="#98b0ad" font-size="10">Rete</text>
+        <text x="51" y="108" text-anchor="middle" fill="#60a5fa" font-size="14" font-weight="700">-0,21 kW</text>
+        <circle cx="165" cy="95" r="22" fill="#182b2e" stroke="#2dd4bf"/>
+        <text x="165" y="99" text-anchor="middle" fill="#eef5f3" font-size="11" font-weight="700">Afore</text>
+        <rect x="232" y="70" width="94" height="50" rx="10" fill="#132224" stroke="#a78bfa"/>
+        <text x="279" y="89" text-anchor="middle" fill="#98b0ad" font-size="10">Casa (der.)</text>
+        <text x="279" y="108" text-anchor="middle" fill="#a78bfa" font-size="14" font-weight="700">1,94 kW</text>
+        <rect x="90" y="134" width="150" height="52" rx="10" fill="#132224" stroke="#34d399"/>
+        <text x="165" y="153" text-anchor="middle" fill="#98b0ad" font-size="10">Batteria · SOC 68%</text>
+        <text x="165" y="174" text-anchor="middle" fill="#34d399" font-size="15" font-weight="700">+0,71 kW · Carica</text>
+      </svg>
+    </article>
+
+    <article class="card" style="padding:12px;">
+      <div class="card-header" style="margin-bottom:6px;"><h2 class="card-title" style="font-size:14px;">Decisione EMS</h2><span class="badge simulated">Simulato</span></div>
+      <div class="kv-row" style="padding:5px 0;"><span class="kv-label">Strategia</span><span class="kv-val">Self Use</span></div>
+      <div class="kv-row" style="padding:5px 0;"><span class="kv-label">Setpoint simulato</span><span class="kv-val" style="color:#2dd4bf;">+710 W</span></div>
+      <div class="kv-row" style="padding:5px 0;"><span class="kv-label">Motivo</span><span class="kv-val">Bilanciamento rete</span></div>
+    </article>
+
+    <div class="mob-kpi-grid">
+      <div class="mob-kpi"><div style="font-size:11px;color:var(--text-secondary);">FV oggi</div><div style="font-size:19px;font-weight:700;color:var(--pv-color);">14,6 kWh</div><div style="font-size:11px;color:var(--battery-color);">▲ +12%</div></div>
+      <div class="mob-kpi"><div style="font-size:11px;color:var(--text-secondary);">Consumo oggi</div><div style="font-size:19px;font-weight:700;color:var(--home-color);">11,8 kWh</div><div style="font-size:11px;color:var(--text-secondary);">Autocons. 71%</div></div>
+      <div class="mob-kpi"><div style="font-size:11px;color:var(--text-secondary);">Batteria</div><div style="font-size:19px;font-weight:700;color:var(--battery-color);">6,2 / 4,9</div><div style="font-size:11px;color:var(--text-secondary);">kWh C/D</div></div>
+      <div class="mob-kpi"><div style="font-size:11px;color:var(--text-secondary);">Concordanza SEM</div><div style="font-size:19px;font-weight:700;color:var(--accent-teal);">87%</div><div style="font-size:11px;color:var(--text-secondary);">Δ med 42 W</div></div>
+    </div>
+  </div>
+
+  <nav class="mob-nav">
+    <div class="mob-nav-item active">Live</div>
+    <div class="mob-nav-item">Storico</div>
+    <div class="mob-nav-item">Decisioni</div>
+    <div class="mob-nav-item">SEM</div>
+    <div class="mob-nav-item">Altro</div>
+  </nav>
+</div>
+</body>
+</html>

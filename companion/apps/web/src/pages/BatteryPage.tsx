@@ -98,9 +98,16 @@ export function BatteryPage() {
           <span className="card-sub">Cicli equivalenti: {fmtNum(stats.equivalent_cycles, "", 3)}</span>
         </article>
         <article className="kpi-card">
-          <div style={{ display: "flex", justifyContent: "space-between" }}><span className="kv-label">SOH &amp; Temperatura</span><ProvBadge provenance="unavailable" /></div>
-          <div className="kpi-val" style={{ color: "var(--missing-grey)", fontSize: 18 }}>Non disponibile</div>
-          <span className="card-sub">Registri SOH/temp batteria non ancora qualificati su FC04</span>
+          <div style={{ display: "flex", justifyContent: "space-between" }}><span className="kv-label">SOH &amp; Temperatura</span><ProvBadge provenance={specs.soh_pct?.provenance ?? specs.battery_temp_c?.provenance ?? "unavailable"} /></div>
+          <div className="kpi-val" style={{ color: specs.soh_pct?.value != null || specs.battery_temp_c?.value != null ? "var(--text-primary)" : "var(--missing-grey)", fontSize: specs.soh_pct?.value != null || specs.battery_temp_c?.value != null ? undefined : 18 }}>
+            {specs.soh_pct?.value != null ? `${fmtNum(specs.soh_pct.value, "%", 0)}` : "Non disponibile"}
+            {specs.battery_temp_c?.value != null ? ` · ${fmtNum(specs.battery_temp_c.value, "°C", 1)}` : ""}
+          </div>
+          <span className="card-sub">
+            {specs.soh_pct?.value != null || specs.battery_temp_c?.value != null
+              ? "Registri FC04 2001 (Tbat) e 2003 (SOH)"
+              : "Registri SOH/temp batteria non ancora qualificati su FC04"}
+          </span>
         </article>
       </section>
 

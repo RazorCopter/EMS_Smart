@@ -1112,14 +1112,17 @@ async def query_battery_summary(
     ).scalars().all()
 
     cfg_json = cfg.config_json if cfg else {}
+    raw_tel = (latest.raw_payload_json or {}) if latest and hasattr(latest, "raw_payload_json") else {}
+    soh_val = raw_tel.get("soh_pct")
+    btemp_val = raw_tel.get("battery_temp_c")
     return {
         "specifications": {
             "model": {"value": "HA / Solarman Battery Profile", "provenance": "configured"},
             "capacity_wh": {"value": cfg_json.get("capacity_wh", 10240), "unit": "Wh", "provenance": "configured"},
             "nominal_v": {"value": round((cfg_json.get("nominal_mv", 51200) / 1000.0), 1), "unit": "V", "provenance": "configured"},
             "efficiency_pct": {"value": cfg_json.get("efficiency_pct", 90), "unit": "%", "provenance": "provisional"},
-            "soh_pct": {"value": None, "unit": "%", "provenance": "unavailable"},
-            "battery_temp_c": {"value": None, "unit": "°C", "provenance": "unavailable"},
+            "soh_pct": {"value": soh_val, "unit": "%", "provenance": "measured" if soh_val is not None else "unavailable"},
+            "battery_temp_c": {"value": btemp_val, "unit": "°C", "provenance": "measured" if btemp_val is not None else "unavailable"},
         },
         "live": {
             "soc": {"value": latest.soc if latest else None, "unit": "%", "provenance": "measured" if latest and latest.soc is not None else "unavailable"},

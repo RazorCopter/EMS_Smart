@@ -260,9 +260,9 @@ export function SettingsPage({ user }: Props) {
                 </span>
               </div>
               <div className="kv-row">
-                <span className="kv-label">Task attivi / Stack min libero / Wi-Fi RSSI</span>
+                <span className="kv-label">Task attivi / Stack app min / Wi-Fi RSSI</span>
                 <span className="kv-val">
-                  {esp.task_count ?? "?"} task · min stack {esp.min_task_stack_free_b ?? "?"} B · {esp.rssi_dbm ?? "?"} dBm
+                  {esp.task_count ?? "?"} task · min stack app {esp.min_application_stack_free_b ?? esp.min_task_stack_free_b ?? "?"} B ({esp.min_application_stack_name ?? "IDLE0"}) · {esp.rssi_dbm ?? "?"} dBm
                 </span>
               </div>
             </article>

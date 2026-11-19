@@ -1,0 +1,47 @@
+{
+  "on": {
+    "operating_mode": "SHADOW",
+    "live_lock": "LIVE_NOT_QUALIFIED",
+    "aux1": "ON",
+    "physical_feedback": null,
+    "last_aux_origin": "MQTT",
+    "last_aux_action": "AUX_ON",
+    "last_aux_reason": "ACCEPTED",
+    "aux_auto_off_ms": 23406,
+    "timestamp": "2026-11-19T00:13:30Z",
+    "uptime_ms": 264255,
+    "time_source": "NTP",
+    "time_valid": true
+  },
+  "ack": {
+    "configuration_revision": 3,
+    "requested_strategy": null,
+    "effective_strategy": "SELF_USE",
+    "configured_strategy": "SELF_USE",
+    "schema": 1,
+    "message_id": "afore-ems_switch_aux1-1795047203415471",
+    "accepted": true,
+    "reason": "ACCEPTED",
+    "executed": false,
+    "aux1": "ON",
+    "physical_feedback": null,
+    "timestamp": "2026-11-19T00:13:23Z",
+    "uptime_ms": 257661,
+    "time_source": "NTP",
+    "time_valid": true
+  },
+  "off": {
+    "operating_mode": "SHADOW",
+    "live_lock": "LIVE_NOT_QUALIFIED",
+    "aux1": "OFF",
+    "physical_feedback": null,
+    "last_aux_origin": "TIMER",
+    "last_aux_action": "AUX_OFF",
+    "last_aux_reason": "TTL_EXPIRED",
+    "aux_auto_off_ms": 0,
+    "timestamp": "2026-11-19T00:13:54Z",
+    "uptime_ms": 288192,
+    "time_source": "NTP",
+    "time_valid": true
+  }
+}

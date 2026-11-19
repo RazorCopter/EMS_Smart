@@ -1,0 +1,192 @@
+[
+  {
+    "tcp": true,
+    "mqtt": true,
+    "last_connect": 2122,
+    "uptime": 23723583,
+    "reads": 52316,
+    "seq": 23295,
+    "strategy": "SELF_USE",
+    "writes": 0
+  },
+  {
+    "tcp": true,
+    "mqtt": true,
+    "last_connect": 2122,
+    "uptime": 23724471,
+    "reads": 52318,
+    "seq": 23296,
+    "strategy": "SELF_USE",
+    "writes": 0
+  },
+  {
+    "tcp": true,
+    "mqtt": true,
+    "last_connect": 2122,
+    "uptime": 23725524,
+    "reads": 52320,
+    "seq": 23297,
+    "strategy": "SELF_USE",
+    "writes": 0
+  },
+  {
+    "tcp": true,
+    "mqtt": true,
+    "last_connect": 2122,
+    "uptime": 23726443,
+    "reads": 52323,
+    "seq": 23298,
+    "strategy": "SELF_USE",
+    "writes": 0
+  },
+  {
+    "tcp": true,
+    "mqtt": true,
+    "last_connect": 2122,
+    "uptime": 23727381,
+    "reads": 52325,
+    "seq": 23299,
+    "strategy": "SELF_USE",
+    "writes": 0
+  },
+  {
+    "tcp": true,
+    "mqtt": true,
+    "last_connect": 2122,
+    "uptime": 23728293,
+    "reads": 52325,
+    "seq": 23300,
+    "strategy": "SELF_USE",
+    "writes": 0
+  },
+  {
+    "tcp": true,
+    "mqtt": true,
+    "last_connect": 2122,
+    "uptime": 23729208,
+    "reads": 52327,
+    "seq": 23301,
+    "strategy": "SELF_USE",
+    "writes": 0
+  },
+  {
+    "tcp": true,
+    "mqtt": true,
+    "last_connect": 2122,
+    "uptime": 23730130,
+    "reads": 52329,
+    "seq": 23301,
+    "strategy": "SELF_USE",
+    "writes": 0
+  },
+  {
+    "tcp": false,
+    "mqtt": false,
+    "last_connect": 2122,
+    "uptime": 23731673,
+    "reads": 52334,
+    "seq": 23303,
+    "strategy": "SELF_USE",
+    "writes": 0
+  },
+  {
+    "tcp": false,
+    "mqtt": false,
+    "last_connect": 2122,
+    "uptime": 23733099,
+    "reads": 52336,
+    "seq": 23304,
+    "strategy": "SELF_USE",
+    "writes": 0
+  },
+  {
+    "tcp": false,
+    "mqtt": false,
+    "last_connect": 2122,
+    "uptime": 23734539,
+    "reads": 52340,
+    "seq": 23306,
+    "strategy": "SELF_USE",
+    "writes": 0
+  },
+  {
+    "tcp": false,
+    "mqtt": false,
+    "last_connect": 2122,
+    "uptime": 23735971,
+    "reads": 52343,
+    "seq": 23307,
+    "strategy": "SELF_USE",
+    "writes": 0
+  },
+  {
+    "tcp": false,
+    "mqtt": false,
+    "last_connect": 2122,
+    "uptime": 23737404,
+    "reads": 52347,
+    "seq": 23309,
+    "strategy": "SELF_USE",
+    "writes": 0
+  },
+  {
+    "tcp": false,
+    "mqtt": false,
+    "last_connect": 2122,
+    "uptime": 23738845,
+    "reads": 52349,
+    "seq": 23310,
+    "strategy": "SELF_USE",
+    "writes": 0
+  },
+  {
+    "tcp": false,
+    "mqtt": false,
+    "last_connect": 2122,
+    "uptime": 23740267,
+    "reads": 52352,
+    "seq": 23311,
+    "strategy": "SELF_USE",
+    "writes": 0
+  },
+  {
+    "tcp": false,
+    "mqtt": false,
+    "last_connect": 2122,
+    "uptime": 23741701,
+    "reads": 52356,
+    "seq": 23313,
+    "strategy": "SELF_USE",
+    "writes": 0
+  },
+  {
+    "tcp": false,
+    "mqtt": false,
+    "last_connect": 2122,
+    "uptime": 23743238,
+    "reads": 52358,
+    "seq": 23314,
+    "strategy": "SELF_USE",
+    "writes": 0
+  },
+  {
+    "tcp": true,
+    "mqtt": false,
+    "last_connect": 2122,
+    "uptime": 23744262,
+    "reads": 52361,
+    "seq": 23315,
+    "strategy": "SELF_USE",
+    "writes": 0
+  },
+  {
+    "tcp": true,
+    "mqtt": true,
+    "last_connect": 23745291,
+    "uptime": 23745184,
+    "reads": 52363,
+    "seq": 23316,
+    "strategy": "SELF_USE",
+    "writes": 0
+  }
+]

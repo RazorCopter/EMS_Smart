@@ -62,7 +62,7 @@ header{padding-top:17px;padding-bottom:10px}main{padding-top:8px}nav{margin-bott
 <button id="adminSignIn" type="button" hidden>Accedi di nuovo</button></div>
 <p id="adminPasswordStatus" class="status" role="status" aria-live="polite"></p>
 </form></details><label>Modalità operativa<select id="opMode"><option>SHADOW</option><option>LIVE</option></select></label><p class="tag">🔒 Controllo reale non ancora qualificato</p>
-<label>Spegnimento automatico AUX1 (secondi, 0 = manuale)<input id="auxTtl" type="number" min="0" max="86400" value="0"></label><div class="actions"><button id="auxOn">Attiva AUX1</button><button id="auxOff">Spegni AUX1</button></div><p class="tag" id="auxStatus"></p><p><a href="/wifi">Configurazione Wi-Fi</a> · <a href="/api/v1/ems/decisions">Scarica audit decisioni</a></p><div class="actions"><button id="backup">Esporta configurazione</button><button id="restart">Riavvia</button><button id="rollbackPolicy">Ripristina EMS precedente</button><button id="rollbackBroker">Ripristina MQTT precedente</button></div><label>Ripristina configurazione EMS e MQTT<input id="restore" type="file" accept="application/json"></label><details><summary>Aggiornamento OTA firmato</summary><form id="otaForm"><label>Firmware applicativo<input name="image" type="file" accept=".bin" required></label><label>SHA-256 del firmware<input name="sha" required pattern="[A-Fa-f0-9]{64}"></label><label>Firma ECDSA DER in esadecimale<input name="signature" required pattern="[A-Fa-f0-9]+"></label><div class="actions"><button>Carica e riavvia</button></div></form></details></article></div></section>
+<label>Spegnimento automatico AUX1 (secondi, 0 = manuale)<input id="auxTtl" type="number" min="0" max="86400" value="0"></label><div class="actions"><button id="auxOn">Attiva AUX1</button><button id="auxOff">Spegni AUX1</button></div><p class="tag" id="auxStatus"></p><p><a href="/wifi">Configurazione Wi-Fi</a> · <a href="/api/v1/ems/decisions">Scarica audit decisioni</a></p><div class="actions"><button id="backup">Esporta configurazione</button></div><details><summary>Azioni avanzate</summary><div class="actions"><button id="restart">Riavvia</button><button id="rollbackPolicy">Ripristina EMS precedente</button><button id="rollbackBroker">Ripristina MQTT precedente</button></div><label>Ripristina configurazione EMS e MQTT<input id="restore" type="file" accept="application/json"></label><details><summary>Aggiornamento OTA firmato</summary><form id="otaForm"><label>Firmware applicativo<input name="image" type="file" accept=".bin" required></label><label>SHA-256 del firmware<input name="sha" required pattern="[A-Fa-f0-9]{64}"></label><label>Firma ECDSA DER in esadecimale<input name="signature" required pattern="[A-Fa-f0-9]+"></label><div class="actions"><button>Carica e riavvia</button></div></form></details></details></article></div></section>
 <div id="feedback" class="status" role="status" aria-live="polite"></div></main>
 <script>
 const $=id=>document.getElementById(id), api='/api/v1/';
@@ -134,7 +134,7 @@ const fieldLabels={deadline_minute:'Ora obiettivo locale',nominal_mv:'Tensione n
 function displayName(value){
  if(value==null||value==='')return '—';
  for(const name of strategies)value=String(value).replaceAll(name.toUpperCase().replaceAll(' ','_'),name);
- const known={LIVE_NOT_QUALIFIED:'Controllo reale non ancora qualificato',SAFETY_LIMIT:'Limitato per sicurezza',TRACK_GRID:'Bilanciamento dello scambio con la rete',NONE:'Nessuno',ACTIVE:'Attiva',IDLE:'In attesa',RUNNING:'In corso',COMPLETED:'Completata',EXPIRED:'Scaduta',RUN:'In corso',OBSERVE:'Monitoraggio',SAFE:'In sicurezza',HOLD:'Mantenimento',TAPER:'Carica in riduzione',NATIVE_OBSERVATION:'Monitoraggio dell’inverter',SAFE_REQUESTED:'Modalità prudenziale richiesta',INPUT_INVALID:'Misure assenti o non attendibili',GRID_BALANCE:'Bilanciamento dello scambio con la rete',CHARGE_REQUEST:'Richiesta di carica simulata',SAFETY_RECLAMP:'Limitato per sicurezza',DEADBAND_OR_RAMP:'Variazione graduale della potenza',STALE_OR_INVALID_TELEMETRY:'Misure assenti o non attendibili',UNREACHABLE_AT_CURRENT_LIMIT:'Obiettivo oltre il limite di carica',MAINTENANCE_HOLD:'Mantenimento del livello di carica',within_limits:'Entro i limiti',ACCEPTED:'Accettato',POLICY_REJECTED:'Impostazione rifiutata',operating_mode:'Modalità operativa',override:'Override temporaneo',target_soc:'Target SOC',maintenance:'Maintenance',policy:'Impostazioni EMS',aux:'Comando AUX1'};
+ const known={LIVE_NOT_QUALIFIED:'Controllo reale non ancora qualificato',SAFETY_LIMIT:'Limitato per sicurezza',TRACK_GRID:'Bilanciamento dello scambio con la rete',NONE:'Nessuno',ACTIVE:'Attiva',IDLE:'In attesa',RUNNING:'In corso',COMPLETED:'Completata',EXPIRED:'Scaduta',RUN:'In corso',OBSERVE:'Monitoraggio',SAFE:'In sicurezza',HOLD:'Mantenimento',TAPER:'Carica in riduzione',NATIVE_OBSERVATION:'Monitoraggio dell’inverter',SOC_RESERVE:'Riserva SOC raggiunta: scarica bloccata',SOC_CEILING:'SOC massimo raggiunto: carica bloccata',POWER_LIMIT:'Limite di potenza applicato',STALE_TELEMETRY:'Telemetria non aggiornata',ESSENTIAL_DATA_UNAVAILABLE:'Dato essenziale non disponibile',OBSERVATION:'Strategia in modalità osservazione',VOLTAGE_LIMIT:'Tensione batteria fuori limite',SAFE_REQUESTED:'Modalità prudenziale richiesta',INPUT_INVALID:'Misure assenti o non attendibili',GRID_BALANCE:'Bilanciamento dello scambio con la rete',CHARGE_REQUEST:'Richiesta di carica simulata',SAFETY_RECLAMP:'Limitato per sicurezza',DEADBAND_OR_RAMP:'Variazione graduale della potenza',STALE_OR_INVALID_TELEMETRY:'Misure assenti o non attendibili',UNREACHABLE_AT_CURRENT_LIMIT:'Obiettivo oltre il limite di carica',MAINTENANCE_HOLD:'Mantenimento del livello di carica',within_limits:'Entro i limiti',ACCEPTED:'Accettato',POLICY_REJECTED:'Impostazione rifiutata',operating_mode:'Modalità operativa',override:'Override temporaneo',target_soc:'Target SOC',maintenance:'Maintenance',policy:'Impostazioni EMS',aux:'Comando AUX1'};
  return known[value]??value;
 }
 function duration(seconds){
@@ -239,7 +239,7 @@ function field(parent,form,name,title,data){
  if(unit==='s'){
   const unitSelect=element('select',null,'timeUnit');
   unitSelect.setAttribute('aria-label','Unità per '+title);
-  const choices=range&&range[1]/scale<60?[[1,'secondi']]:[[1,'secondi'],[60,'minuti'],[3600,'ore']];
+  const choices=range&&range[1]/scale<60?[[1,'s']]:[[1,'s'],[60,'min'],[3600,'h']];
   for(const [factor,name] of choices){const option=element('option',name);option.value=factor;unitSelect.add(option)}
   function setUnit(factor,seconds){
    input.dataset.factor=factor;unitSelect.value=factor;input.step='any';
@@ -373,15 +373,23 @@ function renderInputDetails(data){
 async function update(){
 try{const [h,t,d,s,b,m,f,c]=await Promise.all(['health','telemetry','ems/decision','system','mqtt','manual','ha/inputs'].map(x=>call(x)).concat(call('time').catch(()=>null)));
 if(c)renderClock(c);
-flow(t);$('opMode').value=m.operating_mode;$('auxStatus').textContent='AUX1 '+m.aux1+' · stato comandato · feedback fisico non disponibile'+(m.aux_auto_off_ms?' · '+duration(Math.ceil(m.aux_auto_off_ms/1000)):'');
-const solar=f.forecast_solar;rows('forecastRows',[['Home Assistant',f.ha_online?'Online':'Offline'],['Solcast',solar.status+' · '+fmt(solar.age_s,'s')],['Periodi oggi / domani',solar.data?(solar.data.today.length+' / '+solar.data.tomorrow.length):'Non disponibile'],['Prossimo periodo FV',(()=>{let slot=[...(solar.data?.today??[]),...(solar.data?.tomorrow??[])].find(p=>p.start+1800>Date.now()/1000);return slot?new Date(slot.start*1000).toLocaleTimeString('it-IT',{timeZone:clockState?.zone??'Europe/Rome',hour:'2-digit',minute:'2-digit'})+' · '+fmt(slot.kw,'kW'):'Non disponibile'})()],['Rapporto reale / previsto',fmt(f.forecast_ratio.data?.ratio)],['Nebbia',f.weather.data?.fog==null?'Non disponibile':f.weather.data.fog?'Sì':'No'],['Profilo carico oggi',fmt(f.load_profile.data?.today_kw,'kW')]]);
+flow(t);$('opMode').value=m.operating_mode;$('auxStatus').textContent='AUX1 '+m.aux1+' · stato comandato · feedback fisico non disponibile'+(m.last_aux_origin?' · Ultimo comando: '+m.last_aux_origin:'')+(m.aux_auto_off_ms?' · '+duration(Math.ceil(m.aux_auto_off_ms/1000)):'');
+const solar=f.forecast_solar, weather=f.weather, ratio=f.forecast_ratio, load=f.load_profile;
+const shown=(item,value)=>item.status==='stale'?'Obsoleto':item.status!=='valid'?'Non disponibile':value??'Non applicabile';
+const next=[...(solar.data?.today??[]),...(solar.data?.tomorrow??[])].find(p=>p.start+1800>Date.now()/1000);
+rows('forecastRows',[['Home Assistant',f.ha_online?'Online':'Offline'],
+ ['Solcast',shown(solar,'Disponibile')],['Periodi oggi / domani',shown(solar,solar.data?solar.data.today.length+' / '+solar.data.tomorrow.length:null)],
+ ['Prossimo periodo FV',shown(solar,next?absoluteLocal(new Date(next.start*1000).toISOString())+' · '+fmt(next.kw,'kW'):null)],
+ ['Rapporto reale / previsto',shown(ratio,ratio.data?.ratio==null?null:fmt(ratio.data.ratio))],
+ ['Nebbia',shown(weather,weather.data?.fog==null?null:weather.data.fog?'Sì':'No')],
+ ['Profilo carico oggi',shown(load,load.data?.today_kw==null?null:fmt(load.data.today_kw,'kW'))]]);
 renderInputDetails(f);
 $('live').textContent=t.telemetry_valid?'Telemetria FC04 valida · '+fmt(t.reads)+' letture':'Telemetria non disponibile o scaduta';
 const batteryStatus=t.battery_w==null?'Non disponibile':Math.abs(t.battery_w)<20?'Inattiva':t.battery_w>0?'In carica':'In scarica';
 rows('cards',[['Stato di carica',fmt(t.soc,'%')],['Stato batteria',batteryStatus],['Potenza',fmt(t.battery_w,'W')]]);
-rows('decision',[['Strategia',displayName(d?.strategy)],['Setpoint simulato',fmt(d?.simulated_w,'W')],['Motivo',displayName(d?.reason)],...(d?.uptime_ms!=null?[['Ultima decisione',eventTime(d,h.uptime_ms)]]:[])]);
+rows('decision',[['Strategia',displayName(d?.strategy)],['Setpoint simulato',fmt(d?.simulated_w,'W')],['Motivo',displayName(d?.safety_reason&&d.safety_reason!=='NONE'?d.safety_reason:d?.reason)],...(d?.uptime_ms!=null?[['Ultima decisione',eventTime(d,h.uptime_ms)]]:[])]);
 rows('signals',Object.entries(signals).map(([k,[label,u]])=>[label,fmt(t[k],u),freshness(t.quality?.[k])]));
-rows('strategyStatus',[['Locale',displayName(d?.configured)],['Effettiva',displayName(d?.strategy)],['Ritorno',strategies[savedValues.strategyForm?.fallback]??'—'],['Stato',displayName(d?.state)],['Motivo',displayName(d?.reason)]]);
+rows('strategyStatus',[['Locale',displayName(d?.configured)],['Effettiva',displayName(d?.strategy)],['Ritorno',strategies[savedValues.strategyForm?.fallback]??'—'],['Stato',displayName(d?.state)],['Motivo',displayName(d?.safety_reason&&d.safety_reason!=='NONE'?d.safety_reason:d?.reason)]]);
 const lv=savedValues.limitsForm??{};
 for(const [id,key,title] of [['powerCharge','charge','Carica'],['powerDischarge','discharge','Scarica']]){
  if(!$(id))continue;

@@ -11,7 +11,8 @@ bool auxOn();
 ManualResult manualCommand(const char* action, JsonVariantConst payload, const char* origin,
                            unsigned maximumSeconds = 86400);
 bool acceptHaInput(const char* kind, const char* data, size_t size);
-std::string haSummary(bool contents);
+std::string haSummary(bool contents, bool dashboard=false);
+void rejectRetainedHaInput(const char* kind);
 std::string manualState();
 void registerM5(httpd_handle_t server, bool(*auth)(httpd_req_t*));
 }

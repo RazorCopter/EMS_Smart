@@ -2,6 +2,7 @@
 #include "m4.h"
 #include "clock_service.h"
 #include "m5.h"
+#include "ems_runtime.h"
 #include "remote.h"
 #include <Arduino.h>
 #include <ArduinoJson.h>
@@ -16,6 +17,10 @@
 #include <atomic>
 #include <sstream>
 #include <cstring>
+
+#ifndef V51_BUILD_ID
+#define V51_BUILD_ID "v5.1-remote-1"
+#endif
 
 namespace heliograph::v51 {
 namespace {
@@ -49,7 +54,7 @@ uint32_t brokerRevision=1;
 std::string lastAck,lastCommand;
 std::array<std::string,32> ids;
 size_t idIndex=0;
-constexpr size_t records=256, recordSize=1408;
+constexpr size_t records=256, recordSize=2048;
 char* history=nullptr;
 uint32_t cursor=0;
 EnergyState snapshot;
@@ -131,6 +136,18 @@ void discovery() {
    {"number","charge_a","Charge current limit","config/state",500},{"number","discharge_a","Discharge current limit","config/state",500},
    {"number","voltage_min","Minimum battery voltage","config/state",1000},{"number","voltage_max","Maximum battery voltage","config/state",1000},
    {"switch","grid_charge","Allow simulated grid charge","config/state",1},
+   {"sensor","candidate_w","Candidate power","ems/state",0},{"sensor","limited_w","Safety-limited power","ems/state",0},
+   {"sensor","reason","Decision reason","ems/state",0},{"sensor","safety_reason","Safety reason","ems/state",0},
+   {"sensor","state","Strategy state","ems/state",0},{"sensor","timestamp","Last decision","ems/state",0},
+   {"binary_sensor","ha_online","Home Assistant online","system/ha_inputs",0},
+   {"binary_sensor","time_valid","Time synchronized","diagnostics",0},
+   {"sensor","rssi","Wi-Fi RSSI","diagnostics",0},{"sensor","uptime_ms","Uptime","diagnostics",0},
+   {"sensor","reads","FC04 reads","diagnostics",0},{"sensor","errors","Modbus read errors","diagnostics",0},
+   {"sensor","firmware","Firmware","diagnostics",0},{"sensor","modbus_write_count","Modbus writes","diagnostics",0},
+   {"sensor","aux_auto_off_ms","AUX1 auto-off","system/manual",0},{"sensor","last_aux_origin","Last AUX1 origin","system/manual",0},
+   {"sensor","deadline_minute","Target SOC deadline","config/state",0},{"number","target_deadline_s","Relative target deadline","config/state",604800},
+   {"number","charge_first_s","Charge First duration limit","config/state",604800},
+   {"button","target_soc","Start Target SOC","config/state",0},{"button","maintenance","Start Maintenance","config/state",0},
    {"button","cancel_override","Cancel override","config/state",0},{"button","cancel_session","Cancel session","config/state",0},
  };
  for(const auto& e:entities) {
@@ -150,13 +167,24 @@ void discovery() {
    } else if(component=="switch") {
      d["value_template"]=key=="aux1"?"{{ value_json.aux1 }}":"{{ 'ON' if value_json.grid_charge else 'OFF' }}";
    } else if(component!="button") d["value_template"]="{{ value_json."+key+" }}";
+   if(component=="number" || component=="select" || key=="grid_charge")d["entity_category"]="config";
+   if(std::string(e.path)=="diagnostics")d["entity_category"]="diagnostic";
+   if(key=="time_valid")d["value_template"]="{{ 'ON' if value_json.time_source == 'NTP' else 'OFF' }}";
+   if(key=="timestamp")d["device_class"]="timestamp";
+   if(key=="rssi")d["device_class"]="signal_strength",d["unit_of_measurement"]="dBm";
+   if(key=="uptime_ms" || key=="aux_auto_off_ms") {
+     d["unit_of_measurement"]="s";d["device_class"]="duration";
+     d["value_template"]="{{ (value_json."+key+" / 1000) | int }}";
+   }
+   if(key=="deadline_minute")d["value_template"]="{{ '%02d:%02d' | format(value_json.deadline_minute // 60, value_json.deadline_minute % 60) }}";
+   if(key=="target_deadline_s" || key=="charge_first_s")d["unit_of_measurement"]="s";
    if(key=="capacity_wh") d["unit_of_measurement"]="Wh";
    if(key=="nominal_mv") {d["unit_of_measurement"]="V";d["value_template"]="{{ value_json.nominal_mv / 1000 }}";}
-   if(key=="simulated_w" || key=="charge_w" || key=="discharge_w") d["unit_of_measurement"]="W";
+   if(key=="candidate_w" || key=="limited_w" || key=="simulated_w" || key=="charge_w" || key=="discharge_w") d["unit_of_measurement"]="W";
    if(key=="charge_a" || key=="discharge_a") d["unit_of_measurement"]="A";
    if(key=="voltage_min" || key=="voltage_max") d["unit_of_measurement"]="V";
    if(key.rfind("soc_",0)==0) d["unit_of_measurement"]="%";
-   if(component=="number") {d["min"]=0;d["max"]=e.max;d["step"]=1;}
+   if(component=="number") {d["min"]=(key=="soc_max" || key=="soc_target" || key=="target_deadline_s" || key=="charge_first_s")?1:0;d["max"]=key=="soc_min"?99:e.max;d["step"]=1;}
    const auto envelope="{\"schema\":1,\"message_id\":\""+id+"-{{ (now().timestamp()*1000000)|int }}\",\"timestamp\":{{ now().timestamp()|int }},\"ttl\":30,";
    if(component=="button") {
      d["command_topic"]=base+"/ems/command";
@@ -168,7 +196,7 @@ void discovery() {
      auto tmpl=[&](const std::string& v){return envelope+"\"action\":\"policy\",\"payload\":{\""+key+"\":"+v+"}}";};
      d["command_topic"]=base+"/ems/command";
      if(key=="operating_mode") d["command_template"]=envelope+"\"action\":\"operating_mode\",\"payload\":{\"mode\":\"{{ value }}\"}}";
-     else if(key=="aux1") d["command_template"]=envelope+"\"action\":\"aux\",\"payload\":{\"on\":{{ 'true' if value=='ON' else 'false' }}}}";
+     else if(key=="aux1") d["command_template"]=envelope+"\"action\":\"aux\",\"payload\":{\"on\":{{ 'true' if value=='ON' else 'false' }},\"auto_off_s\":{{ 30 if value=='ON' else 0 }}}}";
      else if(component=="switch") {d["command_template"]=tmpl("{{ 1 if value=='ON' else 0 }}");}
      else d["command_template"]=tmpl(value);
    }
@@ -199,8 +227,12 @@ void handleEvent(void*,esp_event_base_t,int32_t code,void* data) {
          e->current_data_offset==0 && std::string(e->topic,e->topic_len)!=std::string(active.base)+"/ems/command") {
    const auto name=std::string(e->topic,e->topic_len);
    const auto root=std::string(active.base)+"/input/";
-   if(name.compare(0,root.size(),root)==0) acceptHaInput(name.c_str()+root.size(),e->data,e->data_len);
-   else if(name==std::string(active.base)+"/forecast/solar") acceptHaInput("forecast_solar",e->data,e->data_len);
+   const char* kind=name.compare(0,root.size(),root)==0?name.c_str()+root.size():
+     name==std::string(active.base)+"/forecast/solar"?"forecast_solar":nullptr;
+   if(kind) {
+     if(e->retain)rejectRetainedHaInput(kind);
+     else acceptHaInput(kind,e->data,e->data_len);
+   }
  }
  else if(code==MQTT_EVENT_DATA && e->topic && e->data_len<=768 &&
          e->data_len==e->total_data_len && e->current_data_offset==0 &&
@@ -246,6 +278,20 @@ void handleEvent(void*,esp_event_base_t,int32_t code,void* data) {
      }
    }
    JsonDocument ack;
+   const auto info=policyStatus();
+   ack["configuration_revision"]=info.revision;
+   const auto requested=d["payload"]["strategy"];
+   if(action=="target_soc")ack["requested_strategy"]="TARGET_SOC";
+   else if(action=="maintenance")ack["requested_strategy"]="MAINTENANCE";
+   else if(requested.is<int>() && requested.as<int>()>=0 && requested.as<int>()<6)
+     ack["requested_strategy"]=strategyName(static_cast<Strategy>(requested.as<int>()));
+   else ack["requested_strategy"]=nullptr;
+   std::string confirmed;
+   { const std::lock_guard guard(stateLock);confirmed=latest; }
+   JsonDocument decision;
+   deserializeJson(decision,confirmed);
+   ack["effective_strategy"]=decision["strategy"];
+   ack["configured_strategy"]=strategyName(info.configured);
    ack["schema"]=1;ack["message_id"]=id;ack["accepted"]=ok;ack["reason"]=reason;ack["executed"]=false;
    if ((action=="aux" || action=="operating_mode") &&
        (strcmp(reason,"RETAINED")==0 || strcmp(reason,"EXPIRED")==0 ||
@@ -305,6 +351,10 @@ void brokerTask(void*) {
        JsonDocument doc;telemetry(doc,e,now);
        publish("telemetry",encode(doc),active.retain);
        publish("system/manual",manualState(),true);
+       auto external=haSummary(false,true);
+       std::ostringstream timing;appendClock(timing,clockStamp());
+       external.pop_back();external+=timing.str()+"}";
+       publish("system/ha_inputs",external,active.retain);
        if(!decision.empty()) {publish("ems/state",decision,active.retain);publish("ems/decision",decision);}
      }
      if(now-lastInfo>=1000u*active.diagnostics_s) {
@@ -312,6 +362,8 @@ void brokerTask(void*) {
        std::ostringstream config;appendPolicyJson(config);publish("config/state",config.str(),active.retain);
        JsonDocument doc;doc["rssi"]=WiFi.RSSI();doc["heap"]=ESP.getFreeHeap();doc["uptime_ms"]=now;
        doc["psram"]=ESP.getPsramSize();doc["reset_reason"]=esp_reset_reason();doc["aux1"]=auxOn()?"ON":"OFF";
+       doc["firmware"]=V51_BUILD_ID;
+       {const std::lock_guard guard(stateLock);doc["reads"]=snapshot.goodReads;doc["errors"]=snapshot.errors;}
        doc["modbus_write_count"]=0;addClock(doc.as<JsonObject>(),clockStamp());publish("diagnostics",encode(doc),active.retain);
      }
    }

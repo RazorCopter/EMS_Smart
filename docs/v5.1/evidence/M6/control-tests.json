@@ -1,0 +1,321 @@
+{
+  "commands": [
+    {
+      "schema": 1,
+      "message_id": "m6-ctrl-1795070777551-1",
+      "timestamp": 1795070777,
+      "ttl": 30,
+      "action": "policy",
+      "payload": {
+        "strategy": 2,
+        "soc_target": 99,
+        "charge_w": 950
+      }
+    },
+    {
+      "schema": 1,
+      "message_id": "m6-ctrl-1795070807292-2",
+      "timestamp": 1795070807,
+      "ttl": 30,
+      "action": "policy",
+      "payload": {
+        "strategy": 0,
+        "soc_target": 100,
+        "charge_w": 1000
+      }
+    },
+    {
+      "schema": 1,
+      "message_id": "m6-ctrl-1795070812540-3",
+      "timestamp": 1795070812,
+      "ttl": 30,
+      "action": "target_soc",
+      "payload": {}
+    },
+    {
+      "schema": 1,
+      "message_id": "m6-ctrl-1795070817756-4",
+      "timestamp": 1795070817,
+      "ttl": 30,
+      "action": "cancel_session",
+      "payload": {}
+    },
+    {
+      "schema": 1,
+      "message_id": "m6-ctrl-1795070821886-5",
+      "timestamp": 1795070821,
+      "ttl": 30,
+      "action": "maintenance",
+      "payload": {}
+    },
+    {
+      "schema": 1,
+      "message_id": "m6-ctrl-1795070827289-6",
+      "timestamp": 1795070827,
+      "ttl": 30,
+      "action": "cancel_session",
+      "payload": {}
+    },
+    {
+      "schema": 1,
+      "message_id": "m6-ctrl-1795070832509-7",
+      "timestamp": 1795070832,
+      "ttl": 13,
+      "action": "override",
+      "payload": {
+        "strategy": 2
+      }
+    },
+    {
+      "schema": 1,
+      "message_id": "m6-ctrl-1795070847115-8",
+      "timestamp": 1795070847,
+      "ttl": 30,
+      "action": "override",
+      "payload": {
+        "strategy": 2
+      }
+    },
+    {
+      "schema": 1,
+      "message_id": "m6-ctrl-1795070852823-9",
+      "timestamp": 1795070852,
+      "ttl": 30,
+      "action": "cancel_override",
+      "payload": {}
+    }
+  ],
+  "replies": [
+    {
+      "configuration_revision": 2,
+      "requested_strategy": "NATIVE_INVERTER",
+      "effective_strategy": "SELF_USE",
+      "configured_strategy": "NATIVE_INVERTER",
+      "schema": 1,
+      "message_id": "m6-ctrl-1795070777551-1",
+      "accepted": true,
+      "reason": "ACCEPTED",
+      "executed": false,
+      "aux1": "OFF",
+      "physical_feedback": null,
+      "timestamp": "2026-11-19T06:46:17Z",
+      "uptime_ms": 33625,
+      "time_source": "NTP",
+      "time_valid": true
+    },
+    {
+      "configuration_revision": 3,
+      "requested_strategy": "SELF_USE",
+      "effective_strategy": "NATIVE_INVERTER",
+      "configured_strategy": "SELF_USE",
+      "schema": 1,
+      "message_id": "m6-ctrl-1795070807292-2",
+      "accepted": true,
+      "reason": "ACCEPTED",
+      "executed": false,
+      "aux1": "OFF",
+      "physical_feedback": null,
+      "timestamp": "2026-11-19T06:46:47Z",
+      "uptime_ms": 63354,
+      "time_source": "NTP",
+      "time_valid": true
+    },
+    {
+      "configuration_revision": 3,
+      "requested_strategy": null,
+      "effective_strategy": "SELF_USE",
+      "configured_strategy": "SELF_USE",
+      "schema": 1,
+      "message_id": "afore-ems_switch_aux1-1795070810098793",
+      "accepted": true,
+      "reason": "ACCEPTED",
+      "executed": false,
+      "aux1": "ON",
+      "physical_feedback": null,
+      "timestamp": "2026-11-19T06:46:50Z",
+      "uptime_ms": 66289,
+      "time_source": "NTP",
+      "time_valid": true
+    },
+    {
+      "configuration_revision": 4,
+      "requested_strategy": "TARGET_SOC",
+      "effective_strategy": "SELF_USE",
+      "configured_strategy": "TARGET_SOC",
+      "schema": 1,
+      "message_id": "m6-ctrl-1795070812540-3",
+      "accepted": true,
+      "reason": "ACCEPTED",
+      "executed": false,
+      "aux1": "ON",
+      "physical_feedback": null,
+      "timestamp": "2026-11-19T06:46:52Z",
+      "uptime_ms": 68602,
+      "time_source": "NTP",
+      "time_valid": true
+    },
+    {
+      "configuration_revision": 5,
+      "requested_strategy": null,
+      "effective_strategy": "TARGET_SOC",
+      "configured_strategy": "SELF_USE",
+      "schema": 1,
+      "message_id": "m6-ctrl-1795070817756-4",
+      "accepted": true,
+      "reason": "ACCEPTED",
+      "executed": false,
+      "aux1": "ON",
+      "physical_feedback": null,
+      "timestamp": "2026-11-19T06:46:57Z",
+      "uptime_ms": 73851,
+      "time_source": "NTP",
+      "time_valid": true
+    },
+    {
+      "configuration_revision": 5,
+      "requested_strategy": null,
+      "effective_strategy": "SELF_USE",
+      "configured_strategy": "SELF_USE",
+      "schema": 1,
+      "message_id": "afore-ems_switch_aux1-1795070818006783",
+      "accepted": true,
+      "reason": "ACCEPTED",
+      "executed": false,
+      "aux1": "OFF",
+      "physical_feedback": null,
+      "timestamp": "2026-11-19T06:46:58Z",
+      "uptime_ms": 74282,
+      "time_source": "NTP",
+      "time_valid": true
+    },
+    {
+      "configuration_revision": 6,
+      "requested_strategy": "MAINTENANCE",
+      "effective_strategy": "SELF_USE",
+      "configured_strategy": "MAINTENANCE",
+      "schema": 1,
+      "message_id": "m6-ctrl-1795070821886-5",
+      "accepted": true,
+      "reason": "ACCEPTED",
+      "executed": false,
+      "aux1": "OFF",
+      "physical_feedback": null,
+      "timestamp": "2026-11-19T06:47:01Z",
+      "uptime_ms": 77966,
+      "time_source": "NTP",
+      "time_valid": true
+    },
+    {
+      "configuration_revision": 7,
+      "requested_strategy": null,
+      "effective_strategy": "MAINTENANCE",
+      "configured_strategy": "SELF_USE",
+      "schema": 1,
+      "message_id": "m6-ctrl-1795070827289-6",
+      "accepted": true,
+      "reason": "ACCEPTED",
+      "executed": false,
+      "aux1": "OFF",
+      "physical_feedback": null,
+      "timestamp": "2026-11-19T06:47:07Z",
+      "uptime_ms": 83362,
+      "time_source": "NTP",
+      "time_valid": true
+    },
+    {
+      "configuration_revision": 8,
+      "requested_strategy": "NATIVE_INVERTER",
+      "effective_strategy": "SELF_USE",
+      "configured_strategy": "NATIVE_INVERTER",
+      "schema": 1,
+      "message_id": "m6-ctrl-1795070832509-7",
+      "accepted": true,
+      "reason": "ACCEPTED",
+      "executed": false,
+      "aux1": "OFF",
+      "physical_feedback": null,
+      "timestamp": "2026-11-19T06:47:12Z",
+      "uptime_ms": 88571,
+      "time_source": "NTP",
+      "time_valid": true
+    },
+    {
+      "configuration_revision": 10,
+      "requested_strategy": "NATIVE_INVERTER",
+      "effective_strategy": "SELF_USE",
+      "configured_strategy": "NATIVE_INVERTER",
+      "schema": 1,
+      "message_id": "m6-ctrl-1795070847115-8",
+      "accepted": true,
+      "reason": "ACCEPTED",
+      "executed": false,
+      "aux1": "OFF",
+      "physical_feedback": null,
+      "timestamp": "2026-11-19T06:47:27Z",
+      "uptime_ms": 103260,
+      "time_source": "NTP",
+      "time_valid": true
+    },
+    {
+      "configuration_revision": 11,
+      "requested_strategy": null,
+      "effective_strategy": "NATIVE_INVERTER",
+      "configured_strategy": "SELF_USE",
+      "schema": 1,
+      "message_id": "m6-ctrl-1795070852823-9",
+      "accepted": true,
+      "reason": "ACCEPTED",
+      "executed": false,
+      "aux1": "OFF",
+      "physical_feedback": null,
+      "timestamp": "2026-11-19T06:47:32Z",
+      "uptime_ms": 108888,
+      "time_source": "NTP",
+      "time_valid": true
+    }
+  ],
+  "manual": [
+    {
+      "operating_mode": "SHADOW",
+      "live_lock": "LIVE_NOT_QUALIFIED",
+      "aux1": "OFF",
+      "physical_feedback": null,
+      "last_aux_origin": null,
+      "last_aux_action": null,
+      "last_aux_reason": null,
+      "aux_auto_off_ms": 0,
+      "timestamp": "2026-11-19T06:46:11Z",
+      "uptime_ms": 27666,
+      "time_source": "NTP",
+      "time_valid": true
+    },
+    {
+      "operating_mode": "SHADOW",
+      "live_lock": "LIVE_NOT_QUALIFIED",
+      "aux1": "ON",
+      "physical_feedback": null,
+      "last_aux_origin": "MQTT",
+      "last_aux_action": "AUX_ON",
+      "last_aux_reason": "ACCEPTED",
+      "aux_auto_off_ms": 28578,
+      "timestamp": "2026-11-19T06:46:51Z",
+      "uptime_ms": 67712,
+      "time_source": "NTP",
+      "time_valid": true
+    },
+    {
+      "operating_mode": "SHADOW",
+      "live_lock": "LIVE_NOT_QUALIFIED",
+      "aux1": "OFF",
+      "physical_feedback": null,
+      "last_aux_origin": "MQTT",
+      "last_aux_action": "AUX_OFF",
+      "last_aux_reason": "ACCEPTED",
+      "aux_auto_off_ms": 0,
+      "timestamp": "2026-11-19T06:47:01Z",
+      "uptime_ms": 77723,
+      "time_source": "NTP",
+      "time_valid": true
+    }
+  ]
+}

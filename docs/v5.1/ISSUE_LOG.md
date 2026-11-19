@@ -99,3 +99,10 @@ Host assertions passed for SELF_USE, CHARGE_FIRST, NATIVE_INVERTER and SAFE_MODE
 |---|---|---|---|---|
 | V51-30 | Il firmware incorpora le regole POSIX future del database IANA 2025b. Le variazioni istituzionali successive richiedono un aggiornamento del dataset. | Bassa | G8 | Rigenerare la tabella quando cambiano le zone usate sul campo. |
 | V51-31 | Verificati avvio, sincronizzazione su richiesta, boot con RTC e i due server fallback separatamente. Il ciclo di sei ore e la perdita fisica del Wi-Fi non hanno una prova di durata dedicata. | Bassa | G8 | Acquisire un log di sei ore e ripetere il test con il Wi-Fi temporaneamente interrotto. |
+
+### Missione 6B
+
+| ID | Descrizione | Gravità | Gate | Proposta |
+|---|---|---|---|---|
+| V51-32 | Completata la matrice dei comandi dalla UI HA. La scadenza Solcast è verificata su payload reale riprodotto con TTL di 10 s; manca una prova di scadenza naturale a 14 ore. | Bassa | G7 | Campionare la scadenza a 14 ore in un test di durata separato. |
+| V51-33 | L’ACK di configurazione può riportare la strategia effettiva del ciclo precedente. Il pannello conferma lo stato effettivo con la decisione successiva. | Bassa | G8 | Mantenere esplicita la semantica dei campi nelle integrazioni. |

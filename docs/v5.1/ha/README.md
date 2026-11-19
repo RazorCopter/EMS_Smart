@@ -1,9 +1,12 @@
-# Afore ESP push from Home Assistant
+# Home Assistant e Afore EMS SHADOW
 
-Install `afore_esp_inputs.yaml` as a new HA package after checking the listed entity IDs. Keep the original SEM package, automation and Inverter live tab. The package only publishes input data and reads MQTT state. It does not provide inverter commands. The ESP never requests HA API data or credentials.
+L'istanza Home Assistant usa il package `afore_esp_inputs.yaml` in `/homeassistant/packages/`. Per reinstallarlo, copia il file, valida YAML e ricarica script, automazioni, entità template ed entità MQTT configurate in YAML.
 
-Add the card patch from the directory containing `energy-obsidian-card.js`: `git apply energy-obsidian-card.patch` (or use a patch utility outside a Git checkout). Reload the browser asset using a distinct cache version. The added EMS tab compares the local SEM and ESP SHADOW plans. Inverter live remains the SEM/HA control surface.
+La dashboard Energia usa la risorsa `/local/energy/energy-obsidian-card-m6b.js?v=20261119-m6b`. La patch `energy-obsidian-card.patch` si applica alla risorsa Obsidian originale con versione interna `20261024-5`. In Energia → Impostazioni Obsidian → **Afore EMS** trovi la diagnostica e i controlli SHADOW. **Inverter live** gestisce le entità Solarman reali. Durante il collaudo inverter in SelfUse nativo, automazione SEM OFF ed ESP in SHADOW.
 
-The push namespace is `afore/afore-ems/v1/input/` followed by `forecast_solar`, `forecast_ratio`, `weather`, `load_profile` or `heartbeat`. The ESP also accepts `afore/afore-ems/v1/forecast/solar` as an ingress alias. Publish only once on the canonical topic. Unix seconds are used for timestamps. Each item expires according to its own lifetime. Solcast expiration is evaluated against the last upstream poll, even if HA republishes every five minutes. 30-minute period starts are UTC Unix seconds, and estimates are kW.
+Il broker usa il prefisso Discovery `homeassistant` e la base `afore/afore-ems/v1`. I cinque input HA viaggiano su `input/{heartbeat,forecast_solar,forecast_ratio,weather,load_profile}` con schema 2. Il firmware espone lo stato di ricezione su `system/ha_inputs`. Gli input sono solo informativi. Il rapporto reale/previsto può essere nullo quando la previsione FV è troppo bassa per un confronto. Solcast scade a 14 ore dall'ultimo polling effettivo; l'heartbeat viene emesso ogni 30 secondi e scade dopo 90 secondi.
 
-New Discovery items: operating mode select, AUX1 switch, nominal battery voltage, useful battery capacity and LIVE lock reason. AUX ON/OFF commands obey the signed-firmware interlock and report commanded state with physical_feedback=null. The new comparison sensor classifies strategy agreement; SEM current is a limit in A and ESP simulated W is a setpoint, so their numerical equality is not used to infer agreement.
+I comandi HA pubblicano su `ems/command`. Le risposte arrivano su `ems/ack` con revisione, strategia richiesta, strategia configurata e strategia effettiva al momento dell'ACK. La decisione successiva conferma la strategia realmente eseguita in simulazione. Il toggle AUX1 invia auto-spegnimento a 30 secondi, e lo stato MQTT riporta la posizione comandata. Il firmware non dispone di feedback fisico dei contatti.
+
+- [Inventario Discovery](ENTITA_DISCOVERY.md)
+- [Report di collaudo](../MISSION_6.md)

@@ -4,7 +4,7 @@
  /* Obsidian Energy: external profile + settings UI. No third-party runtime. */
  (() => {
 -  const VERSION='20261024-5';
-+  const VERSION='20261118-ems';
++  const VERSION='20261119-m6b';
    const clone = value => JSON.parse(JSON.stringify(value));
    const escapeHTML = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
    const finite = value => value !== '' && value !== null && Number.isFinite(Number(value));
@@ -13,7 +13,7 @@
      disconnectedCallback(){owners.delete(this._owner);}
      setConfig(config){if(!config.config_url)throw new Error('config_url mancante');this._config=config;this._storage=config.storage_key||'energy-obsidian-profile:'+config.config_url;this._load();}
 -    set hass(hass){this._hass=hass;if(this._card)this._card.hass=hass;}
-+    set hass(hass){this._hass=hass;if(this._card)this._card.hass=hass;const ems=this._dialog?.querySelector('[data-esp-ems]');if(ems)this._renderEms(ems);}
++    set hass(hass){this._hass=hass;if(this._card)this._card.hass=hass;this._updateEms();}
      get hass(){return this._hass;}
      getCardSize(){return 12;}
      _uiButton(event){return event.composedPath().find(node=>node?.getAttribute?.('data-obsidian-owner')===this._owner&&['settings','appliances','month-today','month-summary'].includes(node.getAttribute('data-obsidian-ui')));}
@@ -21,27 +21,91 @@
        const actions=addTab('Cancelli');actions.append(this._note('Coordinate in percentuale della foto. Gli offset verticali sono in pixel. Ogni comando mantiene la conferma prima dell’esecuzione.'));
        for(const a of this._draft.actions){const block=document.createElement('details');block.className='block';block.innerHTML='<summary>'+escapeHTML(a.name)+'</summary>';const grid=this._grid(block);for(const key of ['name','entity','service','icon','tooltip','confirm','x','y','y_offset','minimumTop'])if(a[key]!=null)grid.append(this._field(key,a[key],v=>a[key]=v,{type:typeof a[key]==='number'?'number':'text',step:.1}).el);actions.append(block);}
        const live=addTab('Inverter live');this._renderLive(live);
-+      const ems=addTab('EMS');ems.dataset.espEms='true';this._renderEms(ems);
++      this._renderEms(addTab('Afore EMS'));
        const advanced=addTab('Avanzate');advanced.append(this._note('Profilo completo, suddiviso in sezioni JSON. Sono accessibili anche regole meteo, CSS, testi e struttura delle schede. Premi Usa questo JSON per acquisire le modifiche alla sezione, poi Salva e applica.'));
        const part=document.createElement('select');part.className='search';part.setAttribute('aria-label','Sezione JSON');
        const labels={params:'Parametri',entities:'Associazioni entita',images:'Immagini',weatherRules:'Regole meteo',photo:'Geometria foto',actions:'Comandi cancelli',appliances:'Utenze e soglie',colors:'Colori cockpit',applianceColors:'Colori utenze',dashboard:'Struttura completa delle schede'};
-@@ -249,6 +250,20 @@
+@@ -249,6 +250,84 @@
        this.shadowRoot.append(dialog);sections.get(initialTab||groups[0]).button.click();this._showSettingsDialog(dialog);this._status(this._storageWarning||'Modifica un valore, poi salva e applica.');
      }
      _download(p){const url=URL.createObjectURL(new Blob([JSON.stringify(p,null,2)],{type:'application/json'}));const a=document.createElement('a');a.href=url;a.download='energy-obsidian-config.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}
 +    _renderEms(section){
-+      section.replaceChildren();
-+      const states=this._hass?.states||{},get=id=>states[this._draft?.entities?.[id]||id];
-+      const esp=get('sensor.afore_esp_shadow_decision'),manual=get('sensor.afore_esp_manual'),sem=get('sensor.sem_decisione_prevista'),current=get('sensor.sem_corrente_calcolata');
-+      const add=(label,value)=>{const row=document.createElement('div');row.className='live';const key=document.createElement('label'),out=document.createElement('span');key.textContent=label;out.textContent=unavailable(value)?'Non disponibile':String(value);row.append(key,out);section.append(row);};
-+      add('Decisione SEM',sem?.state);
-+      add('Corrente calcolata SEM',finite(current?.state)?current.state+' A':null);
-+      add('Decisione ESP SHADOW',esp?.state);
-+      add('Modalita operativa',manual?.state);
-+      add('Setpoint simulato',esp?.attributes?.simulated_w==null?null:esp.attributes.simulated_w+' W');
-+      add('Motivo ESP',esp?.attributes?.reason);
-+      add('AUX1 comandata',manual?.attributes?.aux1);
-+      add('Concordanza',get('sensor.concordanza_sem_esp_shadow')?.state);
++      section.dataset.espEms='true';
++      section.append(this._note('SEM / Solarman · controllo reale. ESP32 · simulazione SHADOW.'));
++      const row=(label,key,parent=section)=>{
++        const line=document.createElement('div');line.className='live';
++        const title=document.createElement('label'),value=document.createElement('span');
++        title.textContent=label;value.dataset.emsValue=key;line.append(title,value);parent.append(line);
++      };
++      for(const [label,key] of [
++        ['Home Assistant visto dall’ESP','ha'],['Modalità ESP','mode'],['Strategia locale','local'],['Strategia effettiva','strategy'],
++        ['Stato strategia','state'],['Safety','safety'],['Motivo decisione','reason'],
++        ['Setpoint simulato','power'],['Solcast ricevuto','solar'],['Rapporto reale / previsto','ratio'],
++        ['Nebbia','fog'],['Profilo di carico oggi','load'],['Decisione SEM','sem'],['Corrente calcolata SEM','current'],
++        ['Stato automazione SEM','semActive'],['Concordanza SEM / ESP','agreement'],['Motivo discordanza','disagreement'],
++        ['AUX1 comandata','aux']
++      ])row(label,key);
++      const controls=document.createElement('details');controls.open=true;
++      const title=document.createElement('summary');title.textContent='Controlli SHADOW';controls.append(title);
++      for(const [label,id] of [
++        ['Strategia locale','select.afore_autonomous_ems_local_strategy'],
++        ['SOC target','number.afore_autonomous_ems_target_soc'],
++        ['SOC minimo','number.afore_autonomous_ems_minimum_soc'],['SOC massimo','number.afore_autonomous_ems_maximum_soc'],
++        ['Limite carica','number.afore_autonomous_ems_charge_power_limit'],['Limite scarica','number.afore_autonomous_ems_discharge_power_limit'],
++        ['Avvia Target SOC','button.afore_autonomous_ems_start_target_soc'],['Avvia Maintenance','button.afore_autonomous_ems_start_maintenance'],
++        ['Override temporaneo','script.afore_esp_shadow_override'],
++        ['Annulla override','button.afore_autonomous_ems_cancel_override'],['Annulla sessione','button.afore_autonomous_ems_cancel_session'],
++        ['Modalità ESP','select.afore_autonomous_ems_operating_mode'],['AUX1','switch.afore_autonomous_ems_aux1']
++      ]){
++        const b=document.createElement('button');b.textContent=label;
++        b.onclick=()=>{
++          if(id.startsWith('switch.') && this._hass?.states[id]?.state==='off' && !confirm('Attivare AUX1 per 30 secondi?'))return;
++          this._moreInfo(id);
++        };
++        controls.append(b);
++      }
++      section.append(controls);
++      const details=document.createElement('details');
++      const summary=document.createElement('summary');summary.textContent='Sicurezza e diagnostica';details.append(summary);
++      for(const [label,key] of [
++        ['Eseguito','executed'],['Scritture Modbus','writes'],['Blocco LIVE','liveLock'],
++        ['Ultimo comando AUX','auxOrigin'],['Ultimo ACK','ack'],['Ultima decisione','timestamp']
++      ])row(label,key,details);
++      section.append(details);
++      this._updateEms(section);
++    }
++    _updateEms(section=this._dialog?.querySelector('[data-esp-ems]')){
++      if(!section)return;
++      const states=this._hass?.states||{}, get=id=>states[this._draft?.entities?.[id]||id];
++      const state=id=>get(id)?.state;
++      const esp=get('sensor.afore_esp_shadow_decision'),manual=get('sensor.afore_esp_manual');
++      const external=get('sensor.afore_esp_dati_ha'), agreement=get('sensor.concordanza_sem_esp_shadow');
++      const d=esp?.attributes??{},m=manual?.attributes??{},e=external?.attributes??{};
++      const timed=(input,value)=>{
++        if(input?.status==='stale')return 'Obsoleto';
++        if(input?.status!=='valid')return 'Non disponibile';
++        const age=input.age_s==null?'':input.age_s<60?' · '+input.age_s+' s fa':' · '+Math.floor(input.age_s/60)+' min fa';
++        return (value??'Non applicabile')+age;
++      };
++      const solar=e.forecast_solar?.data,ratio=e.forecast_ratio?.data?.ratio,fog=e.weather?.data?.fog,load=e.load_profile?.data?.today_kw;
++      const watts=v=>v==null?null:v+' W';
++      const values={
++        ha:external?.state,mode:manual?.state,local:d.configured,strategy:esp?.state,state:state('sensor.afore_autonomous_ems_strategy_state')??d.state,safety:d.safety_reason,
++        reason:d.reason,power:watts(d.simulated_w),
++        solar:timed(e.forecast_solar,solar?solar.today_periods+' oggi / '+solar.tomorrow_periods+' domani':'Disponibile'),
++        ratio:timed(e.forecast_ratio,ratio),fog:timed(e.weather,fog==null?null:fog?'Sì':'No'),load:timed(e.load_profile,load==null?null:load+' kW'),
++        sem:state('sensor.sem_decisione_prevista'),
++        current:finite(state('sensor.sem_corrente_calcolata'))?state('sensor.sem_corrente_calcolata')+' A':null,
++        semActive:state('automation.solarman_smart_energy_manager'),agreement:agreement?.state,disagreement:agreement?.attributes?.motivo,
++        aux:m.aux1?m.aux1+(m.aux_auto_off_ms?' · '+Math.ceil(m.aux_auto_off_ms/1000)+' s':'')+' · feedback fisico non disponibile':null,
++        executed:d.executed,writes:d.modbus_write_count,liveLock:m.live_lock,
++        auxOrigin:[m.last_aux_origin,m.last_aux_action,m.last_aux_reason].filter(Boolean).join(' · '),
++        ack:state('sensor.afore_esp_ultimo_ack'),timestamp:d.timestamp?new Date(d.timestamp).toLocaleString('it-IT'):null,
++      };
++      for(const out of section.querySelectorAll('[data-ems-value]')){
++        const value=values[out.dataset.emsValue];
++        out.textContent=unavailable(value)?'Non disponibile':String(value);
++      }
 +    }
      _renderLive(section){
        section.append(this._note('Questi controlli scrivono le entita reali. Le modifiche al profilo grafico non inviano comandi all’inverter.'));

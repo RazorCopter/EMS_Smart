@@ -1,0 +1,353 @@
+[
+  {
+    "timestamp": "2026-11-19T07:02:39Z",
+    "uptime_ms": 1016062,
+    "strategy": "SELF_USE",
+    "configured": "SELF_USE",
+    "executed": false,
+    "applied": null,
+    "modbus_write_count": 0
+  },
+  {
+    "timestamp": "2026-11-19T07:02:40Z",
+    "uptime_ms": 1017069,
+    "strategy": "SELF_USE",
+    "configured": "SELF_USE",
+    "executed": false,
+    "applied": null,
+    "modbus_write_count": 0
+  },
+  {
+    "timestamp": "2026-11-19T07:03:08Z",
+    "uptime_ms": 1044528,
+    "strategy": "SELF_USE",
+    "configured": "SELF_USE",
+    "executed": false,
+    "applied": null,
+    "modbus_write_count": 0
+  },
+  {
+    "timestamp": "2026-11-19T07:03:09Z",
+    "uptime_ms": 1045531,
+    "strategy": "SELF_USE",
+    "configured": "SELF_USE",
+    "executed": false,
+    "applied": null,
+    "modbus_write_count": 0
+  },
+  {
+    "timestamp": "2026-11-19T07:03:10Z",
+    "uptime_ms": 1046545,
+    "strategy": "SELF_USE",
+    "configured": "SELF_USE",
+    "executed": false,
+    "applied": null,
+    "modbus_write_count": 0
+  },
+  {
+    "timestamp": "2026-11-19T07:03:17Z",
+    "uptime_ms": 1053716,
+    "strategy": "SELF_USE",
+    "configured": "SELF_USE",
+    "executed": false,
+    "applied": null,
+    "modbus_write_count": 0
+  },
+  {
+    "timestamp": "2026-11-19T07:03:18Z",
+    "uptime_ms": 1054717,
+    "strategy": "SELF_USE",
+    "configured": "SELF_USE",
+    "executed": false,
+    "applied": null,
+    "modbus_write_count": 0
+  },
+  {
+    "timestamp": "2026-11-19T07:03:25Z",
+    "uptime_ms": 1061874,
+    "strategy": "SELF_USE",
+    "configured": "SELF_USE",
+    "executed": false,
+    "applied": null,
+    "modbus_write_count": 0
+  },
+  {
+    "timestamp": "2026-11-19T07:03:26Z",
+    "uptime_ms": 1062890,
+    "strategy": "SELF_USE",
+    "configured": "SELF_USE",
+    "executed": false,
+    "applied": null,
+    "modbus_write_count": 0
+  },
+  {
+    "timestamp": "2026-11-19T07:03:27Z",
+    "uptime_ms": 1063902,
+    "strategy": "SELF_USE",
+    "configured": "SELF_USE",
+    "executed": false,
+    "applied": null,
+    "modbus_write_count": 0
+  },
+  {
+    "timestamp": "2026-11-19T07:03:33Z",
+    "uptime_ms": 1070031,
+    "strategy": "SELF_USE",
+    "configured": "SELF_USE",
+    "executed": false,
+    "applied": null,
+    "modbus_write_count": 0
+  },
+  {
+    "timestamp": "2026-11-19T07:03:34Z",
+    "uptime_ms": 1071046,
+    "strategy": "SELF_USE",
+    "configured": "SELF_USE",
+    "executed": false,
+    "applied": null,
+    "modbus_write_count": 0
+  },
+  {
+    "timestamp": "2026-11-19T07:03:45Z",
+    "uptime_ms": 1081298,
+    "strategy": "SELF_USE",
+    "configured": "SELF_USE",
+    "executed": false,
+    "applied": null,
+    "modbus_write_count": 0
+  },
+  {
+    "timestamp": "2026-11-19T07:03:46Z",
+    "uptime_ms": 1082315,
+    "strategy": "SELF_USE",
+    "configured": "SELF_USE",
+    "executed": false,
+    "applied": null,
+    "modbus_write_count": 0
+  },
+  {
+    "timestamp": "2026-11-19T07:03:53Z",
+    "uptime_ms": 1089432,
+    "strategy": "TARGET_SOC",
+    "configured": "TARGET_SOC",
+    "executed": false,
+    "applied": null,
+    "modbus_write_count": 0
+  },
+  {
+    "timestamp": "2026-11-19T07:03:54Z",
+    "uptime_ms": 1090439,
+    "strategy": "TARGET_SOC",
+    "configured": "TARGET_SOC",
+    "executed": false,
+    "applied": null,
+    "modbus_write_count": 0
+  },
+  {
+    "timestamp": "2026-11-19T07:04:00Z",
+    "uptime_ms": 1096617,
+    "strategy": "SELF_USE",
+    "configured": "SELF_USE",
+    "executed": false,
+    "applied": null,
+    "modbus_write_count": 0
+  },
+  {
+    "timestamp": "2026-11-19T07:04:01Z",
+    "uptime_ms": 1097635,
+    "strategy": "SELF_USE",
+    "configured": "SELF_USE",
+    "executed": false,
+    "applied": null,
+    "modbus_write_count": 0
+  },
+  {
+    "timestamp": "2026-11-19T07:04:02Z",
+    "uptime_ms": 1098649,
+    "strategy": "SELF_USE",
+    "configured": "SELF_USE",
+    "executed": false,
+    "applied": null,
+    "modbus_write_count": 0
+  },
+  {
+    "timestamp": "2026-11-19T07:04:08Z",
+    "uptime_ms": 1104776,
+    "strategy": "MAINTENANCE",
+    "configured": "MAINTENANCE",
+    "executed": false,
+    "applied": null,
+    "modbus_write_count": 0
+  },
+  {
+    "timestamp": "2026-11-19T07:04:09Z",
+    "uptime_ms": 1105791,
+    "strategy": "MAINTENANCE",
+    "configured": "MAINTENANCE",
+    "executed": false,
+    "applied": null,
+    "modbus_write_count": 0
+  },
+  {
+    "timestamp": "2026-11-19T07:04:10Z",
+    "uptime_ms": 1106810,
+    "strategy": "MAINTENANCE",
+    "configured": "MAINTENANCE",
+    "executed": false,
+    "applied": null,
+    "modbus_write_count": 0
+  },
+  {
+    "timestamp": "2026-11-19T07:04:16Z",
+    "uptime_ms": 1112949,
+    "strategy": "SELF_USE",
+    "configured": "SELF_USE",
+    "executed": false,
+    "applied": null,
+    "modbus_write_count": 0
+  },
+  {
+    "timestamp": "2026-11-19T07:04:17Z",
+    "uptime_ms": 1113949,
+    "strategy": "SELF_USE",
+    "configured": "SELF_USE",
+    "executed": false,
+    "applied": null,
+    "modbus_write_count": 0
+  },
+  {
+    "timestamp": "2026-11-19T07:04:18Z",
+    "uptime_ms": 1114961,
+    "strategy": "SELF_USE",
+    "configured": "SELF_USE",
+    "executed": false,
+    "applied": null,
+    "modbus_write_count": 0
+  },
+  {
+    "timestamp": "2026-11-19T07:04:25Z",
+    "uptime_ms": 1122102,
+    "strategy": "NATIVE_INVERTER",
+    "configured": "NATIVE_INVERTER",
+    "executed": false,
+    "applied": null,
+    "modbus_write_count": 0
+  },
+  {
+    "timestamp": "2026-11-19T07:04:26Z",
+    "uptime_ms": 1123107,
+    "strategy": "NATIVE_INVERTER",
+    "configured": "NATIVE_INVERTER",
+    "executed": false,
+    "applied": null,
+    "modbus_write_count": 0
+  },
+  {
+    "timestamp": "2026-11-19T07:04:49Z",
+    "uptime_ms": 1145442,
+    "strategy": "NATIVE_INVERTER",
+    "configured": "NATIVE_INVERTER",
+    "executed": false,
+    "applied": null,
+    "modbus_write_count": 0
+  },
+  {
+    "timestamp": "2026-11-19T07:04:50Z",
+    "uptime_ms": 1146451,
+    "strategy": "NATIVE_INVERTER",
+    "configured": "NATIVE_INVERTER",
+    "executed": false,
+    "applied": null,
+    "modbus_write_count": 0
+  },
+  {
+    "timestamp": "2026-11-19T07:04:51Z",
+    "uptime_ms": 1147452,
+    "strategy": "NATIVE_INVERTER",
+    "configured": "NATIVE_INVERTER",
+    "executed": false,
+    "applied": null,
+    "modbus_write_count": 0
+  },
+  {
+    "timestamp": "2026-11-19T07:05:07Z",
+    "uptime_ms": 1163778,
+    "strategy": "SELF_USE",
+    "configured": "SELF_USE",
+    "executed": false,
+    "applied": null,
+    "modbus_write_count": 0
+  },
+  {
+    "timestamp": "2026-11-19T07:05:08Z",
+    "uptime_ms": 1164797,
+    "strategy": "SELF_USE",
+    "configured": "SELF_USE",
+    "executed": false,
+    "applied": null,
+    "modbus_write_count": 0
+  },
+  {
+    "timestamp": "2026-11-19T07:05:14Z",
+    "uptime_ms": 1170887,
+    "strategy": "SELF_USE",
+    "configured": "SELF_USE",
+    "executed": false,
+    "applied": null,
+    "modbus_write_count": 0
+  },
+  {
+    "timestamp": "2026-11-19T07:05:15Z",
+    "uptime_ms": 1171942,
+    "strategy": "SELF_USE",
+    "configured": "SELF_USE",
+    "executed": false,
+    "applied": null,
+    "modbus_write_count": 0
+  },
+  {
+    "timestamp": "2026-11-19T07:05:21Z",
+    "uptime_ms": 1178016,
+    "strategy": "SELF_USE",
+    "configured": "SELF_USE",
+    "executed": false,
+    "applied": null,
+    "modbus_write_count": 0
+  },
+  {
+    "timestamp": "2026-11-19T07:05:22Z",
+    "uptime_ms": 1179030,
+    "strategy": "SELF_USE",
+    "configured": "SELF_USE",
+    "executed": false,
+    "applied": null,
+    "modbus_write_count": 0
+  },
+  {
+    "timestamp": "2026-11-19T07:05:23Z",
+    "uptime_ms": 1180114,
+    "strategy": "SELF_USE",
+    "configured": "SELF_USE",
+    "executed": false,
+    "applied": null,
+    "modbus_write_count": 0
+  },
+  {
+    "timestamp": "2026-11-19T07:05:34Z",
+    "uptime_ms": 1190233,
+    "strategy": "SELF_USE",
+    "configured": "SELF_USE",
+    "executed": false,
+    "applied": null,
+    "modbus_write_count": 0
+  },
+  {
+    "timestamp": "2026-11-19T07:05:35Z",
+    "uptime_ms": 1191252,
+    "strategy": "SELF_USE",
+    "configured": "SELF_USE",
+    "executed": false,
+    "applied": null,
+    "modbus_write_count": 0
+  }
+]

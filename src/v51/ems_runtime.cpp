@@ -58,6 +58,7 @@ std::string audit(const EnergyState& e,const Policy& p,const Decision& d,
     out<<",\"battery_w\":"; number(out,essential(e.battery,now,p.staleMs));
     out<<",\"load_w\":"; number(out,essential(e.load,now,p.staleMs));
     out<<",\"pv_w\":"; number(out,essential(e.pv,now,p.staleMs));
+    out<<",\"safety_reason\":\""<<d.safetyReason<<"\",\"limited_w\":";number(out,d.limited);
     out<<",\"candidate_w\":"; number(out,d.candidate);
     out<<",\"simulated_w\":"; number(out,d.finalWatts);
     out<<",\"safety_min_w\":"; number(out,d.lower);
@@ -126,6 +127,10 @@ esp_err_t replay(httpd_req_t* r) {
     }
     return httpd_resp_send_chunk(r,nullptr,0);
 }
+}
+PolicyStatus policyStatus() {
+    const std::lock_guard guard(lock);
+    return {revision,static_cast<Strategy>(overridePolicy.value_or(current).strategy)};
 }
 void appendPolicyJson(std::ostream& out) {
     const std::lock_guard guard(lock);

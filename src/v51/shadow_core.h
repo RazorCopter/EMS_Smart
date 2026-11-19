@@ -39,9 +39,10 @@ struct Policy {
 
 struct Decision {
     Strategy strategy=Strategy::Safe, configured=Strategy::SelfUse, previous=Strategy::Safe;
-    std::optional<int> candidate, finalWatts, lower, upper, averageW;
+    std::optional<int> candidate, limited, finalWatts, lower, upper, averageW;
     std::optional<double> missingWh;
     const char* state="SAFE", *reason="INPUT_INVALID", *transition="UNCHANGED";
+    const char* safetyReason="NONE";
     bool unreachable=false;
     static constexpr bool executed=false;
 };
@@ -125,7 +126,13 @@ public:
             if (p.strategy==5 && (e.readHalted || fault(e.soc) || fault(e.grid) || fault(e.battery)))
                 finish("MAINTENANCE_FAULT_ABORT");
         }
-        if (!healthy) return complete(d,now);
+        if (!healthy) {
+            const auto stale=[&](const Sample& sample){
+                return sample.status==Quality::Valid && now-sample.stamp>uint32_t(p.staleMs);
+            };
+            d.safetyReason=stale(e.soc)||stale(e.grid)||stale(e.battery)?"STALE_TELEMETRY":"ESSENTIAL_DATA_UNAVAILABLE";
+            return complete(d,now);
+        }
         uint32_t elapsed=(now-start_)/1000;
         int limit=p.strategy==1 ? p.chargeFirstSec : p.strategy==4 ? p.deadlineSec : p.maintenanceSec;
         if (p.strategy==4 && p.daily && local) {
@@ -154,6 +161,7 @@ public:
         d.transition=done_ ? exit_ : "UNCHANGED";
         if (d.strategy==Strategy::Native || d.strategy==Strategy::Safe) {
             d.state=d.strategy==Strategy::Native ? "OBSERVE" : "SAFE";
+            d.safetyReason=d.strategy==Strategy::Native?"OBSERVATION":"SAFE_MODE";
             d.reason=d.strategy==Strategy::Native ? "NATIVE_OBSERVATION" : "SAFE_REQUESTED";
             return complete(d,now);
         }
@@ -190,12 +198,18 @@ public:
         }
         int selected=std::clamp(*d.candidate,*d.lower,*d.upper);
         const int bounded=selected;
+        d.limited=bounded;
+        if(!voltageSafe)d.safetyReason="VOLTAGE_LIMIT";
+        else if(*d.candidate<0 && reserve_)d.safetyReason="SOC_RESERVE";
+        else if(*d.candidate>0 && *soc>=p.ceiling)d.safetyReason="SOC_CEILING";
+        else if(bounded!=*d.candidate)d.safetyReason="POWER_LIMIT";
         if (priorW_ && effective_==d.strategy) {
             const int step=int(p.ramp*std::min(now-last_,uint32_t(4000))/1000);
             selected=std::abs(selected-*priorW_)<p.deadband ? *priorW_
                 : std::clamp(selected,*priorW_-step,*priorW_+step);
         }
         d.finalWatts=std::clamp(selected,*d.lower,*d.upper);
+        if(selected!=*d.finalWatts && d.safetyReason==std::string_view("NONE"))d.safetyReason="POWER_LIMIT";
         d.reason=d.unreachable ? "UNREACHABLE_AT_CURRENT_LIMIT" : holding ? "MAINTENANCE_HOLD" :
             selected!=*d.finalWatts ? "SAFETY_RECLAMP" : bounded!=*d.candidate ? "SAFETY_LIMIT" :
             bounded!=*d.finalWatts ? "DEADBAND_OR_RAMP" : charging ? "CHARGE_REQUEST" : "GRID_BALANCE";

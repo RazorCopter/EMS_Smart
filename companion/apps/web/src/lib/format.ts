@@ -83,6 +83,10 @@ export function reasonLabel(r: string | null | undefined): string {
     SAFETY_LIMIT: "Limite Safety applicato",
     SAFETY_RECLAMP: "Setpoint limitato dai vincoli Safety",
     DEADBAND_OR_RAMP: "Bilanciamento stabile (deadband/rampa)",
+    CAPTURE_CHARGE_FIRST: "Cattura solare massima (Charge First fino al 100%)",
+    GENTLE_TARGET_CHARGE: "Carica dolce modulata verso orario obiettivo",
+    FULL_SOC_HOLD_5M: "Mantenimento al 100% per bilanciamento celle (5 min)",
+    FULL_SOC_5MIN_COMPLETE: "100% completato (5 min): passaggio a Self Use",
     MAINTENANCE_HOLD: "Mantenimento carica batteria",
     UNREACHABLE_AT_CURRENT_LIMIT: "Target SOC non raggiungibile entro i limiti correnti",
     NATIVE_OBSERVATION: "Gestione nativa inverter",
@@ -139,6 +143,27 @@ export function humanDecisionDetail(
       title,
       subtitle: "In attesa di campioni freschi e completi dall'inverter prima di simulare nuovi setpoint",
       tone: "warn",
+    };
+  }
+  if (primaryCode === "CAPTURE_CHARGE_FIRST") {
+    return {
+      title,
+      subtitle: `${socTxt} · Giornata a bassa produzione o ciclo invernale: accumulo prioritario fino al 100%, scarica bloccata`,
+      tone: "normal",
+    };
+  }
+  if (primaryCode === "GENTLE_TARGET_CHARGE") {
+    return {
+      title,
+      subtitle: `${socTxt} · Carica modulata agli ampere minimi per completare il 100% entro l'orario obiettivo`,
+      tone: "normal",
+    };
+  }
+  if (primaryCode === "FULL_SOC_HOLD_5M" || primaryCode === "FULL_SOC_5MIN_COMPLETE") {
+    return {
+      title,
+      subtitle: `${socTxt} · Bilanciamento finale 5 min al 100% prima del ritorno in Self Use`,
+      tone: "normal",
     };
   }
   if (primaryCode === "NATIVE_OBSERVATION") {

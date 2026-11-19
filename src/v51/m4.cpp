@@ -360,8 +360,39 @@ void brokerTask(void*) {
      if(now-lastInfo>=1000u*active.diagnostics_s) {
        lastInfo=now;
        std::ostringstream config;appendPolicyJson(config);publish("config/state",config.str(),active.retain);
-       JsonDocument doc;doc["rssi"]=WiFi.RSSI();doc["heap"]=ESP.getFreeHeap();doc["uptime_ms"]=now;
-       doc["psram"]=ESP.getPsramSize();doc["reset_reason"]=esp_reset_reason();doc["aux1"]=auxOn()?"ON":"OFF";
+       const auto res=sampleSystemResources();
+       JsonDocument doc;
+       doc["rssi"]=WiFi.RSSI();
+       doc["heap"]=res.heapFree;
+       doc["heap_total"]=res.heapTotal;
+       doc["heap_min"]=res.heapMin;
+       doc["heap_max_alloc"]=res.heapMaxAlloc;
+       doc["heap_used_pct"]=res.heapUsedPct;
+       doc["psram"]=res.psramTotal;
+       doc["psram_free"]=res.psramFree;
+       doc["psram_min"]=res.psramMin;
+       doc["psram_used_pct"]=res.psramUsedPct;
+       if(res.cpuValid) {
+         doc["cpu_pct"]=res.cpuPct;
+         doc["cpu0_pct"]=res.cpu0Pct;
+         doc["cpu1_pct"]=res.cpu1Pct;
+       } else {
+         doc["cpu_pct"]=nullptr;
+         doc["cpu0_pct"]=nullptr;
+         doc["cpu1_pct"]=nullptr;
+       }
+       doc["cpu_mhz"]=res.cpuMhz;
+       doc["task_count"]=res.taskCount;
+       doc["min_task_stack_free_b"]=res.minTaskStackFreeB;
+       doc["nvs_used_entries"]=res.nvsUsedEntries;
+       doc["nvs_free_entries"]=res.nvsFreeEntries;
+       doc["nvs_total_entries"]=res.nvsTotalEntries;
+       doc["nvs_used_pct"]=res.nvsUsedPct;
+       doc["flash_size"]=res.flashSize;
+       doc["sketch_size"]=res.sketchSize;
+       doc["sketch_free"]=res.sketchFree;
+       doc["uptime_ms"]=now;
+       doc["reset_reason"]=esp_reset_reason();doc["aux1"]=auxOn()?"ON":"OFF";
        doc["firmware"]=V51_BUILD_ID;
        {const std::lock_guard guard(stateLock);doc["reads"]=snapshot.goodReads;doc["errors"]=snapshot.errors;}
        doc["modbus_write_count"]=0;addClock(doc.as<JsonObject>(),clockStamp());publish("diagnostics",encode(doc),active.retain);

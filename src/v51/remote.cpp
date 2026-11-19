@@ -14,6 +14,9 @@
 #include <esp_http_server.h>
 #include <esp_ota_ops.h>
 #include <esp_random.h>
+#include <freertos/FreeRTOS.h>
+#include <freertos/task.h>
+#include <nvs.h>
 #include <mbedtls/base64.h>
 #include <mbedtls/pk.h>
 #include <mbedtls/sha256.h>
@@ -22,6 +25,7 @@
 #include <algorithm>
 #include <array>
 #include <atomic>
+#include <cmath>
 #include <cstring>
 #include <mutex>
 
@@ -161,18 +165,41 @@ esp_err_t health(httpd_req_t* request) {
     const bool sta = WiFi.status() == WL_CONNECTED;
     const auto* running = esp_ota_get_running_partition();
     const auto staIp = sta ? WiFi.localIP().toString() : String();
+    const auto res = sampleSystemResources();
     char rssi[12]{};
     if (sta) snprintf(rssi, sizeof(rssi), "%d", WiFi.RSSI());
     else strcpy(rssi, "null");
+    char cpuPct[12]{}, cpu0Pct[12]{}, cpu1Pct[12]{};
+    if (res.cpuValid) {
+        snprintf(cpuPct, sizeof(cpuPct), "%.1f", res.cpuPct);
+        snprintf(cpu0Pct, sizeof(cpu0Pct), "%.1f", res.cpu0Pct);
+        snprintf(cpu1Pct, sizeof(cpu1Pct), "%.1f", res.cpu1Pct);
+    } else {
+        strcpy(cpuPct, "null");
+        strcpy(cpu0Pct, "null");
+        strcpy(cpu1Pct, "null");
+    }
 
-    char response[660]{};
+    char response[1280]{};
     snprintf(response, sizeof(response),
              "{\"firmware\":\"%s\",\"mode\":\"SHADOW\",\"uptime_ms\":%lu,\"reset_reason\":%d,"
-             "\"heap\":%u,\"min_heap\":%u,\"psram\":%u,\"sta_connected\":%s,\"ip\":\"%s\","
+             "\"heap\":%u,\"heap_total\":%u,\"min_heap\":%u,\"heap_max_alloc\":%u,\"heap_used_pct\":%.1f,"
+             "\"psram\":%u,\"psram_free\":%u,\"psram_min\":%u,\"psram_used_pct\":%.1f,"
+             "\"cpu_pct\":%s,\"cpu0_pct\":%s,\"cpu1_pct\":%s,\"cpu_mhz\":%u,"
+             "\"task_count\":%u,\"min_task_stack_free_b\":%u,"
+             "\"nvs_used_entries\":%u,\"nvs_free_entries\":%u,\"nvs_total_entries\":%u,\"nvs_used_pct\":%.1f,"
+             "\"flash_size\":%u,\"sketch_size\":%u,\"sketch_free\":%u,"
+             "\"sta_connected\":%s,\"ip\":\"%s\","
              "\"rssi_dbm\":%s,\"ota_slot\":\"%s\",\"ota_state\":\"%s\","
              "\"aux1\":\"%s\",\"executed\":false,\"modbus_write_count\":0}",
              V51_BUILD_ID, static_cast<unsigned long>(millis()), int(esp_reset_reason()),
-             ESP.getFreeHeap(), ESP.getMinFreeHeap(), ESP.getPsramSize(), sta ? "true" : "false",
+             res.heapFree, res.heapTotal, res.heapMin, res.heapMaxAlloc, res.heapUsedPct,
+             res.psramTotal, res.psramFree, res.psramMin, res.psramUsedPct,
+             cpuPct, cpu0Pct, cpu1Pct, res.cpuMhz,
+             res.taskCount, res.minTaskStackFreeB,
+             res.nvsUsedEntries, res.nvsFreeEntries, res.nvsTotalEntries, res.nvsUsedPct,
+             res.flashSize, res.sketchSize, res.sketchFree,
+             sta ? "true" : "false",
              staIp.c_str(), rssi, running ? running->label : "unknown", imageState(bootState.load()), auxOn()?"ON":"OFF");
     httpd_resp_set_type(request, "application/json");
     httpd_resp_set_hdr(request, "Cache-Control", "no-store");
@@ -543,9 +570,112 @@ void tickRemote(bool healthy) {
         delay(250);
         ESP.restart();
     }
-    if (server) manageWifi(millis());
+    static uint32_t lastResourceSample = 0;
+    const uint32_t now = millis();
+    if (now - lastResourceSample >= 5000) {
+        lastResourceSample = now;
+        sampleSystemResources();
+    }
+    if (server) manageWifi(now);
     if (server) serviceClock(online);
-    verifyBoot(millis(), healthy);
+    verifyBoot(now, healthy);
+}
+
+SystemResources sampleSystemResources() {
+    static std::mutex resMutex;
+    static bool hasBaseline = false;
+    static uint32_t lastSampleMs = 0;
+    static uint32_t prevTotal = 0;
+    static uint32_t prevIdle0 = 0;
+    static uint32_t prevIdle1 = 0;
+    static SystemResources cached{};
+
+    const std::lock_guard lock(resMutex);
+    const uint32_t nowMs = millis();
+    if (hasBaseline && (nowMs - lastSampleMs) < 2000 && cached.heapTotal > 0) {
+        return cached;
+    }
+
+    SystemResources out = cached;
+    out.cpuMhz = ESP.getCpuFreqMHz();
+    out.heapTotal = ESP.getHeapSize();
+    out.heapFree = ESP.getFreeHeap();
+    out.heapMin = ESP.getMinFreeHeap();
+    out.heapMaxAlloc = ESP.getMaxAllocHeap();
+    out.heapUsedPct = out.heapTotal ? std::roundf(1000.0f * float(out.heapTotal - out.heapFree) / float(out.heapTotal)) / 10.0f : 0.0f;
+    out.psramTotal = ESP.getPsramSize();
+    out.psramFree = ESP.getFreePsram();
+    out.psramMin = ESP.getMinFreePsram();
+    out.psramUsedPct = out.psramTotal ? std::roundf(1000.0f * float(out.psramTotal - out.psramFree) / float(out.psramTotal)) / 10.0f : 0.0f;
+    out.flashSize = ESP.getFlashChipSize();
+    out.sketchSize = ESP.getSketchSize();
+    out.sketchFree = ESP.getFreeSketchSpace();
+
+    nvs_stats_t nvsStats{};
+    if (nvs_get_stats(nullptr, &nvsStats) == ESP_OK) {
+        out.nvsUsedEntries = static_cast<uint32_t>(nvsStats.used_entries);
+        out.nvsFreeEntries = static_cast<uint32_t>(nvsStats.free_entries);
+        out.nvsTotalEntries = static_cast<uint32_t>(nvsStats.total_entries);
+        out.nvsUsedPct = out.nvsTotalEntries
+            ? std::roundf(1000.0f * float(out.nvsUsedEntries) / float(out.nvsTotalEntries)) / 10.0f
+            : 0.0f;
+    }
+
+    TaskStatus_t tasks[24]{};
+    uint32_t totalRunTime = 0;
+    const UBaseType_t count = uxTaskGetSystemState(tasks, sizeof(tasks) / sizeof(tasks[0]), &totalRunTime);
+    out.taskCount = static_cast<uint32_t>(count);
+    uint32_t minStack = UINT32_MAX;
+    uint32_t idle0 = 0;
+    uint32_t idle1 = 0;
+    bool found0 = false;
+    bool found1 = false;
+    for (UBaseType_t i = 0; i < count; ++i) {
+        const uint32_t freeStack = static_cast<uint32_t>(tasks[i].usStackHighWaterMark) * sizeof(StackType_t);
+        if (freeStack < minStack) minStack = freeStack;
+        if (strcmp(tasks[i].pcTaskName, "IDLE0") == 0) {
+            idle0 = tasks[i].ulRunTimeCounter;
+            found0 = true;
+        } else if (strcmp(tasks[i].pcTaskName, "IDLE1") == 0) {
+            idle1 = tasks[i].ulRunTimeCounter;
+            found1 = true;
+        }
+    }
+    out.minTaskStackFreeB = (minStack == UINT32_MAX) ? 0 : minStack;
+
+    if (hasBaseline && (nowMs - lastSampleMs) >= 500) {
+        const uint32_t deltaTotal = totalRunTime - prevTotal;
+        if (deltaTotal > 0) {
+            auto coreLoad = [deltaTotal](uint32_t cur, uint32_t prev) -> float {
+                const uint32_t deltaIdle = cur - prev;
+                const float idleFrac = std::min(1.0f, std::max(0.0f, float(deltaIdle) / float(deltaTotal)));
+                return std::roundf(1000.0f * (1.0f - idleFrac)) / 10.0f;
+            };
+            int cores = 0;
+            float sum = 0.0f;
+            if (found0) {
+                out.cpu0Pct = coreLoad(idle0, prevIdle0);
+                sum += out.cpu0Pct;
+                ++cores;
+            }
+            if (found1) {
+                out.cpu1Pct = coreLoad(idle1, prevIdle1);
+                sum += out.cpu1Pct;
+                ++cores;
+            }
+            if (cores > 0) {
+                out.cpuPct = std::roundf(10.0f * (sum / float(cores))) / 10.0f;
+                out.cpuValid = true;
+            }
+        }
+    }
+    prevTotal = totalRunTime;
+    prevIdle0 = idle0;
+    prevIdle1 = idle1;
+    lastSampleMs = nowMs;
+    hasBaseline = true;
+    cached = out;
+    return cached;
 }
 
 void recordLog(const char* message) {

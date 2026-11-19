@@ -138,6 +138,15 @@ int main() {
     assert(dRainy.lower == 0);
     assert(dRainy.recommendedChargeA == 50);
     assert(dRainy.finalWatts == 1800);
+    assert(std::string_view(dRainy.safetyReason) == "NONE");
+
+    // Small cloud drop < deadband (1800 -> 1790W) must NOT emit false POWER_LIMIT warning
+    auto eCloud = sample(25, -1790, 21000);
+    eCloud.batteryVoltage = {52.0, 21000, Quality::Valid};
+    auto dCloud = rainyMgr.tick(eCloud, pred, 1, 21000, &winterDay, std::nullopt, &rainy);
+    assert(dCloud.finalWatts == 1790);
+    assert(std::string_view(dCloud.safetyReason) == "NONE");
+    assert(std::string_view(dCloud.reason) == "CAPTURE_CHARGE_FIRST");
 
     // Night cloud/load during rainy ChargeFirst: zero discharge, protects state
     auto eNight = sample(25, 500, 25000);

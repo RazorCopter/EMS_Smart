@@ -493,7 +493,8 @@ private:
                 : std::clamp(selected, *priorW_ - step, *priorW_ + step);
         }
         d.finalWatts = std::clamp(selected, *d.lower, *d.upper);
-        if (selected != *d.finalWatts && d.safetyReason == std::string_view("NONE")) d.safetyReason = "POWER_LIMIT";
+        if (!keepCustomReason && selected != *d.finalWatts && d.safetyReason == std::string_view("NONE"))
+            d.safetyReason = "POWER_LIMIT";
 
         if (!keepCustomReason || d.unreachable) {
             const bool charging = d.strategy != Strategy::SelfUse;

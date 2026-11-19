@@ -6,7 +6,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class CollectorSettings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
-    database_url: str = "postgresql+asyncpg://afore_companion:afore_companion@postgres-timescaledb:5432/afore_companion"
+    database_url: str = "postgresql+asyncpg://afore_companion:afore_companion@timescaledb:5432/afore_companion"
     device_id: str = "afore-ems"
 
     mqtt_enabled: bool = True

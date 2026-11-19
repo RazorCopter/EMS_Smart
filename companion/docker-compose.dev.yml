@@ -7,12 +7,12 @@ services:
     volumes:
       - ./deploy/docker/mosquitto-dev.conf:/mosquitto/config/mosquitto.conf:ro
     networks:
-      - companion-internal
+      - internal
 
-  postgres-timescaledb:
+  timescaledb:
     ports:
       - "15432:5432"
 
-  companion-api:
+  api:
     ports:
       - "18000:8000"

@@ -13,7 +13,7 @@ cp .env.example .env
 # Impostare le password reali in .env
 docker compose up -d --build
 docker compose ps
-docker compose logs -f companion-collector companion-api
+docker compose logs -f collector api
 ```
 
 ## Healthcheck & Monitoraggio

@@ -9,7 +9,7 @@ class ApiSettings(BaseSettings):
     companion_version: str = "0.1.0"
     companion_timezone: str = "Europe/Rome"
     companion_locale: str = "it-IT"
-    database_url: str = "postgresql+asyncpg://afore_companion:afore_companion@postgres-timescaledb:5432/afore_companion"
+    database_url: str = "postgresql+asyncpg://afore_companion:afore_companion@timescaledb:5432/afore_companion"
     device_id: str = "afore-ems"
 
     companion_secret_key: str = "dev-only-override-in-env"

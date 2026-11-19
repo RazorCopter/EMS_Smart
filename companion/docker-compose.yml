@@ -7,7 +7,7 @@ x-logging: &default-logging
     max-file: "5"
 
 services:
-  postgres-timescaledb:
+  timescaledb:
     image: timescale/timescaledb:2.17.2-pg16
     restart: unless-stopped
     environment:
@@ -23,37 +23,17 @@ services:
       timeout: 5s
       retries: 10
     networks:
-      - companion-internal
+      - internal
     logging: *default-logging
 
-  companion-migrate:
-    build:
-      context: .
-      dockerfile: deploy/docker/Dockerfile.api
-    restart: "no"
-    working_dir: /app/database
-    command: ["alembic", "upgrade", "head"]
-    environment:
-      TZ: ${TZ:-Europe/Rome}
-      ALEMBIC_DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-afore_companion}:${POSTGRES_PASSWORD}@postgres-timescaledb:5432/${POSTGRES_DB:-afore_companion}
-      RETENTION_RAW_MQTT_DAYS: ${RETENTION_RAW_MQTT_DAYS:-30}
-      RETENTION_TELEMETRY_DAYS: ${RETENTION_TELEMETRY_DAYS:-90}
-      RETENTION_AGG_1M_DAYS: ${RETENTION_AGG_1M_DAYS:-730}
-    depends_on:
-      postgres-timescaledb:
-        condition: service_healthy
-    networks:
-      - companion-internal
-    logging: *default-logging
-
-  companion-collector:
+  collector:
     build:
       context: .
       dockerfile: deploy/docker/Dockerfile.collector
     restart: unless-stopped
     environment:
       TZ: ${TZ:-Europe/Rome}
-      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-afore_companion}:${POSTGRES_PASSWORD}@postgres-timescaledb:5432/${POSTGRES_DB:-afore_companion}
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-afore_companion}:${POSTGRES_PASSWORD}@timescaledb:5432/${POSTGRES_DB:-afore_companion}
       MQTT_ENABLED: ${MQTT_ENABLED:-true}
       MQTT_HOST: ${MQTT_HOST:-10.0.10.10}
       MQTT_PORT: ${MQTT_PORT:-1883}
@@ -73,15 +53,15 @@ services:
       POWER_DEADBAND_W: ${POWER_DEADBAND_W:-20}
       BATTERY_NOMINAL_V: ${BATTERY_NOMINAL_V:-51.2}
     depends_on:
-      postgres-timescaledb:
+      timescaledb:
         condition: service_healthy
-      companion-migrate:
-        condition: service_completed_successfully
+      api:
+        condition: service_healthy
     networks:
-      - companion-internal
+      - internal
     logging: *default-logging
 
-  companion-api:
+  api:
     build:
       context: .
       dockerfile: deploy/docker/Dockerfile.api
@@ -91,7 +71,8 @@ services:
       COMPANION_TIMEZONE: ${COMPANION_TIMEZONE:-Europe/Rome}
       COMPANION_LOCALE: ${COMPANION_LOCALE:-it-IT}
       COMPANION_VERSION: ${COMPANION_VERSION:-0.1.0}
-      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-afore_companion}:${POSTGRES_PASSWORD}@postgres-timescaledb:5432/${POSTGRES_DB:-afore_companion}
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-afore_companion}:${POSTGRES_PASSWORD}@timescaledb:5432/${POSTGRES_DB:-afore_companion}
+      ALEMBIC_DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-afore_companion}:${POSTGRES_PASSWORD}@timescaledb:5432/${POSTGRES_DB:-afore_companion}
       COMPANION_SECRET_KEY: ${COMPANION_SECRET_KEY:?COMPANION_SECRET_KEY required}
       COMPANION_SESSION_TTL_HOURS: ${COMPANION_SESSION_TTL_HOURS:-24}
       COMPANION_COOKIE_SECURE: ${COMPANION_COOKIE_SECURE:-false}
@@ -117,21 +98,19 @@ services:
       BATTERY_CAPACITY_WH: ${BATTERY_CAPACITY_WH:-10240}
       BATTERY_NOMINAL_V: ${BATTERY_NOMINAL_V:-51.2}
     depends_on:
-      postgres-timescaledb:
+      timescaledb:
         condition: service_healthy
-      companion-migrate:
-        condition: service_completed_successfully
     networks:
-      - companion-internal
+      - internal
     logging: *default-logging
 
-  companion-web:
+  web:
     build:
       context: .
       dockerfile: deploy/docker/Dockerfile.web
     restart: unless-stopped
     networks:
-      - companion-internal
+      - internal
     logging: *default-logging
 
   reverse-proxy:
@@ -147,12 +126,12 @@ services:
       timeout: 5s
       retries: 3
     depends_on:
-      companion-api:
+      api:
         condition: service_healthy
-      companion-web:
+      web:
         condition: service_healthy
     networks:
-      - companion-internal
+      - internal
     logging: *default-logging
 
   backup:
@@ -162,7 +141,7 @@ services:
     restart: unless-stopped
     environment:
       TZ: ${TZ:-Europe/Rome}
-      PGHOST: postgres-timescaledb
+      PGHOST: timescaledb
       POSTGRES_DB: ${POSTGRES_DB:-afore_companion}
       POSTGRES_USER: ${POSTGRES_USER:-afore_companion}
       PGPASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD required}
@@ -171,12 +150,12 @@ services:
     volumes:
       - backups:/backups
     depends_on:
-      postgres-timescaledb:
+      timescaledb:
         condition: service_healthy
-      companion-migrate:
-        condition: service_completed_successfully
+      api:
+        condition: service_healthy
     networks:
-      - companion-internal
+      - internal
     logging: *default-logging
 
 volumes:
@@ -184,5 +163,5 @@ volumes:
   backups:
 
 networks:
-  companion-internal:
+  internal:
     driver: bridge

@@ -9,11 +9,10 @@ Companion container premium, **strettamente in sola lettura (SHADOW)**, per moni
 
 | Servizio | Ruolo | Porta interna / esposta |
 |---|---|---|
-| `postgres-timescaledb` | PostgreSQL 16 + TimescaleDB (hypertable, continuous aggregates, retention, compressione) | `5432` (interna) |
-| `companion-migrate` | Migrazione Alembic idempotente all'avvio | one-shot |
-| `companion-collector` | Ingestione asincrona MQTT (`aiomqtt`) + backfill/diagnostica REST ESP32 (sola lettura) + `NOTIFY afore_live` | `9101` (`/healthz`, `/metrics`) |
-| `companion-api` | FastAPI + Pydantic v2 + SQLAlchemy 2 + WebSocket/SSE live + export CSV/JSON/PDF | `8000` (interna) |
-| `companion-web` | React 18 + TypeScript strict + Vite + TanStack Query + Apache ECharts | `80` (interna) |
+| `timescaledb` | PostgreSQL 16 + TimescaleDB (hypertable, continuous aggregates, retention, compressione) | `5432` (interna) |
+| `collector` | Ingestione asincrona MQTT (`aiomqtt`) + backfill/diagnostica REST ESP32 (sola lettura) + `NOTIFY afore_live` | `9101` (`/healthz`, `/metrics`) |
+| `api` | Migrazione Alembic automatica all'avvio + FastAPI + Pydantic v2 + SQLAlchemy 2 + WebSocket/SSE live + export CSV/JSON/PDF | `8000` (interna) |
+| `web` | React 18 + TypeScript strict + Vite + TanStack Query + Apache ECharts | `80` (interna) |
 | `reverse-proxy` | Nginx proxy HTTP + WebSocket/SSE + gzip + static cache | `${COMPANION_HTTP_PORT:-8080}` |
 | `backup` | Backup giornaliero `pg_dump` compresso con retention 7–14 giorni | — |
 

@@ -29,7 +29,8 @@ COPY database/migrations ./database/migrations
 USER companion
 EXPOSE 8000
 
-HEALTHCHECK --interval=15s --timeout=5s --start-period=20s --retries=5 \
+HEALTHCHECK --interval=15s --timeout=5s --start-period=30s --retries=5 \
   CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/v1/health', timeout=3)"
 
-CMD ["uvicorn", "companion_api.main:app", "--host", "0.0.0.0", "--port", "8000", "--proxy-headers"]
+# Run idempotent schema migrations before starting uvicorn so no stopped init container remains in Portainer
+CMD ["sh", "-c", "cd /app/database && alembic upgrade head && cd /app && exec uvicorn companion_api.main:app --host 0.0.0.0 --port 8000 --proxy-headers"]

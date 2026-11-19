@@ -9,20 +9,20 @@
 ## Backup manuale on-demand
 
 ```bash
-docker compose exec -T backup sh -c 'pg_dump -h postgres-timescaledb -U "$POSTGRES_USER" -d "$POSTGRES_DB" --no-owner --no-acl | gzip -9' > manual_backup.sql.gz
+docker compose exec -T backup sh -c 'pg_dump -h timescaledb -U "$POSTGRES_USER" -d "$POSTGRES_DB" --no-owner --no-acl | gzip -9' > manual_backup.sql.gz
 ```
 
 ## Restore completo
 
-1. Arrestare `companion-collector` e `companion-api`:
+1. Arrestare `collector` e `api`:
    ```bash
-   docker compose stop companion-collector companion-api
+   docker compose stop collector api
    ```
 2. Ripristinare il database (in un DB pulito o ricreato):
    ```bash
-   gunzip -c afore_companion_YYYYMMDD-HHMMSS.sql.gz | docker compose exec -T postgres-timescaledb psql -U afore_companion -d afore_companion
+   gunzip -c afore_companion_YYYYMMDD-HHMMSS.sql.gz | docker compose exec -T timescaledb psql -U afore_companion -d afore_companion
    ```
 3. Riavviare i servizi:
    ```bash
-   docker compose start companion-api companion-collector
+   docker compose start api collector
    ```

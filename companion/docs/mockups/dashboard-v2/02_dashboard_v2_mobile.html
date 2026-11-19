@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Mockup v2 · Dashboard Live Mobile · Afore EMS Companion</title>
+<style>
+  :root {
+    --bg-canvas: #091011;
+    --bg-sidebar: #0d1618;
+    --bg-surface: #111d1f;
+    --bg-inset: #0b1416;
+    --border-subtle: #1f3134;
+    --text-primary: #eef5f3;
+    --text-secondary: #98b0ad;
+    --text-muted: #6e8683;
+    --accent-teal: #2dd4bf;
+    --pv-color: #f5b942;
+    --home-color: #a78bfa;
+    --battery-color: #34d399;
+    --grid-color: #60a5fa;
+    --shadow-blue: #38bdf8;
+    --safety-amber: #f59e0b;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg-canvas);
+    color: var(--text-primary);
+    font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    font-size: 13.5px;
+    font-variant-numeric: tabular-nums;
+    width: 390px;
+  }
+  .mhead {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 10px 14px; background: var(--bg-sidebar); border-bottom: 1px solid var(--border-subtle);
+  }
+  .wrap { padding: 12px 12px 76px; display: flex; flex-direction: column; gap: 12px; }
+  .card { background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: 14px; padding: 12px; }
+  .chip { padding: 3px 9px; border-radius: 999px; font-size: 11px; font-weight: 650; border: 1px solid rgba(56,189,248,0.35); color: var(--shadow-blue); background: rgba(56,189,248,0.12); }
+  .kpi2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .mini { background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: 12px; padding: 10px 11px; }
+  .val { font-size: 20px; font-weight: 750; letter-spacing: -0.02em; }
+  .bnav {
+    position: fixed; bottom: 0; left: 0; width: 390px;
+    display: grid; grid-template-columns: repeat(5, 1fr);
+    background: var(--bg-sidebar); border-top: 1px solid var(--border-subtle); padding: 7px 4px; text-align: center; font-size: 11px; color: var(--text-secondary);
+  }
+  .bnav .active { color: var(--accent-teal); font-weight: 700; }
+</style>
+</head>
+<body>
+  <header class="mhead">
+    <strong>Afore EMS · Live</strong>
+    <span class="chip">SHADOW · 2 s fa</span>
+  </header>
+
+  <div class="wrap">
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <div>
+        <h1 style="margin:0;font-size:18px">Dashboard Live</h1>
+        <div style="font-size:11.5px;color:var(--text-secondary)">Copertura 99,8% · Da oggi 10:29</div>
+      </div>
+    </div>
+
+    <!-- Mobile Radial Energy Monitor -->
+    <article class="card">
+      <svg viewBox="0 0 340 286" width="100%" style="display:block;">
+        <circle cx="170" cy="142" r="82" fill="none" stroke="#1f3134" stroke-dasharray="4 5" />
+        <path d="M170 68 L170 116" stroke="#f5b942" stroke-width="3.2" />
+        <path d="M98 142 L134 142" stroke="#60a5fa" stroke-width="3" />
+        <path d="M206 142 L242 142" stroke="#a78bfa" stroke-width="3.2" stroke-dasharray="5 4" />
+        <path d="M170 168 L170 206" stroke="#34d399" stroke-width="2.6" />
+
+        <!-- PV -->
+        <g transform="translate(88,4)">
+          <rect width="164" height="64" rx="13" fill="#0b1416" stroke="#f5b942" stroke-width="1.5"/>
+          <text x="12" y="21" fill="#98b0ad" font-size="11" font-weight="650">Fotovoltaico</text>
+          <text x="12" y="45" fill="#f5b942" font-size="19" font-weight="750">1,48 kW</text>
+          <text x="150" y="45" text-anchor="end" fill="#98b0ad" font-size="10.5">Produzione</text>
+        </g>
+
+        <!-- Rete -->
+        <g transform="translate(0,104)">
+          <rect width="102" height="76" rx="13" fill="#0b1416" stroke="#60a5fa" stroke-width="1.5"/>
+          <text x="10" y="21" fill="#98b0ad" font-size="11" font-weight="650">Rete</text>
+          <text x="10" y="44" fill="#60a5fa" font-size="16" font-weight="750">+0,29 kW</text>
+          <text x="10" y="62" fill="#98b0ad" font-size="10">→ Prelievo</text>
+        </g>
+
+        <!-- Hub -->
+        <g transform="translate(134,116)">
+          <rect width="72" height="52" rx="14" fill="#162528" stroke="#2dd4bf" stroke-width="1.8"/>
+          <text x="36" y="30" text-anchor="middle" fill="#eef5f3" font-size="12.5" font-weight="750">Afore</text>
+        </g>
+
+        <!-- Casa -->
+        <g transform="translate(238,104)">
+          <rect width="102" height="76" rx="13" fill="#0b1416" stroke="#a78bfa" stroke-width="1.5" stroke-dasharray="5 3"/>
+          <text x="10" y="21" fill="#98b0ad" font-size="11" font-weight="650">Casa</text>
+          <text x="10" y="44" fill="#a78bfa" font-size="16" font-weight="750">1,34 kW</text>
+          <text x="10" y="62" fill="#98b0ad" font-size="10">← Consumo</text>
+        </g>
+
+        <!-- Batteria -->
+        <g transform="translate(45,206)">
+          <rect width="250" height="74" rx="14" fill="#0b1416" stroke="#34d399" stroke-width="1.5"/>
+          <text x="12" y="22" fill="#98b0ad" font-size="11" font-weight="650">Batteria · Carica ↑</text>
+          <text x="12" y="45" fill="#34d399" font-size="18" font-weight="750">+0,43 kW</text>
+          <text x="236" y="42" text-anchor="end" fill="#34d399" font-size="20" font-weight="800">24%</text>
+          <rect x="12" y="54" width="224" height="8" rx="4" fill="#111d1f" />
+          <rect x="12" y="54" width="54" height="8" rx="4" fill="#34d399" />
+        </g>
+      </svg>
+    </article>
+
+    <!-- Decision Card -->
+    <article class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <strong>Decisione EMS · #11983</strong>
+        <span class="chip">SHADOW</span>
+      </div>
+      <div style="background:rgba(56,189,248,0.12);border:1px solid rgba(56,189,248,0.3);border-radius:8px;padding:7px 9px;font-size:11.5px;margin-bottom:8px">
+        <strong style="color:var(--shadow-blue)">SHADOW – decisioni simulate</strong> · Nessun comando applicato
+      </div>
+      <div style="font-weight:650;font-size:13px;color:var(--safety-amber)">Riserva SOC raggiunta: scarica bloccata</div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:8px">
+        <div class="mini"><div style="font-size:10px;color:var(--text-muted)">Candidato</div><strong>434 W</strong></div>
+        <div class="mini"><div style="font-size:10px;color:var(--text-muted)">Safety</div><strong>434 W</strong></div>
+        <div class="mini"><div style="font-size:10px;color:var(--text-muted)">Simulato</div><strong style="color:var(--accent-teal)">427 W</strong></div>
+      </div>
+    </article>
+
+    <!-- Primary + Secondary KPIs 2 per row -->
+    <section class="kpi2">
+      <article class="mini"><div style="font-size:11px;color:var(--text-secondary)">Autoconsumo</div><div class="val" style="color:var(--pv-color)">99,8%</div><div style="height:6px;background:#1f3134;border-radius:99px;margin-top:6px"><div style="width:99%;height:100%;background:var(--pv-color);border-radius:99px"></div></div></article>
+      <article class="mini"><div style="font-size:11px;color:var(--text-secondary)">Autosufficienza</div><div class="val" style="color:var(--accent-teal)">28,1%</div><div style="height:6px;background:#1f3134;border-radius:99px;margin-top:6px"><div style="width:28%;height:100%;background:var(--accent-teal);border-radius:99px"></div></div></article>
+      <article class="mini"><div style="font-size:11px;color:var(--text-secondary)">FV oggi</div><div class="val" style="color:var(--pv-color)">0,16 kWh</div><div style="font-size:10.5px;color:var(--text-muted)">Da domani vs ieri</div></article>
+      <article class="mini"><div style="font-size:11px;color:var(--text-secondary)">Casa oggi</div><div class="val" style="color:var(--home-color)">0,20 kWh</div><div style="font-size:10.5px;color:var(--text-muted)">Da domani vs ieri</div></article>
+    </section>
+
+    <article class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+        <strong>Ultime 6 ore</strong>
+        <span style="font-size:11px;color:var(--accent-teal)">1h · 3h · [6h] · 12h</span>
+      </div>
+      <svg viewBox="0 0 320 120" width="100%" height="120">
+        <line x1="8" y1="100" x2="312" y2="100" stroke="#1f3134"/>
+        <path d="M190 88 Q230 70 265 40 T310 26" fill="none" stroke="#f5b942" stroke-width="2"/>
+        <path d="M190 78 Q240 72 310 66" fill="none" stroke="#a78bfa" stroke-width="1.8"/>
+      </svg>
+    </article>
+  </div>
+
+  <nav class="bnav">
+    <span class="active">Live</span><span>Storico</span><span>Decisioni</span><span>SEM</span><span>Altro</span>
+  </nav>
+</body>
+</html>

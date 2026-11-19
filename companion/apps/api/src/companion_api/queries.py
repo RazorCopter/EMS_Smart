@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
+import re
 from typing import Any
 from zoneinfo import ZoneInfo
 
@@ -44,6 +45,14 @@ def resolve_window(
     local_now = now.astimezone(tz)
     today_start = local_now.replace(hour=0, minute=0, second=0, microsecond=0).astimezone(timezone.utc)
 
+    if range_name == "1h":
+        return now - timedelta(hours=1), now, "1m"
+    if range_name == "3h":
+        return now - timedelta(hours=3), now, "1m"
+    if range_name == "6h":
+        return now - timedelta(hours=6), now, "5m"
+    if range_name == "12h":
+        return now - timedelta(hours=12), now, "5m"
     if range_name == "today":
         return today_start, now, "1m"
     if range_name == "yesterday":
@@ -296,6 +305,187 @@ async def query_hourly_sparklines(
     ]
 
 
+_GAP_RECORDS_RE = re.compile(r"\((\d+)\s+record\)", re.IGNORECASE)
+
+_GROUP_LABELS: dict[tuple[str, str], tuple[str, str]] = {
+    ("SOC_LIMIT", "single"): ("Riserva SOC raggiunta", "Scarica bloccata dal vincolo minimo SOC"),
+    ("SOC_LIMIT", "plural"): ("Riserva SOC intervenuta {n} volte", "Scarica bloccata al limite minimo SOC"),
+    ("POWER_LIMIT", "single"): ("Limite di potenza applicato", "Vincolo Safety di potenza attiva"),
+    ("POWER_LIMIT", "plural"): ("Limite potenza applicato {n} volte", "Setpoint limitato dai vincoli Safety"),
+    ("TELEMETRY_STALE", "single"): ("Telemetria non aggiornata", "Campioni oltre la soglia di freschezza"),
+    ("TELEMETRY_STALE", "plural"): ("Telemetria non aggiornata {n} volte", "Interruzioni temporanee aggiornamento"),
+    ("ESP_REBOOT", "single"): ("Riavvio ESP32 rilevato", "Nuova sessione di avvio del controllore"),
+    ("ESP_REBOOT", "plural"): ("Riavvii ESP32 rilevati ({n})", "Più riavvii nella finestra recente"),
+}
+
+
+def is_legacy_stride_gap(event_type: str, title: str | None, detail: str | None) -> bool:
+    """Identify pre-fix MQTT 5s stride DECISION_GAP rows without deleting history."""
+    if event_type != "DECISION_GAP":
+        return False
+    m = _GAP_RECORDS_RE.search(title or "")
+    if m and int(m.group(1)) <= 250:
+        return True
+    return False
+
+
+def group_dashboard_events(events: list[EmsEvent], *, limit: int = 3) -> tuple[list[dict[str, Any]], int]:
+    """Group repetitive dashboard events into concise human summaries (max `limit`)."""
+    legacy_excluded = 0
+    buckets: dict[str, dict[str, Any]] = {}
+    order: list[str] = []
+
+    for ev in events:
+        if is_legacy_stride_gap(ev.event_type, ev.title, ev.detail):
+            legacy_excluded += 1
+            continue
+
+        if ev.event_type in {"SOC_LIMIT", "POWER_LIMIT", "TELEMETRY_STALE", "ESP_REBOOT"}:
+            key = ev.event_type
+        elif ev.event_type in {"MQTT_ONLINE", "MQTT_OFFLINE"}:
+            key = f"MQTT:{ev.event_type}"
+        elif ev.event_type in {"HA_ONLINE", "HA_OFFLINE"}:
+            key = f"HA:{ev.event_type}"
+        else:
+            key = f"{ev.event_type}:{ev.title}"
+
+        if key not in buckets:
+            buckets[key] = {
+                "key": key,
+                "id": ev.id,
+                "event_type": ev.event_type,
+                "severity": ev.severity,
+                "raw_title": ev.title,
+                "detail": ev.detail,
+                "latest_at": ev.occurred_at.isoformat(),
+                "count": 1,
+            }
+            order.append(key)
+        else:
+            buckets[key]["count"] += 1
+
+    grouped: list[dict[str, Any]] = []
+    for key in order[:limit]:
+        item = buckets[key]
+        cnt = item["count"]
+        et = item["event_type"]
+        if (et, "plural" if cnt > 1 else "single") in _GROUP_LABELS:
+            tpl_title, fallback_detail = _GROUP_LABELS[(et, "plural" if cnt > 1 else "single")]
+            title = tpl_title.format(n=cnt)
+            detail = fallback_detail if cnt > 1 else (item["detail"] or fallback_detail)
+        else:
+            title = f"{item['raw_title']} ({cnt} volte)" if cnt > 1 else item["raw_title"]
+            detail = item["detail"]
+        grouped.append(
+            {
+                "key": key,
+                "id": item["id"],
+                "event_type": et,
+                "severity": item["severity"],
+                "title": title,
+                "detail": detail,
+                "count": cnt,
+                "occurred_at": item["latest_at"],
+            }
+        )
+    return grouped, legacy_excluded
+
+
+async def query_coverage_summary(
+    session: AsyncSession,
+    device_id: str,
+    today_start: datetime,
+    now: datetime,
+    kpi_today: dict[str, Any],
+) -> dict[str, Any]:
+    """Compute telemetry coverage strictly since monitoring started, distinguishing pre-install time."""
+    first_tel_ts = (
+        await session.execute(
+            select(func.min(TelemetrySample.source_timestamp)).where(TelemetrySample.device_id == device_id)
+        )
+    ).scalar_one_or_none()
+    if first_tel_ts is None:
+        first_tel_ts = (
+            await session.execute(
+                select(func.min(EnergySample.bucket_start)).where(EnergySample.device_id == device_id)
+            )
+        ).scalar_one_or_none()
+
+    today_stats = (
+        await session.execute(
+            text(
+                """
+                SELECT
+                    MIN(source_timestamp) AS first_today_ts,
+                    MAX(source_timestamp) AS last_today_ts,
+                    COUNT(*) AS total_samples,
+                    COUNT(*) FILTER (
+                        WHERE telemetry_valid IS FALSE
+                           OR pv_w IS NULL
+                           OR grid_w IS NULL
+                           OR soc IS NULL
+                    ) AS invalid_samples
+                FROM telemetry_samples
+                WHERE device_id = :dev AND source_timestamp >= :s AND source_timestamp <= :e
+                """
+            ),
+            {"dev": device_id, "s": today_start, "e": now},
+        )
+    ).one()
+
+    valid_s = float(kpi_today.get("valid_seconds") or 0.0)
+    explicit_gap_s = float(kpi_today.get("gap_seconds") or 0.0)
+    last_today_ts = today_stats.last_today_ts
+    unavailable_s = 0.0
+    if last_today_ts is not None:
+        tail_s = (now - last_today_ts).total_seconds()
+        if tail_s > 60.0:
+            unavailable_s = round(tail_s - 60.0, 1)
+
+    if first_tel_ts is None:
+        return {
+            "first_sample_at": None,
+            "effective_monitor_start_at": None,
+            "monitoring_started_today": False,
+            "unmonitored_pre_install_seconds": 0.0,
+            "monitored_window_seconds": 0.0,
+            "valid_seconds": valid_s,
+            "gap_seconds": explicit_gap_s,
+            "invalid_samples": 0,
+            "unavailable_seconds": unavailable_s,
+            "coverage_since_first_sample_pct": None,
+            "states": ["NON MONITORATO"],
+        }
+
+    started_today = first_tel_ts >= today_start
+    effective_start = first_tel_ts if started_today else today_start
+    unmonitored_pre_s = round(max(0.0, (first_tel_ts - today_start).total_seconds()), 1) if started_today else 0.0
+    monitored_window_s = round(max(0.0, (now - effective_start).total_seconds()), 1)
+
+    # Denominator counts only elapsed time after Companion monitoring started (excluding pre-install window)
+    denom_s = max(valid_s + explicit_gap_s + unavailable_s, max(0.0, monitored_window_s - 5.0))
+    cov_pct = round(min(100.0, max(0.0, (valid_s / denom_s) * 100.0)), 1) if denom_s > 0 else None
+
+    return {
+        "first_sample_at": first_tel_ts.isoformat(),
+        "effective_monitor_start_at": effective_start.isoformat(),
+        "monitoring_started_today": started_today,
+        "unmonitored_pre_install_seconds": unmonitored_pre_s,
+        "monitored_window_seconds": monitored_window_s,
+        "valid_seconds": round(valid_s, 1),
+        "gap_seconds": round(explicit_gap_s, 1),
+        "invalid_samples": int(today_stats.invalid_samples or 0),
+        "unavailable_seconds": unavailable_s,
+        "coverage_since_first_sample_pct": cov_pct,
+        "states": {
+            "pre_install": "NON MONITORATO" if started_today else None,
+            "post_install_gap": "GAP" if explicit_gap_s > 0 else None,
+            "invalid": "INVALIDO" if int(today_stats.invalid_samples or 0) > 0 else None,
+            "unavailable": "UNAVAILABLE" if unavailable_s > 0 else None,
+        },
+    }
+
+
 async def get_live_payload(
     session: AsyncSession,
     device_id: str,
@@ -333,17 +523,30 @@ async def get_live_payload(
     yest_s, yest_e, _ = resolve_window("yesterday", tz_name=tz_name, now_utc=now)
     kpi_today = await query_energy_kpi(session, device_id, today_s, today_e, battery_capacity_wh=battery_capacity_wh)
     kpi_yesterday = await query_energy_kpi(session, device_id, yest_s, yest_e, battery_capacity_wh=battery_capacity_wh)
+    coverage = await query_coverage_summary(session, device_id, today_s, now, kpi_today)
+    if coverage["coverage_since_first_sample_pct"] is not None:
+        kpi_today["data_availability_pct"] = coverage["coverage_since_first_sample_pct"]
+
     sparklines = await query_hourly_sparklines(session, device_id, today_s, today_e, tz_name)
 
     sys_status = await get_system_status(session, device_id)
-    recent_events = (
+    window_events = (
         await session.execute(
             select(EmsEvent)
-            .where(EmsEvent.device_id == device_id)
+            .where(EmsEvent.device_id == device_id, EmsEvent.occurred_at >= today_s - timedelta(hours=24))
             .order_by(desc(EmsEvent.occurred_at))
-            .limit(6)
+            .limit(250)
         )
     ).scalars().all()
+    grouped_events, legacy_gaps_excluded = group_dashboard_events(list(window_events), limit=3)
+    coverage["legacy_stride_gaps_excluded"] = legacy_gaps_excluded
+    recent_events = [
+        ev for ev in window_events if not is_legacy_stride_gap(ev.event_type, ev.title, ev.detail)
+    ][:6]
+
+    yesterday_available = bool(
+        (kpi_yesterday.get("valid_seconds") or 0) > 0 and kpi_yesterday.get("pv_kwh") is not None
+    )
 
     return {
         "generated_at": now.isoformat(),
@@ -360,8 +563,14 @@ async def get_live_payload(
         "config": cfg_row.config_json if cfg_row else None,
         "kpi_today": kpi_today,
         "kpi_yesterday": kpi_yesterday,
+        "comparison_yesterday": {
+            "available": yesterday_available,
+            "reason": "available" if yesterday_available else "no_previous_day_data",
+        },
+        "coverage": coverage,
         "sparklines": sparklines,
         "system": sys_status,
+        "grouped_events": grouped_events,
         "recent_events": [
             {
                 "id": e.id,
@@ -893,17 +1102,23 @@ async def query_analytics_report(
         )
     ).one()
 
-    events_rows = (
+    events_all = (
         await session.execute(
-            select(EmsEvent.event_type, func.count().label("cnt"))
+            select(EmsEvent.event_type, EmsEvent.title, EmsEvent.detail)
             .where(
                 EmsEvent.device_id == device_id,
                 EmsEvent.occurred_at >= start,
                 EmsEvent.occurred_at <= end,
             )
-            .group_by(EmsEvent.event_type)
         )
     ).fetchall()
+    event_counts: dict[str, int] = {}
+    legacy_stride_gaps = 0
+    for r in events_all:
+        if is_legacy_stride_gap(r.event_type, r.title, r.detail):
+            legacy_stride_gaps += 1
+            continue
+        event_counts[r.event_type] = event_counts.get(r.event_type, 0) + 1
 
     ha_valid_cnt = int(
         (
@@ -934,7 +1149,6 @@ async def query_analytics_report(
         ).scalar_one()
     )
 
-    event_counts = {r.event_type: int(r.cnt) for r in events_rows}
     return {
         "period": {"start": start.isoformat(), "end": end.isoformat(), "timezone": tz_name},
         "operating_mode": "SHADOW",
@@ -965,6 +1179,7 @@ async def query_analytics_report(
             "ha_stale_inputs": ha_stale_cnt,
             "esp_reboots": event_counts.get("ESP_REBOOT", 0),
             "decision_gaps": event_counts.get("DECISION_GAP", 0),
+            "legacy_stride_gaps": legacy_stride_gaps,
         },
     }
 

@@ -78,22 +78,103 @@ export function strategyLabel(s: string | null | undefined): string {
 
 export function reasonLabel(r: string | null | undefined): string {
   const map: Record<string, string> = {
-    GRID_BALANCE: "Bilanciamento rete",
-    CHARGE_REQUEST: "Richiesta carica",
+    GRID_BALANCE: "Bilanciamento della rete",
+    CHARGE_REQUEST: "Richiesta carica batteria attiva",
     SAFETY_LIMIT: "Limite Safety applicato",
-    SAFETY_RECLAMP: "Riadattamento Safety",
-    DEADBAND_OR_RAMP: "Filtro deadband / rampa",
-    MAINTENANCE_HOLD: "Mantenimento SOC",
-    UNREACHABLE_AT_CURRENT_LIMIT: "Target non raggiungibile",
-    NATIVE_OBSERVATION: "Osservazione inverter nativo",
+    SAFETY_RECLAMP: "Setpoint limitato dai vincoli Safety",
+    DEADBAND_OR_RAMP: "Bilanciamento stabile (deadband/rampa)",
+    MAINTENANCE_HOLD: "Mantenimento carica batteria",
+    UNREACHABLE_AT_CURRENT_LIMIT: "Target SOC non raggiungibile entro i limiti correnti",
+    NATIVE_OBSERVATION: "Gestione nativa inverter",
     SAFE_REQUESTED: "Modalità sicura attiva",
-    SOC_RESERVE: "Riserva SOC raggiunta",
-    SOC_CEILING: "Limite superiore SOC",
-    POWER_LIMIT: "Limite potenza",
-    VOLTAGE_LIMIT: "Limite tensione batteria",
-    STALE_TELEMETRY: "Telemetria scaduta",
+    SOC_RESERVE: "Riserva SOC raggiunta: scarica bloccata",
+    SOC_CEILING: "Limite superiore SOC raggiunto: carica ridotta",
+    POWER_LIMIT: "Limite massimo di potenza applicato",
+    VOLTAGE_LIMIT: "Limite tensione batteria applicato",
+    STALE_TELEMETRY: "Telemetria non aggiornata",
     ESSENTIAL_DATA_UNAVAILABLE: "Dati essenziali non disponibili",
-    NONE: "Nessuna limitazione",
+    NONE: "Nessun vincolo Safety intervenuto",
   };
   return r ? map[r] ?? r : "Non disponibile";
+}
+
+export function humanDecisionDetail(
+  safetyReason: string | null | undefined,
+  reason: string | null | undefined,
+  soc: number | null | undefined,
+  safetyMinW: number | null | undefined,
+  safetyMaxW: number | null | undefined,
+): { title: string; subtitle: string; tone: "normal" | "safety" | "warn" } {
+  const primaryCode = safetyReason && safetyReason !== "NONE" ? safetyReason : reason;
+  const title = reasonLabel(primaryCode);
+  const socTxt = soc != null ? `SOC ${Math.round(soc)}%` : "SOC n.d.";
+
+  if (primaryCode === "SOC_RESERVE") {
+    return {
+      title,
+      subtitle: `${socTxt} al limite minimo di riserva: scarica sospesa, consentita solo eventuale carica da surplus`,
+      tone: "safety",
+    };
+  }
+  if (primaryCode === "SOC_CEILING") {
+    return {
+      title,
+      subtitle: `${socTxt} prossimo al limite massimo configurato: carica ridotta per protezione batteria`,
+      tone: "safety",
+    };
+  }
+  if (primaryCode === "POWER_LIMIT" || primaryCode === "SAFETY_LIMIT" || primaryCode === "SAFETY_RECLAMP") {
+    const bounds =
+      safetyMinW != null && safetyMaxW != null
+        ? ` (${Math.round(safetyMinW)} / ${Math.round(safetyMaxW)} W)`
+        : "";
+    return {
+      title,
+      subtitle: `${socTxt} · Setpoint adattato all'inviluppo di sicurezza${bounds}`,
+      tone: "safety",
+    };
+  }
+  if (primaryCode === "STALE_TELEMETRY" || primaryCode === "ESSENTIAL_DATA_UNAVAILABLE") {
+    return {
+      title,
+      subtitle: "In attesa di campioni freschi e completi dall'inverter prima di simulare nuovi setpoint",
+      tone: "warn",
+    };
+  }
+  if (primaryCode === "NATIVE_OBSERVATION") {
+    return {
+      title,
+      subtitle: "Inverter osservato in gestione nativa; simulazione SHADOW attiva senza interventi",
+      tone: "normal",
+    };
+  }
+  return {
+    title,
+    subtitle: `${socTxt} · Nessun vincolo restrittivo attivo nella valutazione corrente`,
+    tone: "normal",
+  };
+}
+
+export function fmtShortTime(iso: string | null | undefined, tz = "Europe/Rome"): string {
+  if (!iso) return "Non disponibile";
+  try {
+    return new Date(iso).toLocaleTimeString("it-IT", {
+      timeZone: tz,
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  } catch {
+    return iso;
+  }
+}
+
+export function fmtDurationCompact(seconds: number | null | undefined): string {
+  if (seconds == null || !Number.isFinite(seconds)) return "Non disponibile";
+  const s = Math.max(0, Math.round(seconds));
+  if (s < 60) return `${s} s`;
+  const mins = Math.floor(s / 60);
+  if (mins < 60) return `${mins} min`;
+  const hrs = Math.floor(mins / 60);
+  const rem = mins % 60;
+  return rem > 0 ? `${hrs} h ${rem} min` : `${hrs} h`;
 }

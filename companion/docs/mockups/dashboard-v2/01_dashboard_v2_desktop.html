@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Mockup v2 · Dashboard Live Desktop · Afore EMS Companion</title>
+<style>
+  :root {
+    --bg-canvas: #091011;
+    --bg-sidebar: #0d1618;
+    --bg-surface: #111d1f;
+    --bg-elevated: #162528;
+    --bg-inset: #0b1416;
+    --border-subtle: #1f3134;
+    --border-strong: #2d464a;
+    --text-primary: #eef5f3;
+    --text-secondary: #98b0ad;
+    --text-muted: #6e8683;
+    --accent-teal: #2dd4bf;
+    --accent-teal-soft: rgba(45, 212, 191, 0.14);
+    --pv-color: #f5b942;
+    --pv-soft: rgba(245, 185, 66, 0.15);
+    --home-color: #a78bfa;
+    --home-soft: rgba(167, 139, 250, 0.15);
+    --battery-color: #34d399;
+    --battery-soft: rgba(52, 211, 153, 0.15);
+    --grid-color: #60a5fa;
+    --grid-soft: rgba(96, 165, 250, 0.15);
+    --safety-amber: #f59e0b;
+    --safety-soft: rgba(245, 158, 11, 0.16);
+    --shadow-blue: #38bdf8;
+    --shadow-soft: rgba(56, 189, 248, 0.14);
+    --missing-grey: #64748b;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg-canvas);
+    color: var(--text-primary);
+    font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    font-size: 14px;
+    font-variant-numeric: tabular-nums;
+  }
+  .app { display: grid; grid-template-columns: 240px 1fr; min-height: 100vh; }
+  .sidebar {
+    background: var(--bg-sidebar);
+    border-right: 1px solid var(--border-subtle);
+    padding: 18px 14px;
+    display: flex; flex-direction: column; justify-content: space-between;
+  }
+  .brand { display: flex; align-items: center; gap: 10px; padding-bottom: 14px; border-bottom: 1px solid var(--border-subtle); }
+  .brand-mark {
+    width: 36px; height: 36px; border-radius: 10px;
+    background: linear-gradient(145deg, #163d39, #0c2220);
+    border: 1px solid #2d6a62; display: grid; place-items: center;
+  }
+  .nav { display: flex; flex-direction: column; gap: 4px; margin-top: 14px; }
+  .nav-item { padding: 9px 12px; border-radius: 10px; color: var(--text-secondary); font-weight: 500; font-size: 13.5px; }
+  .nav-item.active { background: var(--accent-teal-soft); color: var(--accent-teal); border: 1px solid rgba(45,212,191,0.3); font-weight: 650; }
+  .sidebar-footer { border-top: 1px solid var(--border-subtle); padding-top: 12px; display: flex; flex-direction: column; gap: 8px; }
+  .conn { display: flex; justify-content: space-between; font-size: 12px; color: var(--text-secondary); }
+  .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; background: var(--battery-color); box-shadow: 0 0 8px rgba(52,211,153,0.45); margin-right: 6px; }
+  .shadow-pill { background: var(--shadow-soft); border: 1px solid rgba(56,189,248,0.35); border-radius: 10px; padding: 10px; }
+  .main { padding: 20px 26px 28px; display: flex; flex-direction: column; gap: 16px; max-width: 1440px; }
+  .topbar { display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--border-subtle); padding-bottom: 12px; gap: 12px; }
+  .page-title { font-size: 22px; font-weight: 700; margin: 0; letter-spacing: -0.025em; }
+  .page-sub { font-size: 12.5px; color: var(--text-secondary); margin: 2px 0 0; }
+  .chips { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .chip { padding: 5px 11px; border-radius: 999px; font-size: 12px; font-weight: 600; border: 1px solid var(--border-subtle); background: var(--bg-surface); }
+  .chip.ok { background: var(--battery-soft); color: var(--battery-color); border-color: rgba(52,211,153,0.35); }
+  .chip.cov { background: var(--accent-teal-soft); color: var(--accent-teal); border-color: rgba(45,212,191,0.35); }
+  .chip.shadow { background: var(--shadow-soft); color: var(--shadow-blue); border-color: rgba(56,189,248,0.4); }
+  .hero { display: grid; grid-template-columns: 1.85fr 1fr; gap: 16px; align-items: stretch; }
+  .card { background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: 16px; padding: 16px 18px; position: relative; }
+  .card-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 12px; }
+  .card-title { margin: 0; font-size: 15px; font-weight: 650; }
+  .card-sub { margin: 2px 0 0; font-size: 12px; color: var(--text-muted); }
+  .energy-stage {
+    background: radial-gradient(circle at 50% 50%, rgba(45,212,191,0.08) 0%, rgba(11,20,22,0.95) 68%);
+    border: 1px solid var(--border-subtle);
+    border-radius: 14px;
+    padding: 12px;
+    position: relative;
+  }
+  .popover-mock {
+    position: absolute;
+    right: 22px;
+    bottom: 16px;
+    width: 220px;
+    background: var(--bg-elevated);
+    border: 1px solid var(--accent-teal);
+    border-radius: 12px;
+    padding: 10px 12px;
+    box-shadow: 0 12px 28px rgba(0,0,0,0.48);
+    font-size: 11.5px;
+  }
+  .popover-mock h4 { margin: 0 0 6px; font-size: 12px; color: var(--battery-color); }
+  .pop-row { display: flex; justify-content: space-between; color: var(--text-secondary); padding: 2px 0; }
+  .shadow-banner {
+    background: linear-gradient(90deg, rgba(56,189,248,0.14), rgba(45,212,191,0.08));
+    border: 1px solid rgba(56,189,248,0.38);
+    border-radius: 10px;
+    padding: 10px 12px;
+    margin-bottom: 12px;
+  }
+  .human-reason {
+    background: var(--safety-soft);
+    border: 1px solid rgba(245,158,11,0.35);
+    border-radius: 10px;
+    padding: 10px 12px;
+    margin: 10px 0;
+  }
+  .pipeline-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 10px 0; }
+  .pipe-box { background: var(--bg-inset); border: 1px solid var(--border-subtle); border-radius: 10px; padding: 8px 10px; }
+  .pipe-lbl { font-size: 11px; color: var(--text-muted); }
+  .pipe-val { font-size: 16px; font-weight: 700; margin-top: 2px; }
+  .kv { display: flex; justify-content: space-between; font-size: 12.5px; padding: 7px 0; border-bottom: 1px solid var(--border-subtle); }
+  .kv:last-child { border-bottom: 0; }
+  .kpi-primary-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+  .kpi-big-card { background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: 14px; padding: 15px 17px; display: flex; align-items: center; justify-content: space-between; gap: 14px; }
+  .kpi-compact-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+  .kpi-mini { background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: 12px; padding: 12px 14px; display: flex; flex-direction: column; gap: 7px; }
+  .kpi-num { font-size: 26px; font-weight: 750; letter-spacing: -0.03em; line-height: 1.1; }
+  .kpi-unit { font-size: 13px; font-weight: 500; color: var(--text-secondary); margin-left: 4px; }
+  .badge { font-size: 10.5px; font-weight: 600; padding: 2px 7px; border-radius: 6px; }
+  .badge.m { background: var(--battery-soft); color: var(--battery-color); }
+  .badge.d { background: var(--home-soft); color: var(--home-color); }
+  .coverage-bar {
+    display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;
+    background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: 12px; padding: 10px 16px;
+    font-size: 12px; color: var(--text-secondary);
+  }
+  .cov-seg { display: flex; gap: 6px; align-items: center; }
+  .chart-card { background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: 16px; padding: 14px 18px; }
+  .seg-group { display: inline-flex; background: var(--bg-inset); border: 1px solid var(--border-subtle); border-radius: 9px; padding: 3px; gap: 2px; }
+  .seg { padding: 4px 10px; border-radius: 6px; font-size: 12px; color: var(--text-secondary); }
+  .seg.active { background: var(--accent-teal); color: #06211d; font-weight: 700; }
+  .bottom-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .pill-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+  .sys-pill { background: var(--bg-inset); border: 1px solid var(--border-subtle); border-radius: 10px; padding: 8px 10px; display: flex; align-items: center; justify-content: space-between; font-size: 12px; }
+  .ev-row { display: flex; justify-content: space-between; align-items: center; padding: 9px 10px; border-radius: 10px; background: var(--bg-inset); border: 1px solid var(--border-subtle); }
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar">
+    <div>
+      <div class="brand">
+        <div class="brand-mark">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#2dd4bf" stroke-width="2"><circle cx="12" cy="12" r="4"/><path d="M12 2v3M12 19v3M4.93 4.93l2.12 2.12M16.95 16.95l2.12 2.12M2 12h3M19 12h3"/></svg>
+        </div>
+        <div>
+          <div style="font-weight:700;font-size:15px">Afore EMS</div>
+          <div style="font-size:11px;color:var(--text-muted)">Companion · v0.1.0</div>
+        </div>
+      </div>
+      <nav class="nav">
+        <div class="nav-item active">Dashboard</div>
+        <div class="nav-item">Storico</div>
+        <div class="nav-item">Decisioni</div>
+        <div class="nav-item">Analisi</div>
+        <div class="nav-item">Confronto SEM</div>
+        <div class="nav-item">Batteria</div>
+        <div class="nav-item">Report</div>
+        <div class="nav-item">Impostazioni</div>
+      </nav>
+    </div>
+    <div class="sidebar-footer">
+      <div class="conn"><span><span class="dot"></span>ESP32</span><span>Online</span></div>
+      <div class="conn"><span><span class="dot"></span>MQTT</span><span>Connesso</span></div>
+      <div class="conn"><span><span class="dot"></span>Home Assistant</span><span>Online</span></div>
+      <div class="shadow-pill">
+        <div style="font-size:11px;font-weight:700;color:var(--shadow-blue)">SHADOW · SOLA LETTURA</div>
+        <div style="font-size:11px;color:var(--text-secondary)">Nessun comando all'inverter</div>
+      </div>
+    </div>
+  </aside>
+
+  <main class="main">
+    <header class="topbar">
+      <div>
+        <h1 class="page-title">Dashboard Live</h1>
+        <p class="page-sub">Monitoraggio in tempo reale · 19/11/2026, 11:12:04 · Europe/Rome</p>
+      </div>
+      <div class="chips">
+        <span class="chip ok">● Telemetria live · 2 s fa</span>
+        <span class="chip cov">● Copertura dal primo campione: 99,8% · Da oggi 10:29</span>
+        <span class="chip shadow">Modalità SHADOW</span>
+      </div>
+    </header>
+
+    <!-- HERO 65% / 35% -->
+    <section class="hero">
+      <article class="card">
+        <div class="card-head">
+          <div>
+            <h2 class="card-title">Energy Monitor</h2>
+            <p class="card-sub">Flussi istantanei · Clicca un nodo per i dettagli tecnici</p>
+          </div>
+          <span class="badge m">Deadband ±20 W</span>
+        </div>
+
+        <div class="energy-stage">
+          <svg viewBox="0 0 680 355" width="100%" style="display:block;max-height:340px;">
+            <!-- Subtle orbital ring inspired by OpenEMS clarity -->
+            <circle cx="340" cy="178" r="118" fill="none" stroke="#1f3134" stroke-width="1.5" stroke-dasharray="4 6" />
+            <!-- Flow lines -->
+            <!-- PV -> Hub -->
+            <path d="M340 88 L340 144" stroke="#f5b942" stroke-width="4.2" stroke-linecap="round" />
+            <polygon points="334,136 346,136 340,145" fill="#f5b942" />
+            <!-- Grid -> Hub -->
+            <path d="M174 178 L294 178" stroke="#60a5fa" stroke-width="3.6" stroke-linecap="round" />
+            <polygon points="286,172 286,184 295,178" fill="#60a5fa" />
+            <!-- Hub -> Home (derived dashed discreet) -->
+            <path d="M386 178 L506 178" stroke="#a78bfa" stroke-width="4" stroke-dasharray="6 5" stroke-linecap="round" />
+            <polygon points="498,172 498,184 507,178" fill="#a78bfa" />
+            <!-- Hub -> Battery -->
+            <path d="M340 212 L340 258" stroke="#34d399" stroke-width="2.6" stroke-linecap="round" />
+            <polygon points="334,251 346,251 340,260" fill="#34d399" />
+
+            <!-- Top: Fotovoltaico -->
+            <g transform="translate(230,8)">
+              <rect width="220" height="78" rx="16" fill="#111d1f" stroke="#f5b942" stroke-width="1.7" />
+              <circle cx="32" cy="39" r="16" fill="rgba(245,185,66,0.16)" />
+              <circle cx="32" cy="39" r="6" fill="#f5b942" />
+              <text x="58" y="25" fill="#98b0ad" font-size="11.5" font-weight="650">Fotovoltaico</text>
+              <text x="58" y="49" fill="#f5b942" font-size="22" font-weight="750">1,48 kW</text>
+              <text x="58" y="66" fill="#98b0ad" font-size="11">↓ Produzione attiva</text>
+              <circle cx="202" cy="18" r="7" fill="rgba(52,211,153,0.18)" />
+              <text x="202" y="21" text-anchor="middle" fill="#34d399" font-size="9" font-weight="700">✓</text>
+            </g>
+
+            <!-- Left: Rete -->
+            <g transform="translate(12,135)">
+              <rect width="162" height="86" rx="16" fill="#111d1f" stroke="#60a5fa" stroke-width="1.7" />
+              <text x="16" y="24" fill="#98b0ad" font-size="11.5" font-weight="650">Rete</text>
+              <text x="16" y="50" fill="#60a5fa" font-size="21" font-weight="750">+0,29 kW</text>
+              <text x="16" y="69" fill="#98b0ad" font-size="11">→ Prelievo da rete</text>
+              <circle cx="144" cy="18" r="7" fill="rgba(52,211,153,0.18)" />
+              <text x="144" y="21" text-anchor="middle" fill="#34d399" font-size="9" font-weight="700">✓</text>
+            </g>
+
+            <!-- Right: Casa -->
+            <g transform="translate(506,135)">
+              <rect width="162" height="86" rx="16" fill="#111d1f" stroke="#a78bfa" stroke-width="1.7" stroke-dasharray="5 3" />
+              <text x="16" y="24" fill="#98b0ad" font-size="11.5" font-weight="650">Casa</text>
+              <text x="16" y="50" fill="#a78bfa" font-size="21" font-weight="750">1,34 kW</text>
+              <text x="16" y="69" fill="#98b0ad" font-size="11">← Consumo utenze</text>
+              <circle cx="144" cy="18" r="7" fill="rgba(167,139,250,0.2)" />
+              <text x="144" y="21" text-anchor="middle" fill="#a78bfa" font-size="9" font-weight="700">≈</text>
+            </g>
+
+            <!-- Center Hub: Afore Inverter -->
+            <g transform="translate(292,144)">
+              <rect width="96" height="68" rx="18" fill="#162528" stroke="#2dd4bf" stroke-width="2" />
+              <text x="48" y="31" text-anchor="middle" fill="#eef5f3" font-size="14" font-weight="750">Afore</text>
+              <text x="48" y="49" text-anchor="middle" fill="#2dd4bf" font-size="11" font-weight="600">Operativo</text>
+            </g>
+
+            <!-- Bottom: Batteria -->
+            <g transform="translate(195,258)">
+              <rect width="290" height="88" rx="16" fill="#111d1f" stroke="#34d399" stroke-width="1.7" />
+              <text x="16" y="24" fill="#98b0ad" font-size="11.5" font-weight="650">Batteria · In carica ↑</text>
+              <text x="16" y="53" fill="#34d399" font-size="22" font-weight="750">+0,43 kW</text>
+              <text x="272" y="25" text-anchor="end" fill="#eef5f3" font-size="11.5" font-weight="600">SOC</text>
+              <text x="272" y="51" text-anchor="end" fill="#34d399" font-size="24" font-weight="800">24%</text>
+              <rect x="16" y="65" width="258" height="10" rx="5" fill="#0b1416" stroke="#1f3134" />
+              <rect x="16" y="65" width="62" height="10" rx="5" fill="#34d399" />
+            </g>
+          </svg>
+
+          <!-- Example Node Popover -->
+          <div class="popover-mock">
+            <h4>Dettaglio nodo · Batteria</h4>
+            <div class="pop-row"><span>Origine</span><strong>Misurato FC04</strong></div>
+            <div class="pop-row"><span>Tensione / Corrente</span><strong>52,5 V · +8,2 A</strong></div>
+            <div class="pop-row"><span>Età campione</span><strong>2 s fa</strong></div>
+            <div class="pop-row"><span>Stato qualità</span><strong style="color:var(--battery-color)">Valido</strong></div>
+          </div>
+        </div>
+      </article>
+
+      <article class="card" style="display:flex;flex-direction:column;justify-content:space-between;">
+        <div>
+          <div class="card-head">
+            <div>
+              <h2 class="card-title">Decisione EMS</h2>
+              <p class="card-sub">Valutazione locale istantanea</p>
+            </div>
+            <span class="chip shadow">SHADOW</span>
+          </div>
+          <div class="shadow-banner">
+            <div style="font-weight:700;font-size:12.5px;color:var(--shadow-blue)">SHADOW – decisioni simulate</div>
+            <div style="font-size:11.5px;color:var(--text-secondary)">Nessun comando applicato all'inverter</div>
+          </div>
+
+          <div class="kv"><span>Strategia locale → effettiva</span><strong>Self Use → Self Use</strong></div>
+
+          <div class="human-reason">
+            <div style="font-size:11px;color:var(--safety-amber);font-weight:700;text-transform:uppercase">Motivo decisione</div>
+            <div style="font-size:13.5px;font-weight:650;margin-top:2px">Riserva SOC raggiunta: scarica bloccata</div>
+            <div style="font-size:11.5px;color:var(--text-secondary);margin-top:2px">SOC 20% al limite minimo · Consentita solo carica da surplus</div>
+          </div>
+
+          <div class="pipeline-3">
+            <div class="pipe-box">
+              <div class="pipe-lbl">Candidato</div>
+              <div class="pipe-val">434 W</div>
+            </div>
+            <div class="pipe-box">
+              <div class="pipe-lbl">Safety-limited</div>
+              <div class="pipe-val" style="color:var(--safety-amber)">434 W</div>
+            </div>
+            <div class="pipe-box">
+              <div class="pipe-lbl">Simulato</div>
+              <div class="pipe-val" style="color:var(--accent-teal)">427 W</div>
+            </div>
+          </div>
+
+          <div class="kv"><span>Limiti Safety attivi</span><strong>0 W / 434 W</strong></div>
+          <div class="kv"><span>Ultima decisione</span><strong>#11983 · 11:12:02</strong></div>
+        </div>
+        <a href="#decisioni" style="display:block;text-align:center;padding:9px;border-radius:10px;background:var(--accent-teal-soft);color:var(--accent-teal);text-decoration:none;font-weight:650;margin-top:10px;">Apri dettaglio decisione →</a>
+      </article>
+    </section>
+
+    <!-- ROW 1: HIGH IMPACT KPIs -->
+    <section class="kpi-primary-grid">
+      <article class="kpi-big-card">
+        <div>
+          <div style="font-size:12px;color:var(--text-secondary);font-weight:600">Autoconsumo ⓘ</div>
+          <div class="kpi-num" style="color:var(--pv-color);margin-top:4px">99,8<span class="kpi-unit">%</span></div>
+          <div style="font-size:12px;color:var(--text-secondary);margin-top:4px">0,16 kWh usati in casa / 0,16 kWh FV</div>
+        </div>
+        <svg width="92" height="58" viewBox="0 0 92 58">
+          <path d="M10 48 A36 36 0 0 1 82 48" fill="none" stroke="#1f3134" stroke-width="10" stroke-linecap="round"/>
+          <path d="M10 48 A36 36 0 0 1 81.8 46" fill="none" stroke="#f5b942" stroke-width="10" stroke-linecap="round"/>
+        </svg>
+      </article>
+
+      <article class="kpi-big-card">
+        <div>
+          <div style="font-size:12px;color:var(--text-secondary);font-weight:600">Autosufficienza ⓘ</div>
+          <div class="kpi-num" style="color:var(--accent-teal);margin-top:4px">28,1<span class="kpi-unit">%</span></div>
+          <div style="font-size:12px;color:var(--text-secondary);margin-top:4px">Rete: 0,15 kWh prelevati su 0,20 kWh</div>
+        </div>
+        <svg width="92" height="58" viewBox="0 0 92 58">
+          <path d="M10 48 A36 36 0 0 1 82 48" fill="none" stroke="#1f3134" stroke-width="10" stroke-linecap="round"/>
+          <path d="M10 48 A36 36 0 0 1 28 19" fill="none" stroke="#2dd4bf" stroke-width="10" stroke-linecap="round"/>
+        </svg>
+      </article>
+
+      <article class="kpi-big-card">
+        <div style="width:100%">
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <span style="font-size:12px;color:var(--text-secondary);font-weight:600">Batteria oggi</span>
+            <span style="font-size:11.5px;color:var(--battery-color);font-weight:700">SOC 24%</span>
+          </div>
+          <div class="kpi-num" style="color:var(--battery-color);margin-top:4px">+0,02 / -0,00<span class="kpi-unit">kWh</span></div>
+          <div style="height:8px;background:#0b1416;border-radius:99px;overflow:hidden;margin:8px 0 6px;border:1px solid #1f3134">
+            <div style="width:24%;height:100%;background:var(--battery-color)"></div>
+          </div>
+          <div style="font-size:12px;color:var(--text-secondary)">Throughput 0,02 kWh · 0,001 cicli eq.</div>
+        </div>
+      </article>
+    </section>
+
+    <!-- ROW 2: COMPACT DAILY KPIs -->
+    <section class="kpi-compact-grid">
+      <article class="kpi-mini">
+        <div style="display:flex;justify-content:space-between;align-items:center"><span style="font-size:12px;color:var(--text-secondary)">Produzione FV oggi</span><span class="badge m">Misurato</span></div>
+        <div class="kpi-num" style="font-size:22px;color:var(--pv-color)">0,16<span class="kpi-unit">kWh</span></div>
+        <svg viewBox="0 0 160 24" height="22"><rect x="120" y="10" width="10" height="12" rx="2" fill="#f5b942"/><rect x="134" y="4" width="10" height="18" rx="2" fill="#f5b942"/></svg>
+        <div style="font-size:11.5px;color:var(--text-muted)">Confronto disponibile da domani</div>
+      </article>
+      <article class="kpi-mini">
+        <div style="display:flex;justify-content:space-between;align-items:center"><span style="font-size:12px;color:var(--text-secondary)">Consumo casa oggi</span><span class="badge d">Derivato</span></div>
+        <div class="kpi-num" style="font-size:22px;color:var(--home-color)">0,20<span class="kpi-unit">kWh</span></div>
+        <svg viewBox="0 0 160 24" height="22"><rect x="120" y="6" width="10" height="16" rx="2" fill="#a78bfa"/><rect x="134" y="3" width="10" height="19" rx="2" fill="#a78bfa"/></svg>
+        <div style="font-size:11.5px;color:var(--text-muted)">Confronto disponibile da domani</div>
+      </article>
+      <article class="kpi-mini">
+        <div style="display:flex;justify-content:space-between;align-items:center"><span style="font-size:12px;color:var(--text-secondary)">Scambio rete oggi</span><span class="badge m">Misurato</span></div>
+        <div class="kpi-num" style="font-size:22px;color:var(--grid-color)">0,15<span class="kpi-unit">imp / 0,00 esp</span></div>
+        <svg viewBox="0 0 160 24" height="22"><rect x="120" y="8" width="10" height="14" rx="2" fill="#60a5fa"/><rect x="134" y="11" width="10" height="11" rx="2" fill="#60a5fa"/></svg>
+        <div style="font-size:11.5px;color:var(--text-muted)">Confronto disponibile da domani</div>
+      </article>
+      <article class="kpi-mini">
+        <div style="display:flex;justify-content:space-between;align-items:center"><span style="font-size:12px;color:var(--text-secondary)">Carica / Scarica batt.</span><span class="badge m">Misurato</span></div>
+        <div class="kpi-num" style="font-size:22px;color:var(--battery-color)">+0,02<span class="kpi-unit">/ -0,00 kWh</span></div>
+        <svg viewBox="0 0 160 24" height="22"><rect x="134" y="13" width="10" height="9" rx="2" fill="#34d399"/></svg>
+        <div style="font-size:11.5px;color:var(--text-muted)">Confronto disponibile da domani</div>
+      </article>
+    </section>
+
+    <!-- COVERAGE BAR -->
+    <section class="coverage-bar">
+      <div class="cov-seg"><span class="dot"></span><strong>Copertura dal primo campione: 99,8%</strong> · Monitoraggio iniziato oggi alle 10:29</div>
+      <div class="cov-seg">
+        <span class="chip">Pre-avvio: Non monitorato</span>
+        <span class="chip">Gap post-avvio: 0 s</span>
+        <span class="chip">Invalidi: 0</span>
+      </div>
+    </section>
+
+    <!-- COMPACT CHART -->
+    <section class="chart-card">
+      <div class="card-head">
+        <div>
+          <h3 class="card-title">Andamento ultime 6 ore</h3>
+          <p class="card-sub">FV, Casa, Batteria, Rete (W) e SOC (%) · Gap espliciti (nessuno zero sintetico)</p>
+        </div>
+        <div style="display:flex;align-items:center;gap:12px">
+          <div class="seg-group">
+            <span class="seg">1h</span><span class="seg">3h</span><span class="seg active">6h</span><span class="seg">12h</span><span class="seg">Oggi</span>
+          </div>
+          <a href="#storico" style="color:var(--accent-teal);text-decoration:none;font-size:12.5px;font-weight:600">Apri Storico →</a>
+        </div>
+      </div>
+      <svg viewBox="0 0 1120 220" width="100%" height="220">
+        <line x1="40" y1="180" x2="1080" y2="180" stroke="#1f3134"/>
+        <line x1="40" y1="120" x2="1080" y2="120" stroke="#1f3134" stroke-dasharray="3 4"/>
+        <line x1="40" y1="60" x2="1080" y2="60" stroke="#1f3134" stroke-dasharray="3 4"/>
+        <rect x="40" y="20" width="660" height="160" fill="rgba(100,116,139,0.06)"/>
+        <text x="360" y="100" text-anchor="middle" fill="#64748b" font-size="12">Periodo precedente all'avvio · Non monitorato</text>
+        <path d="M710 155 Q780 140 840 110 T960 72 T1070 55" fill="none" stroke="#f5b942" stroke-width="2.5"/>
+        <path d="M710 145 Q790 132 860 128 T990 120 T1070 115" fill="none" stroke="#a78bfa" stroke-width="2.2"/>
+        <path d="M710 170 Q820 165 920 150 T1070 138" fill="none" stroke="#34d399" stroke-width="2"/>
+        <path d="M710 162 Q820 156 940 168 T1070 172" fill="none" stroke="#60a5fa" stroke-width="1.8"/>
+        <path d="M710 148 L1070 134" fill="none" stroke="#eef5f3" stroke-width="1.6" stroke-dasharray="5 4"/>
+      </svg>
+    </section>
+
+    <!-- BOTTOM ROW -->
+    <section class="bottom-grid">
+      <article class="card">
+        <div class="card-head">
+          <div><h3 class="card-title">Ultimi 3 eventi significativi</h3><p class="card-sub">Eventi ripetitivi raggruppati</p></div>
+          <a href="#decisioni" style="color:var(--accent-teal);text-decoration:none;font-size:12px">Apri Decisioni →</a>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <div class="ev-row"><div><strong>Riserva SOC intervenuta 18 volte</strong><div style="font-size:11.5px;color:var(--text-muted)">Scarica bloccata al 20%</div></div><span class="chip">10:52</span></div>
+          <div class="ev-row"><div><strong>ESP32 disponibile online</strong><div style="font-size:11.5px;color:var(--text-muted)">Connessione MQTT ripristinata</div></div><span class="chip">10:43</span></div>
+          <div class="ev-row"><div><strong>Cambio strategia → Self Use</strong><div style="font-size:11.5px;color:var(--text-muted)">Modalità SHADOW attiva</div></div><span class="chip">10:29</span></div>
+        </div>
+      </article>
+      <article class="card">
+        <div class="card-head">
+          <div><h3 class="card-title">Stato sistema</h3><p class="card-sub">8 sottosistemi in tempo reale</p></div>
+          <span class="badge m">Tutto operativo</span>
+        </div>
+        <div class="pill-grid">
+          <div class="sys-pill"><span>ESP32</span><strong><span class="dot"></span>OK</strong></div>
+          <div class="sys-pill"><span>MQTT</span><strong><span class="dot"></span>OK</strong></div>
+          <div class="sys-pill"><span>HA</span><strong><span class="dot"></span>OK</strong></div>
+          <div class="sys-pill"><span>Modbus</span><strong><span class="dot"></span>OK</strong></div>
+          <div class="sys-pill"><span>NTP</span><strong><span class="dot"></span>OK</strong></div>
+          <div class="sys-pill"><span>Collector</span><strong><span class="dot"></span>OK</strong></div>
+          <div class="sys-pill"><span>Database</span><strong><span class="dot"></span>OK</strong></div>
+          <div class="sys-pill"><span>AUX1</span><strong>OFF</strong></div>
+        </div>
+      </article>
+    </section>
+  </main>
+</div>
+</body>
+</html>

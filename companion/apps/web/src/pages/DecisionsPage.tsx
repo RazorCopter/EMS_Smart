@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import type { EChartsOption } from "echarts";
 import { X } from "lucide-react";
@@ -17,10 +18,11 @@ const STRATEGY_COLORS: Record<string, { bg: string; fg: string }> = {
 };
 
 export function DecisionsPage() {
+  const [searchParams] = useSearchParams();
   const [range, setRange] = useState<TimeRange>("today");
   const [strategyFilter, setStrategyFilter] = useState<string>("");
   const [safetyOnly, setSafetyOnly] = useState(false);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(() => searchParams.get("id"));
 
   const decQuery = useQuery({
     queryKey: ["decisions", range, strategyFilter, safetyOnly],

@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 import { ShadowBanner } from "../components/ShadowBanner";
 import { PowerFlow } from "../components/PowerFlow";
-import { fmtKwh, fmtWatts } from "../lib/format";
+import { fmtKwh, fmtWatts, humanDecisionDetail } from "../lib/format";
 
 describe("formatting preserves null without substituting zero", () => {
   it("renders Non disponibile for null or undefined", () => {
@@ -11,6 +11,12 @@ describe("formatting preserves null without substituting zero", () => {
     expect(fmtWatts(undefined, "W")).toBe("Non disponibile");
     expect(fmtKwh(null)).toBe("Non disponibile");
     expect(fmtWatts(0, "W")).toBe("0 W");
+  });
+
+  it("translates decision codes to human Italian copy", () => {
+    const d = humanDecisionDetail("SOC_RESERVE", "GRID_BALANCE", 20, 0, 434);
+    expect(d.title).toMatch(/Riserva SOC raggiunta/i);
+    expect(d.subtitle).toMatch(/SOC 20%/i);
   });
 });
 
@@ -28,7 +34,7 @@ describe("PowerFlow", () => {
     expect(screen.getAllByText(/Non disp\./i).length).toBeGreaterThanOrEqual(4);
   });
 
-  it("renders measured and derived provenance labels for valid telemetry", () => {
+  it("keeps diagram clean of technical strings and reveals them in node popover on click", () => {
     render(
       <PowerFlow
         telemetry={{
@@ -42,6 +48,7 @@ describe("PowerFlow", () => {
           battery_w: 710,
           battery_v: 52.9,
           battery_a: 13.4,
+          hz: 50.01,
           quality: { pv_w: { state: "valid", source: "measured" }, load_w: { state: "valid", source: "derived" } },
         }}
         safetyMinW={-1000}
@@ -49,8 +56,12 @@ describe("PowerFlow", () => {
         selfConsumptionPct={71}
       />
     );
-    expect(screen.getByText(/FOTOVOLTAICO · MISURATO/i)).toBeInTheDocument();
-    expect(screen.getByText(/CASA · DERIVATO AC/i)).toBeInTheDocument();
+    expect(screen.queryByText(/Misurato FC04/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Derivato AC/i)).not.toBeInTheDocument();
     expect(screen.getByText(/68%/i)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /Batteria:/i }));
+    expect(screen.getByRole("dialog", { name: /Dettaglio nodo · Batteria/i })).toBeInTheDocument();
+    expect(screen.getByText(/Misurato FC04/i)).toBeInTheDocument();
   });
 });

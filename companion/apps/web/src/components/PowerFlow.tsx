@@ -1,22 +1,33 @@
+import { useEffect, useState, type KeyboardEvent } from "react";
+import { X } from "lucide-react";
 import { fmtAbsKw, fmtAge, fmtNum, fmtPct, fmtWatts } from "../lib/format";
 
-interface TelemetryLive {
+export interface TelemetryLive {
   age_s?: number | null;
   stale?: boolean;
+  fault?: boolean | null;
   soc?: number | null;
   battery_w?: number | null;
   battery_v?: number | null;
   battery_a?: number | null;
   pv_w?: number | null;
   pv1_w?: number | null;
+  pv1_v?: number | null;
+  pv1_a?: number | null;
   pv2_w?: number | null;
+  pv2_v?: number | null;
+  pv2_a?: number | null;
   grid_w?: number | null;
   grid_v?: number | null;
   hz?: number | null;
   load_w?: number | null;
   temp_c?: number | null;
+  reads?: number | null;
+  errors?: number | null;
   quality?: Record<string, { age_ms?: number | null; source?: string; state?: string }>;
 }
+
+type NodeId = "pv" | "grid" | "home" | "battery" | "inverter";
 
 interface Props {
   telemetry: TelemetryLive | null;
@@ -26,16 +37,44 @@ interface Props {
   deadbandW?: number;
 }
 
-function edgeWidth(watts: number | null | undefined): number {
-  if (watts == null) return 2;
+function flowStrokeWidth(watts: number | null | undefined, deadband: number): number {
+  if (watts == null) return 2.2;
   const abs = Math.abs(watts);
-  if (abs <= 20) return 2;
-  return Math.min(5.5, 2 + (abs / 3500) * 3.5);
+  if (abs <= deadband) return 2.2;
+  return Number(Math.min(5.6, 2.5 + (abs / 3500) * 3.1).toFixed(2));
 }
 
-function edgeClass(watts: number | null | undefined, deadband: number, reverse = false): string {
-  if (watts == null || Math.abs(watts) <= deadband) return "flow-edge";
-  return reverse ? "flow-edge animated reverse" : "flow-edge animated";
+function flowSpeedSeconds(watts: number | null | undefined, deadband: number): string {
+  const abs = Math.abs(watts ?? 0);
+  if (abs <= deadband) return "1.8s";
+  const dur = Math.max(0.65, Math.min(2.1, 2.1 - (abs / 3500) * 1.45));
+  return `${dur.toFixed(2)}s`;
+}
+
+function QualityGlyph({
+  x,
+  y,
+  kind,
+}: {
+  x: number;
+  y: number;
+  kind: "measured" | "derived" | "stale" | "unavailable";
+}) {
+  const palette = {
+    measured: { bg: "rgba(52, 211, 153, 0.16)", fg: "var(--battery-color)", glyph: "✓" },
+    derived: { bg: "rgba(167, 139, 250, 0.18)", fg: "var(--home-color)", glyph: "≈" },
+    stale: { bg: "rgba(245, 158, 11, 0.2)", fg: "var(--safety-amber)", glyph: "!" },
+    unavailable: { bg: "rgba(100, 116, 139, 0.2)", fg: "var(--missing-grey)", glyph: "○" },
+  }[kind];
+
+  return (
+    <g transform={`translate(${x}, ${y})`} aria-hidden="true">
+      <circle r="8.5" fill={palette.bg} />
+      <text y="3.5" textAnchor="middle" fill={palette.fg} fontSize="10" fontWeight="700">
+        {palette.glyph}
+      </text>
+    </g>
+  );
 }
 
 export function PowerFlow({
@@ -45,266 +84,647 @@ export function PowerFlow({
   selfConsumptionPct,
   deadbandW = 20,
 }: Props) {
+  const [activeNode, setActiveNode] = useState<NodeId | null>(null);
+  const [compactViewport, setCompactViewport] = useState<boolean>(() =>
+    typeof window !== "undefined" && typeof window.matchMedia === "function"
+      ? window.matchMedia("(max-width: 680px)").matches
+      : false,
+  );
+
+  useEffect(() => {
+    if (typeof window === "undefined" || typeof window.matchMedia !== "function") return;
+    const mq = window.matchMedia("(max-width: 680px)");
+    const onChange = () => setCompactViewport(mq.matches);
+    mq.addEventListener("change", onChange);
+    return () => mq.removeEventListener("change", onChange);
+  }, []);
+
+  const isStale = Boolean(telemetry?.stale);
   const pv = telemetry?.pv_w ?? null;
   const load = telemetry?.load_w ?? null;
   const grid = telemetry?.grid_w ?? null;
   const batt = telemetry?.battery_w ?? null;
   const soc = telemetry?.soc ?? null;
-  const ageText = telemetry ? fmtAge(telemetry.age_s) : "Nessun dato";
 
-  const pvActive = pv != null && pv > deadbandW;
-  const loadActive = load != null && load > deadbandW;
-  const gridImport = grid != null && grid > deadbandW;
-  const gridExport = grid != null && grid < -deadbandW;
-  const battCharge = batt != null && batt > deadbandW;
-  const battDischarge = batt != null && batt < -deadbandW;
+  const pvActive = !isStale && pv != null && pv > deadbandW;
+  const loadActive = !isStale && load != null && load > deadbandW;
+  const gridImport = !isStale && grid != null && grid > deadbandW;
+  const gridExport = !isStale && grid != null && grid < -deadbandW;
+  const gridActive = gridImport || gridExport;
+  const battCharge = !isStale && batt != null && batt > deadbandW;
+  const battDischarge = !isStale && batt != null && batt < -deadbandW;
+  const battActive = battCharge || battDischarge;
 
-  const pvColor = pv == null ? "var(--missing-grey)" : pvActive ? "var(--pv-color)" : "#505d5c";
-  const loadColor = load == null ? "var(--missing-grey)" : loadActive ? "var(--home-color)" : "#505d5c";
-  const gridColor =
-    grid == null ? "var(--missing-grey)" : gridImport || gridExport ? "var(--grid-color)" : "#505d5c";
-  const battColor =
-    batt == null ? "var(--missing-grey)" : battCharge || battDischarge ? "var(--battery-color)" : "#505d5c";
+  const inactiveColor = "var(--missing-grey)";
+  const pvColor = pv == null || isStale ? inactiveColor : pvActive ? "var(--pv-color)" : inactiveColor;
+  const loadColor = load == null || isStale ? inactiveColor : loadActive ? "var(--home-color)" : inactiveColor;
+  const gridColor = grid == null || isStale ? inactiveColor : gridActive ? "var(--grid-color)" : inactiveColor;
+  const battColor = batt == null || isStale ? inactiveColor : battActive ? "var(--battery-color)" : inactiveColor;
 
-  const battDir =
-    batt == null ? "Non disponibile" : battCharge ? "In carica" : battDischarge ? "In scarica" : "Inattiva";
-  const gridDir =
-    grid == null ? "Non disponibile" : gridImport ? "Importazione" : gridExport ? "Esportazione" : "In equilibrio";
+  const pvQualityKind = pv == null ? "unavailable" : isStale ? "stale" : "measured";
+  const gridQualityKind = grid == null ? "unavailable" : isStale ? "stale" : "measured";
+  const loadQualityKind =
+    load == null
+      ? "unavailable"
+      : isStale
+      ? "stale"
+      : (telemetry?.quality?.load_w?.source ?? "derived") === "derived"
+      ? "derived"
+      : "measured";
+  const battQualityKind = batt == null && soc == null ? "unavailable" : isStale ? "stale" : "measured";
 
-  const capLabel =
-    safetyMinW != null && safetyMaxW != null
-      ? `Limiti ${Math.round(safetyMinW)} / ${Math.round(safetyMaxW)} W`
-      : "Limiti non disponibili";
+  const pvStateLabel = pv == null ? "Non disp." : pvActive ? "↓ Produzione" : "Inattivo";
+  const gridDirLabel =
+    grid == null ? "Non disp." : gridImport ? "→ Prelievo" : gridExport ? "← Immissione" : "In equilibrio";
+  const loadDirLabel = load == null ? "Non disp." : loadActive ? "← Consumo" : "Standby";
+  const battDirLabel =
+    batt == null ? "Non disp." : battCharge ? "↑ In carica" : battDischarge ? "↓ In scarica" : "Inattiva";
 
-  const pvQuality = telemetry?.quality?.pv_w?.state ?? (pv != null ? "valid" : "unavailable");
-  const loadSource = telemetry?.quality?.load_w?.source ?? "derived";
+  const invStatusLabel = !telemetry
+    ? "In attesa"
+    : telemetry.fault
+    ? "Anomalia"
+    : isStale
+    ? "Non agg."
+    : "Operativo";
+
+  function toggleNode(id: NodeId) {
+    setActiveNode((cur) => (cur === id ? null : id));
+  }
+
+  function handleNodeKey(id: NodeId, e: KeyboardEvent<SVGGElement>) {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      toggleNode(id);
+    } else if (e.key === "Escape") {
+      setActiveNode(null);
+    }
+  }
+
+  const edgeOverlayClass = (active: boolean, dashed = false) => {
+    if (!active) return "flow-pulse hidden";
+    return dashed ? "flow-pulse animated derived-flow" : "flow-pulse animated";
+  };
+
+  function renderFlowLine({
+    d,
+    color,
+    watts,
+    active,
+    markerId,
+    dashed = false,
+  }: {
+    d: string;
+    color: string;
+    watts: number | null | undefined;
+    active: boolean;
+    markerId: string;
+    dashed?: boolean;
+  }) {
+    const sw = flowStrokeWidth(watts, deadbandW);
+    return (
+      <g>
+        <path
+          d={d}
+          className="flow-base"
+          stroke={color}
+          strokeWidth={sw}
+          strokeDasharray={dashed ? "6 5" : undefined}
+          opacity={active ? (dashed ? 0.52 : 0.36) : 0.45}
+          markerEnd={active ? `url(#${markerId})` : undefined}
+        />
+        {active && (
+          <path
+            d={d}
+            className={edgeOverlayClass(active, dashed)}
+            style={{ animationDuration: flowSpeedSeconds(watts, deadbandW) }}
+            stroke={color}
+            strokeWidth={sw}
+          />
+        )}
+      </g>
+    );
+  }
+
+  const renderPopoverContent = () => {
+    if (!activeNode) return null;
+    const age = telemetry ? fmtAge(telemetry.age_s) : "Non disponibile";
+    const qualityStatus = !telemetry ? "Non disponibile" : isStale ? "Non aggiornato (stale)" : "Valido";
+
+    const specs: Record<NodeId, { title: string; accent: string; rows: Array<[string, string]> }> = {
+      pv: {
+        title: "Dettaglio nodo · Fotovoltaico",
+        accent: "var(--pv-color)",
+        rows: [
+          ["Potenza totale", fmtAbsKw(pv)],
+          ["Stringa PV1", `${telemetry?.pv1_w != null ? `${Math.round(telemetry.pv1_w)} W` : "—"} · ${fmtNum(telemetry?.pv1_v, "V", 1)}`],
+          ["Stringa PV2", `${telemetry?.pv2_w != null ? `${Math.round(telemetry.pv2_w)} W` : "—"} · ${fmtNum(telemetry?.pv2_v, "V", 1)}`],
+          ["Provenienza", "Misurato FC04"],
+          ["Età campione", age],
+          ["Qualità dato", qualityStatus],
+        ],
+      },
+      grid: {
+        title: "Dettaglio nodo · Rete elettrica",
+        accent: "var(--grid-color)",
+        rows: [
+          ["Scambio netto", fmtWatts(grid)],
+          ["Tensione / Frequenza", `${fmtNum(telemetry?.grid_v, "V", 1)} · ${fmtNum(telemetry?.hz, "Hz", 2)}`],
+          ["Provenienza", "Misurato FC04"],
+          ["Età campione", age],
+          ["Qualità dato", qualityStatus],
+        ],
+      },
+      home: {
+        title: "Dettaglio nodo · Utenze Casa",
+        accent: "var(--home-color)",
+        rows: [
+          ["Consumo istantaneo", fmtAbsKw(load)],
+          ["Autoconsumo oggi", fmtPct(selfConsumptionPct)],
+          ["Tensione / Frequenza", `${fmtNum(telemetry?.grid_v, "V", 1)} · ${fmtNum(telemetry?.hz, "Hz", 2)}`],
+          ["Provenienza", telemetry?.quality?.load_w?.source === "derived" || !telemetry?.quality?.load_w ? "Derivato AC (bilancio inverter)" : String(telemetry.quality.load_w.source)],
+          ["Età campione", age],
+          ["Qualità dato", qualityStatus],
+        ],
+      },
+      battery: {
+        title: "Dettaglio nodo · Batteria",
+        accent: "var(--battery-color)",
+        rows: [
+          ["SOC attuale", fmtPct(soc)],
+          ["Potenza istantanea", `${fmtWatts(batt)} (${battDirLabel})`],
+          ["Tensione / Corrente", `${fmtNum(telemetry?.battery_v, "V", 1)} · ${fmtNum(telemetry?.battery_a, "A", 1)}`],
+          ["Limiti Safety", safetyMinW != null && safetyMaxW != null ? `${Math.round(safetyMinW)} / ${Math.round(safetyMaxW)} W` : "Non disponibile"],
+          ["Provenienza", "Misurato FC04"],
+          ["Età campione", age],
+        ],
+      },
+      inverter: {
+        title: "Dettaglio nodo · Inverter Afore",
+        accent: "var(--accent-teal)",
+        rows: [
+          ["Stato sistema", invStatusLabel],
+          ["Temperatura interna", fmtNum(telemetry?.temp_c, "°C", 1)],
+          ["Letture / Errori RS485", `${telemetry?.reads ?? "—"} / ${telemetry?.errors ?? "—"}`],
+          ["Deadband flussi", `±${deadbandW} W`],
+          ["Età campione", age],
+        ],
+      },
+    };
+
+    const spec = specs[activeNode];
+    return (
+      <div
+        className="node-popover"
+        role="dialog"
+        aria-label={spec.title}
+        onKeyDown={(e) => {
+          if (e.key === "Escape") setActiveNode(null);
+        }}
+      >
+        <div className="node-popover-head">
+          <strong style={{ color: spec.accent }}>{spec.title}</strong>
+          <button
+            type="button"
+            className="btn-icon"
+            aria-label="Chiudi dettaglio nodo"
+            onClick={() => setActiveNode(null)}
+          >
+            <X size={15} />
+          </button>
+        </div>
+        <div className="node-popover-grid">
+          {spec.rows.map(([k, v]) => (
+            <div key={k} className="node-popover-row">
+              <span>{k}</span>
+              <strong>{v}</strong>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  };
+
+  const socWidth = soc != null ? Math.max(4, Math.min(284, (soc / 100) * 284)) : 0;
 
   return (
-    <div>
+    <div className="energy-monitor-wrap">
       <div className="card-header">
         <div>
-          <h2 className="card-title">Flusso di Potenza Istantaneo</h2>
+          <h2 className="card-title">Energy Monitor</h2>
           <p className="card-sub">
-            Deadband ±{deadbandW} W · Tratteggiato = derivato · Grigio = non disponibile · Aggiornato: {ageText}
+            Flussi energetici in tempo reale · Seleziona un nodo per i parametri elettrici
           </p>
         </div>
-        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-          <span className={`badge ${pvQuality === "valid" ? "measured" : "unavailable"}`}>
-            FV/Rete/Batt: {pvQuality === "valid" ? "Misurato FC04" : "Non disp."}
+        <div className="energy-legend-pills">
+          <span className="legend-dot-pill">
+            <span className="legend-swatch solid" aria-hidden="true" /> Misurato
           </span>
-          <span className="badge derived">Casa: {loadSource === "derived" ? "Derivato AC" : loadSource}</span>
+          <span className="legend-dot-pill">
+            <span className="legend-swatch dashed" aria-hidden="true" /> Derivato
+          </span>
         </div>
       </div>
 
-      <div
-        style={{
-          background: "var(--bg-inset)",
-          border: "1px solid var(--border-subtle)",
-          borderRadius: 12,
-          padding: 14,
-        }}
-      >
-        <svg
-          viewBox="0 0 700 296"
-          width="100%"
-          style={{ display: "block", maxHeight: 280 }}
-          role="img"
-          aria-label={`Flusso potenza: FV ${fmtAbsKw(pv)}, Casa ${fmtAbsKw(load)}, Rete ${fmtWatts(grid)}, Batteria ${fmtWatts(batt)}, SOC ${fmtPct(soc)}`}
-        >
-          <defs>
-            <marker id="pf-arr-pv" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
-              <path d="M0 0L6 3L0 6Z" fill={pvColor} />
-            </marker>
-            <marker id="pf-arr-home" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
-              <path d="M0 0L6 3L0 6Z" fill={loadColor} />
-            </marker>
-            <marker id="pf-arr-grid" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
-              <path d="M0 0L6 3L0 6Z" fill={gridColor} />
-            </marker>
-            <marker id="pf-arr-batt" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
-              <path d="M0 0L6 3L0 6Z" fill={battColor} />
-            </marker>
-          </defs>
+      <div className="energy-stage">
+        {compactViewport ? (
+          <svg
+            viewBox="0 0 340 296"
+            width="100%"
+            className="energy-svg mobile"
+            role="img"
+            aria-label={`Energy Monitor: Fotovoltaico ${pv == null ? "Non disponibile" : fmtAbsKw(pv)}, Rete ${fmtWatts(grid)}, Casa ${load == null ? "Non disponibile" : fmtAbsKw(load)}, Batteria ${fmtWatts(batt)}, SOC ${fmtPct(soc)}`}
+          >
+            <defs>
+              <marker id="em-arr-pv" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
+                <path d="M0 0L6 3L0 6Z" fill={pvColor} />
+              </marker>
+              <marker id="em-arr-home" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
+                <path d="M0 0L6 3L0 6Z" fill={loadColor} />
+              </marker>
+              <marker id="em-arr-grid" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
+                <path d="M0 0L6 3L0 6Z" fill={gridColor} />
+              </marker>
+              <marker id="em-arr-batt" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
+                <path d="M0 0L6 3L0 6Z" fill={battColor} />
+              </marker>
+            </defs>
+            <circle cx="170" cy="144" r="84" fill="none" stroke="var(--border-subtle)" strokeWidth="1.5" strokeDasharray="4 6" opacity="0.8" />
+            {renderFlowLine({ d: "M170 72 L170 116", color: pvColor, watts: pv, active: pvActive, markerId: "em-arr-pv" })}
+            {renderFlowLine({
+              d: gridExport ? "M130 144 L106 144" : "M104 144 L128 144",
+              color: gridColor,
+              watts: grid,
+              active: gridActive,
+              markerId: "em-arr-grid",
+            })}
+            {renderFlowLine({ d: "M212 144 L234 144", color: loadColor, watts: load, active: loadActive, markerId: "em-arr-home", dashed: true })}
+            {renderFlowLine({
+              d: battDischarge ? "M170 212 L170 174" : "M170 172 L170 210",
+              color: battColor,
+              watts: batt,
+              active: battActive,
+              markerId: "em-arr-batt",
+            })}
 
-          {/* PV -> Inverter */}
-          <path
-            d="M135 90 L135 147 L300 147"
-            className={edgeClass(pv, deadbandW)}
-            stroke={pvColor}
-            strokeWidth={edgeWidth(pv)}
-            markerEnd={pvActive ? "url(#pf-arr-pv)" : undefined}
-          />
+            {/* Mobile Top: PV */}
+            <g
+              transform="translate(76, 4)"
+              className={`energy-node ${activeNode === "pv" ? "selected" : ""}`}
+              role="button"
+              tabIndex={0}
+              aria-expanded={activeNode === "pv"}
+              aria-label={`Fotovoltaico: ${pv == null ? "Non disponibile" : fmtAbsKw(pv)}, stato ${pvStateLabel}`}
+              onClick={() => toggleNode("pv")}
+              onKeyDown={(e) => handleNodeKey("pv", e)}
+            >
+              <rect width="188" height="68" rx="14" fill="var(--bg-surface)" stroke={pv == null || isStale ? inactiveColor : "var(--pv-color)"} strokeWidth="1.7" />
+              <text x="14" y="22" fill="var(--text-secondary)" fontSize="11.5" fontWeight="650">Fotovoltaico</text>
+              <text x="14" y="45" fill={pv == null || isStale ? inactiveColor : "var(--pv-color)"} fontSize="19" fontWeight="750">{pv == null ? "Non disp." : fmtAbsKw(pv)}</text>
+              <text x="14" y="60" fill="var(--text-muted)" fontSize="10.5">{pvStateLabel}</text>
+              <QualityGlyph x={170} y={18} kind={pvQualityKind} />
+            </g>
 
-          {/* Inverter -> Home (derived = dashed) */}
-          <path
-            d="M350 118 L350 92"
-            className={edgeClass(load, deadbandW)}
-            stroke={loadColor}
-            strokeWidth={edgeWidth(load)}
-            strokeDasharray="6 5"
-            markerEnd={loadActive ? "url(#pf-arr-home)" : undefined}
-          />
+            {/* Mobile Left: Rete */}
+            <g
+              transform="translate(2, 102)"
+              className={`energy-node ${activeNode === "grid" ? "selected" : ""}`}
+              role="button"
+              tabIndex={0}
+              aria-expanded={activeNode === "grid"}
+              aria-label={`Rete: ${grid == null ? "Non disponibile" : fmtWatts(grid)}, stato ${gridDirLabel}`}
+              onClick={() => toggleNode("grid")}
+              onKeyDown={(e) => handleNodeKey("grid", e)}
+            >
+              <rect width="102" height="84" rx="14" fill="var(--bg-surface)" stroke={grid == null || isStale ? inactiveColor : "var(--grid-color)"} strokeWidth="1.7" />
+              <text x="10" y="22" fill="var(--text-secondary)" fontSize="11.5" fontWeight="650">Rete</text>
+              <text x="10" y="47" fill={grid == null || isStale ? inactiveColor : "var(--grid-color)"} fontSize="16" fontWeight="750">{grid == null ? "Non disp." : fmtWatts(grid)}</text>
+              <text x="10" y="68" fill="var(--text-muted)" fontSize="10.5">{gridDirLabel}</text>
+              <QualityGlyph x={86} y={18} kind={gridQualityKind} />
+            </g>
 
-          {/* Grid <-> Inverter */}
-          {gridImport ? (
-            <path
-              d="M565 90 L565 147 L400 147"
-              className={edgeClass(grid, deadbandW)}
-              stroke={gridColor}
-              strokeWidth={edgeWidth(grid)}
-              markerEnd="url(#pf-arr-grid)"
-            />
-          ) : (
-            <path
-              d="M400 147 L565 147 L565 90"
-              className={edgeClass(grid, deadbandW)}
-              stroke={gridColor}
-              strokeWidth={edgeWidth(grid)}
-              markerEnd={gridExport ? "url(#pf-arr-grid)" : undefined}
-            />
-          )}
+            {/* Mobile Center: Inverter */}
+            <g
+              transform="translate(130, 118)"
+              className={`energy-node ${activeNode === "inverter" ? "selected" : ""}`}
+              role="button"
+              tabIndex={0}
+              aria-expanded={activeNode === "inverter"}
+              aria-label={`Inverter Afore: stato ${invStatusLabel}`}
+              onClick={() => toggleNode("inverter")}
+              onKeyDown={(e) => handleNodeKey("inverter", e)}
+            >
+              <rect width="80" height="54" rx="15" fill="var(--bg-elevated)" stroke={telemetry?.fault ? "var(--fault-red)" : "var(--accent-teal)"} strokeWidth="1.9" />
+              <text x="40" y="26" textAnchor="middle" fill="var(--text-primary)" fontSize="13.5" fontWeight="750">Afore</text>
+              <text x="40" y="42" textAnchor="middle" fill="var(--accent-teal)" fontSize="10.5" fontWeight="650">{invStatusLabel}</text>
+            </g>
 
-          {/* Inverter <-> Battery */}
-          {battDischarge ? (
-            <path
-              d="M350 206 L350 179"
-              className={edgeClass(batt, deadbandW)}
-              stroke={battColor}
-              strokeWidth={edgeWidth(batt)}
-              markerEnd="url(#pf-arr-batt)"
-            />
-          ) : (
-            <path
-              d="M350 177 L350 204"
-              className={edgeClass(batt, deadbandW)}
-              stroke={battColor}
-              strokeWidth={edgeWidth(batt)}
-              markerEnd={battCharge ? "url(#pf-arr-batt)" : undefined}
-            />
-          )}
+            {/* Mobile Right: Casa */}
+            <g
+              transform="translate(236, 102)"
+              className={`energy-node ${activeNode === "home" ? "selected" : ""}`}
+              role="button"
+              tabIndex={0}
+              aria-expanded={activeNode === "home"}
+              aria-label={`Casa: ${load == null ? "Non disponibile" : fmtAbsKw(load)}, stato ${loadDirLabel}`}
+              onClick={() => toggleNode("home")}
+              onKeyDown={(e) => handleNodeKey("home", e)}
+            >
+              <rect width="102" height="84" rx="14" fill="var(--bg-surface)" stroke={load == null || isStale ? inactiveColor : "var(--home-color)"} strokeWidth="1.7" strokeDasharray="5 3" />
+              <text x="10" y="22" fill="var(--text-secondary)" fontSize="11.5" fontWeight="650">Casa</text>
+              <text x="10" y="47" fill={load == null || isStale ? inactiveColor : "var(--home-color)"} fontSize="16" fontWeight="750">{load == null ? "Non disp." : fmtAbsKw(load)}</text>
+              <text x="10" y="68" fill="var(--text-muted)" fontSize="10.5">{loadDirLabel}</text>
+              <QualityGlyph x={86} y={18} kind={loadQualityKind} />
+            </g>
 
-          {/* PV Node */}
-          <g transform="translate(22,12)">
-            <rect
-              width="224"
-              height="78"
-              rx="14"
-              fill="var(--bg-surface)"
-              stroke={pv == null ? "var(--missing-grey)" : "var(--pv-color)"}
+            {/* Mobile Bottom: Batteria */}
+            <g
+              transform="translate(32, 212)"
+              className={`energy-node ${activeNode === "battery" ? "selected" : ""}`}
+              role="button"
+              tabIndex={0}
+              aria-expanded={activeNode === "battery"}
+              aria-label={`Batteria: SOC ${fmtPct(soc)}, potenza ${batt == null ? "Non disponibile" : fmtWatts(batt)}`}
+              onClick={() => toggleNode("battery")}
+              onKeyDown={(e) => handleNodeKey("battery", e)}
+            >
+              <rect width="276" height="80" rx="15" fill="var(--bg-surface)" stroke={batt == null && soc == null ? inactiveColor : isStale ? inactiveColor : "var(--battery-color)"} strokeWidth="1.7" />
+              <text x="14" y="23" fill="var(--text-secondary)" fontSize="11.5" fontWeight="650">Batteria · {battDirLabel}</text>
+              <text x="14" y="49" fill={batt == null || isStale ? inactiveColor : "var(--battery-color)"} fontSize="18" fontWeight="750">{batt == null ? "Non disp." : fmtWatts(batt)}</text>
+              <text x="240" y="48" textAnchor="end" fill={soc == null ? inactiveColor : "var(--battery-color)"} fontSize="22" fontWeight="800">{soc != null ? fmtPct(soc) : "—"}</text>
+              <QualityGlyph x={258} y={19} kind={battQualityKind} />
+              <rect x="14" y="59" width="248" height="9" rx="4.5" fill="var(--bg-inset)" stroke="var(--border-subtle)" />
+              {soc != null && (
+                <rect x="14" y="59" width={Math.max(4, Math.min(248, (soc / 100) * 248))} height="9" rx="4.5" fill={isStale ? inactiveColor : "var(--battery-color)"} />
+              )}
+            </g>
+          </svg>
+        ) : (
+          <svg
+            viewBox="0 0 680 356"
+            width="100%"
+            className="energy-svg"
+            role="img"
+            aria-label={`Energy Monitor: Fotovoltaico ${pv == null ? "Non disponibile" : fmtAbsKw(pv)}, Rete ${fmtWatts(grid)}, Casa ${load == null ? "Non disponibile" : fmtAbsKw(load)}, Batteria ${fmtWatts(batt)}, SOC ${fmtPct(soc)}`}
+          >
+            <defs>
+              <marker id="em-arr-pv" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
+                <path d="M0 0L6 3L0 6Z" fill={pvColor} />
+              </marker>
+              <marker id="em-arr-home" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
+                <path d="M0 0L6 3L0 6Z" fill={loadColor} />
+              </marker>
+              <marker id="em-arr-grid" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
+                <path d="M0 0L6 3L0 6Z" fill={gridColor} />
+              </marker>
+              <marker id="em-arr-batt" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
+                <path d="M0 0L6 3L0 6Z" fill={battColor} />
+              </marker>
+            </defs>
+
+            {/* Subtle OpenEMS-inspired radial orbital guide */}
+            <circle
+              cx="340"
+              cy="178"
+              r="122"
+              fill="none"
+              stroke="var(--border-subtle)"
               strokeWidth="1.5"
+              strokeDasharray="4 6"
+              opacity="0.85"
             />
-            <text x="14" y="24" fill="var(--text-secondary)" fontSize="11" fontWeight="650">
-              FOTOVOLTAICO · MISURATO
+
+            {/* Flow: PV -> Hub */}
+            {renderFlowLine({ d: "M340 88 L340 142", color: pvColor, watts: pv, active: pvActive, markerId: "em-arr-pv" })}
+
+            {/* Flow: Grid <-> Hub */}
+            {renderFlowLine({
+              d: gridExport ? "M286 178 L184 178" : "M180 178 L282 178",
+              color: gridColor,
+              watts: grid,
+              active: gridActive,
+              markerId: "em-arr-grid",
+            })}
+
+            {/* Flow: Hub -> Home (derived = discreet dashed) */}
+            {renderFlowLine({ d: "M398 178 L496 178", color: loadColor, watts: load, active: loadActive, markerId: "em-arr-home", dashed: true })}
+
+            {/* Flow: Hub <-> Battery */}
+            {renderFlowLine({
+              d: battDischarge ? "M340 256 L340 216" : "M340 214 L340 254",
+              color: battColor,
+              watts: batt,
+              active: battActive,
+              markerId: "em-arr-batt",
+            })}
+
+          {/* TOP NODE: Fotovoltaico */}
+          <g
+            transform="translate(222, 6)"
+            className={`energy-node ${activeNode === "pv" ? "selected" : ""}`}
+            role="button"
+            tabIndex={0}
+            aria-expanded={activeNode === "pv"}
+            aria-label={`Fotovoltaico: ${pv == null ? "Non disponibile" : fmtAbsKw(pv)}, stato ${pvStateLabel}. Premi Invio per dettagli tecnici`}
+            onClick={() => toggleNode("pv")}
+            onKeyDown={(e) => handleNodeKey("pv", e)}
+          >
+            <rect
+              width="236"
+              height="80"
+              rx="16"
+              fill="var(--bg-surface)"
+              stroke={pv == null || isStale ? inactiveColor : "var(--pv-color)"}
+              strokeWidth={activeNode === "pv" ? 2.4 : 1.7}
+            />
+            <circle cx="32" cy="40" r="17" fill="var(--pv-soft)" />
+            <g transform="translate(20,28)" stroke={pv == null || isStale ? inactiveColor : "var(--pv-color)"} strokeWidth="1.9" fill="none" strokeLinecap="round">
+              <circle cx="12" cy="12" r="4" />
+              <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" />
+            </g>
+            <text x="58" y="25" fill="var(--text-secondary)" fontSize="12" fontWeight="650">
+              Fotovoltaico
             </text>
-            <text x="14" y="52" fill={pv == null ? "var(--missing-grey)" : "var(--pv-color)"} fontSize="20" fontWeight="700">
+            <text x="58" y="51" fill={pv == null || isStale ? inactiveColor : "var(--pv-color)"} fontSize="22" fontWeight="750">
               {pv == null ? "Non disp." : fmtAbsKw(pv)}
             </text>
-            <text x="122" y="45" fill="var(--text-muted)" fontSize="11">
-              PV1: {telemetry?.pv1_w != null ? `${Math.round(telemetry.pv1_w)} W` : "—"}
+            <text x="58" y="69" fill="var(--text-muted)" fontSize="11.5">
+              {pvStateLabel}
             </text>
-            <text x="122" y="61" fill="var(--text-muted)" fontSize="11">
-              PV2: {telemetry?.pv2_w != null ? `${Math.round(telemetry.pv2_w)} W` : "—"}
-            </text>
+            <QualityGlyph x={216} y={19} kind={pvQualityKind} />
           </g>
 
-          {/* Home Node */}
-          <g transform="translate(238,12)">
+          {/* LEFT NODE: Rete */}
+          <g
+            transform="translate(8, 134)"
+            className={`energy-node ${activeNode === "grid" ? "selected" : ""}`}
+            role="button"
+            tabIndex={0}
+            aria-expanded={activeNode === "grid"}
+            aria-label={`Rete: ${grid == null ? "Non disponibile" : fmtWatts(grid)}, stato ${gridDirLabel}. Premi Invio per dettagli tecnici`}
+            onClick={() => toggleNode("grid")}
+            onKeyDown={(e) => handleNodeKey("grid", e)}
+          >
             <rect
-              width="224"
-              height="78"
-              rx="14"
+              width="172"
+              height="88"
+              rx="16"
               fill="var(--bg-surface)"
-              stroke={load == null ? "var(--missing-grey)" : "var(--home-color)"}
-              strokeWidth="1.5"
-              strokeDasharray="5 3"
+              stroke={grid == null || isStale ? inactiveColor : "var(--grid-color)"}
+              strokeWidth={activeNode === "grid" ? 2.4 : 1.7}
             />
-            <text x="14" y="24" fill="var(--text-secondary)" fontSize="11" fontWeight="650">
-              CASA · DERIVATO AC
+            <g transform="translate(14,14)" stroke={grid == null || isStale ? inactiveColor : "var(--grid-color)"} strokeWidth="1.8" fill="none" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M9 2L4 18M9 2l5 16M5 10h8M3 6h12M6 14h6" />
+            </g>
+            <text x="36" y="27" fill="var(--text-secondary)" fontSize="12" fontWeight="650">
+              Rete
             </text>
-            <text x="14" y="52" fill={load == null ? "var(--missing-grey)" : "var(--home-color)"} fontSize="20" fontWeight="700">
-              {load == null ? "Non disp." : fmtAbsKw(load)}
-            </text>
-            <text x="122" y="45" fill="var(--battery-color)" fontSize="11" fontWeight="600">
-              Autocons: {selfConsumptionPct != null ? fmtPct(selfConsumptionPct) : "—"}
-            </text>
-            <text x="122" y="61" fill="var(--text-muted)" fontSize="11">
-              {fmtNum(telemetry?.grid_v, "V", 1)} · {fmtNum(telemetry?.hz, "Hz", 2)}
-            </text>
-          </g>
-
-          {/* Grid Node */}
-          <g transform="translate(454,12)">
-            <rect
-              width="224"
-              height="78"
-              rx="14"
-              fill="var(--bg-surface)"
-              stroke={grid == null ? "var(--missing-grey)" : "var(--grid-color)"}
-              strokeWidth="1.5"
-            />
-            <text x="14" y="24" fill="var(--text-secondary)" fontSize="11" fontWeight="650">
-              RETE · {gridDir.toUpperCase()}
-            </text>
-            <text x="14" y="52" fill={grid == null ? "var(--missing-grey)" : "var(--grid-color)"} fontSize="20" fontWeight="700">
+            <text x="16" y="54" fill={grid == null || isStale ? inactiveColor : "var(--grid-color)"} fontSize="20.5" fontWeight="750">
               {grid == null ? "Non disp." : fmtWatts(grid)}
             </text>
-            <text x="126" y="45" fill="var(--text-muted)" fontSize="11">
-              {gridImport ? "+ Prelievo" : gridExport ? "- Immissione" : "Equilibrio"}
+            <text x="16" y="73" fill="var(--text-muted)" fontSize="11.5">
+              {gridDirLabel}
             </text>
-            <text x="126" y="61" fill="var(--text-muted)" fontSize="11">
-              {ageText}
-            </text>
+            <QualityGlyph x={153} y={20} kind={gridQualityKind} />
           </g>
 
-          {/* Inverter Hub */}
-          <g transform="translate(300,118)">
-            <rect width="100" height="58" rx="14" fill="var(--bg-elevated)" stroke="var(--accent-teal)" strokeWidth="1.6" />
-            <text x="50" y="26" textAnchor="middle" fill="var(--text-primary)" fontSize="13" fontWeight="700">
+          {/* RIGHT NODE: Casa */}
+          <g
+            transform="translate(500, 134)"
+            className={`energy-node ${activeNode === "home" ? "selected" : ""}`}
+            role="button"
+            tabIndex={0}
+            aria-expanded={activeNode === "home"}
+            aria-label={`Casa: ${load == null ? "Non disponibile" : fmtAbsKw(load)}, stato ${loadDirLabel}. Premi Invio per dettagli tecnici`}
+            onClick={() => toggleNode("home")}
+            onKeyDown={(e) => handleNodeKey("home", e)}
+          >
+            <rect
+              width="172"
+              height="88"
+              rx="16"
+              fill="var(--bg-surface)"
+              stroke={load == null || isStale ? inactiveColor : "var(--home-color)"}
+              strokeWidth={activeNode === "home" ? 2.4 : 1.7}
+              strokeDasharray="5 3"
+            />
+            <g transform="translate(14,14)" stroke={load == null || isStale ? inactiveColor : "var(--home-color)"} strokeWidth="1.8" fill="none" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M2 9.5L9 3l7 6.5M4 8.5V16h10V8.5" />
+            </g>
+            <text x="36" y="27" fill="var(--text-secondary)" fontSize="12" fontWeight="650">
+              Casa
+            </text>
+            <text x="16" y="54" fill={load == null || isStale ? inactiveColor : "var(--home-color)"} fontSize="20.5" fontWeight="750">
+              {load == null ? "Non disp." : fmtAbsKw(load)}
+            </text>
+            <text x="16" y="73" fill="var(--text-muted)" fontSize="11.5">
+              {loadDirLabel}
+            </text>
+            <QualityGlyph x={153} y={20} kind={loadQualityKind} />
+          </g>
+
+          {/* CENTER HUB: Inverter Afore */}
+          <g
+            transform="translate(288, 144)"
+            className={`energy-node ${activeNode === "inverter" ? "selected" : ""}`}
+            role="button"
+            tabIndex={0}
+            aria-expanded={activeNode === "inverter"}
+            aria-label={`Inverter Afore: stato ${invStatusLabel}. Premi Invio per dettagli tecnici`}
+            onClick={() => toggleNode("inverter")}
+            onKeyDown={(e) => handleNodeKey("inverter", e)}
+          >
+            <rect
+              width="104"
+              height="68"
+              rx="18"
+              fill="var(--bg-elevated)"
+              stroke={telemetry?.fault ? "var(--fault-red)" : "var(--accent-teal)"}
+              strokeWidth={activeNode === "inverter" ? 2.6 : 2}
+            />
+            <text x="52" y="31" textAnchor="middle" fill="var(--text-primary)" fontSize="14.5" fontWeight="750">
               Afore
             </text>
-            <text x="50" y="44" textAnchor="middle" fill="var(--accent-teal)" fontSize="11">
-              {telemetry?.temp_c != null ? fmtNum(telemetry.temp_c, "°C", 1) : "Inverter"}
+            <text
+              x="52"
+              y="49"
+              textAnchor="middle"
+              fill={telemetry?.fault ? "var(--fault-red)" : isStale ? "var(--safety-amber)" : "var(--accent-teal)"}
+              fontSize="11.5"
+              fontWeight="650"
+            >
+              {invStatusLabel}
             </text>
           </g>
 
-          {/* Battery Node */}
-          <g transform="translate(170,206)">
+          {/* BOTTOM NODE: Batteria */}
+          <g
+            transform="translate(182, 258)"
+            className={`energy-node ${activeNode === "battery" ? "selected" : ""}`}
+            role="button"
+            tabIndex={0}
+            aria-expanded={activeNode === "battery"}
+            aria-label={`Batteria: SOC ${fmtPct(soc)}, potenza ${batt == null ? "Non disponibile" : fmtWatts(batt)}, stato ${battDirLabel}. Premi Invio per dettagli tecnici`}
+            onClick={() => toggleNode("battery")}
+            onKeyDown={(e) => handleNodeKey("battery", e)}
+          >
             <rect
-              width="360"
-              height="78"
-              rx="14"
+              width="316"
+              height="90"
+              rx="16"
               fill="var(--bg-surface)"
-              stroke={batt == null ? "var(--missing-grey)" : "var(--battery-color)"}
-              strokeWidth="1.5"
+              stroke={batt == null && soc == null ? inactiveColor : isStale ? inactiveColor : "var(--battery-color)"}
+              strokeWidth={activeNode === "battery" ? 2.4 : 1.7}
             />
-            <text x="16" y="24" fill="var(--text-secondary)" fontSize="11" fontWeight="650">
-              BATTERIA · {battDir.toUpperCase()}
+            <g transform="translate(16,15)" stroke={batt == null && soc == null ? inactiveColor : "var(--battery-color)"} strokeWidth="1.8" fill="none" strokeLinecap="round">
+              <rect x="1" y="4" width="16" height="10" rx="2" />
+              <path d="M19 7v4" />
+            </g>
+            <text x="41" y="27" fill="var(--text-secondary)" fontSize="12" fontWeight="650">
+              Batteria · {battDirLabel}
             </text>
-            <text x="16" y="53" fill={batt == null ? "var(--missing-grey)" : "var(--battery-color)"} fontSize="20" fontWeight="700">
+            <text
+              x="16"
+              y="55"
+              fill={batt == null || isStale ? inactiveColor : "var(--battery-color)"}
+              fontSize="21"
+              fontWeight="750"
+            >
               {batt == null ? "Non disp." : fmtWatts(batt)}
             </text>
-            <text x="158" y="24" fill="var(--text-secondary)" fontSize="11">
+
+            <text x="278" y="25" textAnchor="end" fill="var(--text-secondary)" fontSize="11" fontWeight="650">
               SOC
             </text>
-            <text x="344" y="24" textAnchor="end" fill="var(--text-primary)" fontSize="14" fontWeight="700">
-              {soc != null ? fmtPct(soc) : "Non disp."}
+            <text
+              x="278"
+              y="54"
+              textAnchor="end"
+              fill={soc == null ? inactiveColor : "var(--battery-color)"}
+              fontSize="26"
+              fontWeight="800"
+            >
+              {soc != null ? fmtPct(soc) : "—"}
             </text>
-            <rect x="158" y="33" width="186" height="10" rx="5" fill="var(--bg-inset)" stroke="var(--border-subtle)" />
+            <QualityGlyph x={296} y={20} kind={battQualityKind} />
+
+            {/* Graphic battery fill bar */}
+            <rect x="16" y="66" width="284" height="11" rx="5.5" fill="var(--bg-inset)" stroke="var(--border-subtle)" />
             {soc != null && (
               <rect
-                x="158"
-                y="33"
-                width={Math.max(4, Math.min(186, (soc / 100) * 186))}
-                height="10"
-                rx="5"
-                fill="var(--battery-color)"
+                x="16"
+                y="66"
+                width={socWidth}
+                height="11"
+                rx="5.5"
+                fill={isStale ? inactiveColor : "var(--battery-color)"}
               />
             )}
-            <text x="158" y="61" fill="var(--text-muted)" fontSize="11">
-              {fmtNum(telemetry?.battery_v, "V", 1)} · {fmtNum(telemetry?.battery_a, "A", 1)} · {capLabel}
-            </text>
           </g>
         </svg>
+        )}
+
+        {renderPopoverContent()}
       </div>
     </div>
   );

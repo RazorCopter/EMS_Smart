@@ -50,6 +50,7 @@ from .pdf_export import build_simple_pdf
 from .queries import (
     get_live_payload,
     get_system_status,
+    is_legacy_stride_gap,
     load_companion_settings,
     query_analytics_report,
     query_battery_summary,
@@ -350,7 +351,7 @@ async def sse_live(
 @app.get("/api/v1/history")
 async def history(
     request: Request,
-    range: str = Query(default="today", pattern="^(today|yesterday|7d|30d|12m|custom)$"),
+    range: str = Query(default="today", pattern="^(1h|3h|6h|12h|today|yesterday|7d|30d|12m|custom)$"),
     start: str | None = None,
     end: str | None = None,
     bucket: str = Query(default="auto", pattern="^(auto|1m|5m|15m|1h|1d)$"),
@@ -487,6 +488,7 @@ async def events(
                 "title": ev.title,
                 "detail": ev.detail,
                 "metadata": ev.metadata_json,
+                "legacy_stride_gap": is_legacy_stride_gap(ev.event_type, ev.title, ev.detail),
             }
             for ev in rows
         ]

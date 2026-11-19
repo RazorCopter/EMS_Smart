@@ -124,6 +124,9 @@ tr:last-child td{border-bottom:0}
       <label style="cursor:pointer;display:flex;align-items:center;margin-top:8px">
         <input id="mq_ha" type="checkbox" checked style="width:auto;margin:0 8px 0 0">Enable Home Assistant Discovery
       </label>
+      <label style="cursor:pointer;display:flex;align-items:center;margin-top:8px">
+        <input id="mq_tls" type="checkbox" style="width:auto;margin:0 8px 0 0">Enable TLS / MQTTS (Secure Connection)
+      </label>
     </div>
   </div>
 
@@ -201,6 +204,7 @@ const setupReady=fetch('/api/v1/config').then(r=>r.json()).then(c=>{
     if(c.mqtt.username)$('mq_u').value=c.mqtt.username;
     if(c.mqtt.base_topic)$('mq_bt').value=c.mqtt.base_topic;
     if(c.mqtt.discovery_enabled!==undefined)$('mq_ha').checked=c.mqtt.discovery_enabled;
+    if(c.mqtt.tls!==undefined||c.mqtt.use_tls!==undefined)$('mq_tls').checked=!!(c.mqtt.tls||c.mqtt.use_tls);
   }
   if(reauth){
     $('pwhint').style.display='block';
@@ -298,7 +302,8 @@ $('f').onsubmit=async e=>{
         port:parseInt($('mq_p').value||'1883',10),
         username:$('mq_u').value.trim(),
         base_topic:$('mq_bt').value.trim()||'heliograph',
-        discovery_enabled:$('mq_ha').checked
+        discovery_enabled:$('mq_ha').checked,
+        tls:$('mq_tls').checked
       };
       if($('mq_pw').value!==''){
         body.mqtt.password=$('mq_pw').value;

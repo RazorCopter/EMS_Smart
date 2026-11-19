@@ -1,0 +1,239 @@
+# Smart Energy Manager - package di sola lettura, v2
+# Non scrive registri inverter e non modifica la blueprint.
+# Parametri da mantenere allineati con l'automazione.
+# Inserire in /config/packages/sem_sensors_package.yaml
+# configuration.yaml: homeassistant: {packages: !include_dir_named packages}
+# Non installare insieme alla versione precedente: sostituirla.
+
+template:
+  - sensor:
+      - name: SEM Energia mancante
+        unique_id: sem_deficit_kwh
+        unit_of_measurement: kWh
+        icon: mdi:battery-arrow-up
+        availability: "{{ is_number(states('sensor.solarman_battery_soc')) }}"
+        state: >-
+          {{ ((100 - states('sensor.solarman_battery_soc') | float(0)) * 10.24 / 100) | round(2) }}
+
+      - name: SEM Età previsione Solcast
+        unique_id: sem_solcast_age
+        unit_of_measurement: h
+        icon: mdi:update
+        availability: >-
+          {{ as_datetime(states('sensor.solcast_pv_forecast_ultimo_polling_api'), none) is not none }}
+        state: >-
+          {% set p = as_datetime(states('sensor.solcast_pv_forecast_ultimo_polling_api'), none) %}
+          {{ ([0, (as_timestamp(now()) - as_timestamp(p)) / 3600] | max) | round(1) if p else 0 }}
+
+      - name: SEM Differenza T-Td
+        unique_id: sem_spread
+        unit_of_measurement: '°C'
+        icon: mdi:weather-fog
+        availability: >-
+          {{ is_number(states('sensor.sense_esterno_temperature')) and is_number(states('sensor.punto_di_rugiada')) }}
+        state: >-
+          {{ (states('sensor.sense_esterno_temperature') | float(0) - states('sensor.punto_di_rugiada') | float(0)) | round(1) }}
+
+      - name: SEM Rapporto reale previsto
+        unique_id: sem_ratio
+        icon: mdi:chart-bell-curve
+        state: >-
+          {% set f = state_attr('sensor.solcast_pv_forecast_previsione_per_oggi','detailedForecast') or [] %}
+          {% set ns = namespace(kw=0) %}
+          {% for x in f if x is mapping %}
+            {% set start = as_timestamp(x.get('period_start'), none) %}
+            {% if start is not none and start <= as_timestamp(now()) < start + 1800 %}
+              {% set ns.kw = x.get('pv_estimate',0) | float(0) %}
+            {% endif %}
+          {% endfor %}
+          {% set actual = states('sensor.solarman_pv_power_media_15_min') %}
+          {% if is_number(actual) and ns.kw >= 0.2 %}
+            {{ [[(actual | float(0) / 1000 / ns.kw), 0.5] | max, 1] | min | round(2) }}
+          {% else %}1{% endif %}
+        attributes:
+          previsto_kw: >-
+            {% set f = state_attr('sensor.solcast_pv_forecast_previsione_per_oggi','detailedForecast') or [] %}
+            {% set ns = namespace(kw=0) %}
+            {% for x in f if x is mapping %}
+              {% set start = as_timestamp(x.get('period_start'), none) %}
+              {% if start is not none and start <= as_timestamp(now()) < start + 1800 %}
+                {% set ns.kw = x.get('pv_estimate',0) | float(0) %}
+              {% endif %}
+            {% endfor %}
+            {{ ns.kw | round(2) }}
+
+  # Un solo sensore di calcolo aggregato, aggiornato ogni 5 minuti e
+  # al cambiamento dei dati essenziali. Gli attributi sono numerici.
+  - triggers:
+      - trigger: time_pattern
+        minutes: '/5'
+      - trigger: homeassistant
+        event: start
+      - trigger: state
+        entity_id:
+          - sensor.solarman_battery_soc
+          - sensor.solcast_pv_forecast_previsione_per_oggi
+          - sensor.solcast_pv_forecast_previsione_per_domani
+          - sensor.solarman_pv_power_media_15_min
+          - sensor.sense_esterno_temperature
+          - sensor.punto_di_rugiada
+          - sensor.radiazione_solare
+          - select.solarman_modalita_ems
+    sensor:
+      - name: SEM Calcoli
+        unique_id: sem_calcoli
+        icon: mdi:calculator-variant
+        state: "{{ now().strftime('%H:%M') }}"
+        attributes:
+          dati: >-
+            {% set cap = 10.24 %}
+            {% set target_soc = 100 %}
+            {% set target_time = today_at('15:30:00') %}
+            {% set load = 0.9 if now().weekday() in [5,6] else 0.6 %}
+            {% set load_tomorrow = 0.9 if (now() + timedelta(days=1)).weekday() in [5,6] else 0.6 %}
+            {% set soc_raw = states('sensor.solarman_battery_soc') %}
+            {% set soc = soc_raw | float(0) %}
+            {% set soc_valid = is_number(soc_raw) and 0 <= soc <= 100 %}
+            {% set poll = as_datetime(states('sensor.solcast_pv_forecast_ultimo_polling_api'), none) %}
+            {% set fresh = poll is not none and 0 <= as_timestamp(now()) - as_timestamp(poll) <= 14 * 3600 %}
+            {% set today = state_attr('sensor.solcast_pv_forecast_previsione_per_oggi','detailedForecast') or [] %}
+            {% set tomorrow = state_attr('sensor.solcast_pv_forecast_previsione_per_domani','detailedForecast') or [] %}
+            {% set forecast_ok = fresh and today | count > 0 %}
+            {% set t = states('sensor.sense_esterno_temperature') %}
+            {% set d = states('sensor.punto_di_rugiada') %}
+            {% set rad = states('sensor.radiazione_solare') %}
+            {% set spread_ok = is_number(t) and is_number(d) %}
+            {% set spread = t | float(0) - d | float(0) if spread_ok else 99 %}
+            {% set fog = spread_ok and spread <= 1.5 and (not is_number(rad) or rad | float(0) < 100) and now() < today_at('11:30:00') %}
+            {% set ratio = states('sensor.sem_rapporto_reale_previsto') | float(1) %}
+            {% set ns = namespace(target=0.0, day=0.0, tomorrow=0.0) %}
+            {% for x in today if x is mapping %}
+              {% set start = as_timestamp(x.get('period_start'), none) %}
+              {% set raw = x.get('pv_estimate',none) %}
+              {% if start is not none and is_number(raw) %}
+                {% set end = start + 1800 %}
+                {% set current = as_timestamp(now()) %}
+                {% if end > current %}
+                  {% set factor = 1.0 %}
+                  {% if fog and start < as_timestamp(today_at('11:30:00')) %}{% set factor = [factor,0.3] | min %}{% endif %}
+                  {% if start < current + 7200 %}{% set factor = [factor,ratio] | min %}{% endif %}
+                  {% set surplus = [raw | float(0) * factor - load, 0] | max %}
+                  {% set ns.day = ns.day + surplus * (end - [start,current] | max) / 3600 %}
+                  {% set overlap = [0, ([end,as_timestamp(target_time)] | min) - ([start,current] | max)] | max %}
+                  {% set ns.target = ns.target + surplus * overlap / 3600 %}
+                {% endif %}
+              {% endif %}
+            {% endfor %}
+            {% for x in tomorrow if x is mapping %}
+              {% set start = as_timestamp(x.get('period_start'), none) %}
+              {% set raw = x.get('pv_estimate',none) %}
+              {% if start is not none and is_number(raw) %}
+                {% set day = as_datetime(start | timestamp_local).date() %}
+                {% if day == (now() + timedelta(days=1)).date() %}
+                  {% set ns.tomorrow = ns.tomorrow + ([raw | float(0) - load_tomorrow, 0] | max) * 0.5 %}
+                {% endif %}
+              {% endif %}
+            {% endfor %}
+            {% set deficit = ([100 - soc,0] | max) * cap / 100 %}
+            {% set need = deficit * 1.1 %}
+            {% set hrs = (as_timestamp(target_time) - as_timestamp(now())) / 3600 %}
+            {% set season_day = now().month * 100 + now().day %}
+            {% set season = season_day >= 1025 or season_day <= 228 %}
+            {% set today_ok = forecast_ok and ns.day >= need %}
+            {% set tomorrow_ok = tomorrow | count > 0 and ns.tomorrow >= 7 and soc >= 40 %}
+            {% set ems = states('select.solarman_modalita_ems') %}
+            {% if not soc_valid %}
+              {% set decision = 'SOC non disponibile' %}
+            {% elif ems == 'ChgFst' %}
+              {% set decision = 'ChgFst attivo' %}
+            {% elif not season %}
+              {% set decision = 'Solo modulazione' %}
+            {% elif not forecast_ok %}
+              {% set decision = 'Previsione non valida' %}
+            {% elif today_ok %}
+              {% set decision = 'SelfUse (oggi basta)' %}
+            {% elif tomorrow_ok %}
+              {% set decision = 'SelfUse (rimando a domani)' %}
+            {% else %}
+              {% set decision = 'ChgFst probabile' %}
+            {% endif %}
+            {% if ems == 'ChgFst' %}
+              {% set amps = 50 %}{% set reason = 'ChgFst: corrente massima' %}
+            {% elif deficit <= 0.05 %}
+              {% set amps = 5 %}{% set reason = 'SOC al target' %}
+            {% elif not forecast_ok %}
+              {% set amps = 50 %}{% set reason = 'Previsione non valida' %}
+            {% elif hrs <= 0.5 %}
+              {% set amps = 50 %}{% set reason = 'Target vicino o superato' %}
+            {% elif ns.target < deficit * 1.2 %}
+              {% set amps = 50 %}{% set reason = 'Surplus insufficiente' %}
+            {% else %}
+              {% set amps = [[(deficit * 1000 / hrs / 51.2 * 1.2) | round(0,'ceil') | int,5] | max,50] | min %}
+              {% set reason = 'Modulazione fino alle 15:30' %}
+            {% endif %}
+            {{ dict(valid=soc_valid, forecast_ok=forecast_ok, fog=fog,
+              target=ns.target|round(2), day=ns.day|round(2), tomorrow=ns.tomorrow|round(2),
+              need=need|round(2), amps=amps, reason=reason, decision=decision,
+              season=season, today_ok=today_ok, tomorrow_ok=tomorrow_ok,
+              load_today=load, load_tomorrow=load_tomorrow,
+              soc_eod=([soc + ns.day / cap * 100,100]|min)|round(0)) }}
+
+  # Entità esposte alla dashboard. Unavailable se il dato base manca.
+  - sensor:
+      - name: SEM Surplus fino al target
+        unique_id: sem_surplus_target
+        unit_of_measurement: kWh
+        icon: mdi:solar-power-variant
+        availability: "{{ state_attr('sensor.sem_calcoli','dati') is mapping and state_attr('sensor.sem_calcoli','dati').get('forecast_ok',false) }}"
+        state: "{{ state_attr('sensor.sem_calcoli','dati').get('target',0) }}"
+      - name: SEM Surplus resto giornata
+        unique_id: sem_surplus_day
+        unit_of_measurement: kWh
+        icon: mdi:weather-sunset-down
+        availability: "{{ state_attr('sensor.sem_calcoli','dati') is mapping and state_attr('sensor.sem_calcoli','dati').get('forecast_ok',false) }}"
+        state: "{{ state_attr('sensor.sem_calcoli','dati').get('day',0) }}"
+      - name: SEM Surplus domani
+        unique_id: sem_surplus_tomorrow
+        unit_of_measurement: kWh
+        icon: mdi:calendar-arrow-right
+        availability: "{{ state_attr('sensor.sem_calcoli','dati') is mapping and state_attr('sensor.solcast_pv_forecast_previsione_per_domani','detailedForecast') is not none }}"
+        state: "{{ state_attr('sensor.sem_calcoli','dati').get('tomorrow',0) }}"
+      - name: SEM Energia richiesta ChgFst
+        unique_id: sem_need_full
+        unit_of_measurement: kWh
+        icon: mdi:scale-balance
+        availability: "{{ is_number(states('sensor.solarman_battery_soc')) }}"
+        state: "{{ ((100 - states('sensor.solarman_battery_soc') | float(0)) * 10.24 / 100 * 1.1) | round(2) }}"
+      - name: SEM SOC previsto a fine giornata
+        unique_id: sem_soc_forecast_eod
+        unit_of_measurement: '%'
+        icon: mdi:battery-clock
+        availability: "{{ state_attr('sensor.sem_calcoli','dati') is mapping and state_attr('sensor.sem_calcoli','dati').get('valid',false) and state_attr('sensor.sem_calcoli','dati').get('forecast_ok',false) }}"
+        state: "{{ state_attr('sensor.sem_calcoli','dati').get('soc_eod',0) }}"
+      - name: SEM Corrente calcolata
+        unique_id: sem_target_current
+        unit_of_measurement: A
+        icon: mdi:current-dc
+        availability: "{{ state_attr('sensor.sem_calcoli','dati') is mapping and state_attr('sensor.sem_calcoli','dati').get('valid',false) }}"
+        state: "{{ state_attr('sensor.sem_calcoli','dati').get('amps',50) }}"
+        attributes:
+          motivo: "{{ state_attr('sensor.sem_calcoli','dati').get('reason','') if state_attr('sensor.sem_calcoli','dati') is mapping else '' }}"
+      - name: SEM Decisione prevista
+        unique_id: sem_decision
+        icon: mdi:head-cog
+        state: "{{ state_attr('sensor.sem_calcoli','dati').get('decision','Dati in attesa') if state_attr('sensor.sem_calcoli','dati') is mapping else 'Dati in attesa' }}"
+        attributes:
+          periodo_chgfst: "{{ state_attr('sensor.sem_calcoli','dati').get('season',false) if state_attr('sensor.sem_calcoli','dati') is mapping else false }}"
+          oggi_ok: "{{ state_attr('sensor.sem_calcoli','dati').get('today_ok',false) if state_attr('sensor.sem_calcoli','dati') is mapping else false }}"
+          domani_ok: "{{ state_attr('sensor.sem_calcoli','dati').get('tomorrow_ok',false) if state_attr('sensor.sem_calcoli','dati') is mapping else false }}"
+          consumo_oggi_kw: "{{ state_attr('sensor.sem_calcoli','dati').get('load_today',0.6) if state_attr('sensor.sem_calcoli','dati') is mapping else 0.6 }}"
+          consumo_domani_kw: "{{ state_attr('sensor.sem_calcoli','dati').get('load_tomorrow',0.6) if state_attr('sensor.sem_calcoli','dati') is mapping else 0.6 }}"
+  - binary_sensor:
+      - name: SEM Nebbia
+        unique_id: sem_fog
+        icon: mdi:weather-fog
+        state: "{{ state_attr('sensor.sem_calcoli','dati').get('fog',false) if state_attr('sensor.sem_calcoli','dati') is mapping else false }}"
+      - name: SEM Previsione valida
+        unique_id: sem_fc_ok
+        icon: mdi:check-network
+        state: "{{ state_attr('sensor.sem_calcoli','dati').get('forecast_ok',false) if state_attr('sensor.sem_calcoli','dati') is mapping else false }}"

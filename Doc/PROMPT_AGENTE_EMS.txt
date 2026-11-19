@@ -1,0 +1,69 @@
+Devi sviluppare Afore Autonomous EMS secondo il piano allegato PIANO_IMPLEMENTAZIONE_EMS_OPENEMS.md, versione 1.0 del 13 novembre 2026.
+
+OBIETTIVO
+Realizza un vero gestore dell’energia autonomo, con nucleo C++17 comune a Raspberry e ESP32, strategie e limiti configurabili da GUI, integrazione smart Home Assistant via MQTT e attuazione Afore External EMS in una fase separata e validata. Non limitarti a un monitor o a una GUI dimostrativa.
+
+CONTESTO
+Repository: C:\Users\gianv\Documents\Progetti\ESP\afore-autonomous-ems
+Banco: ssh afore-m3
+Sistema osservato: Raspberry ARM64 con Debian 13.7.
+Dashboard osservata: http://10.0.5.174:8080/
+Documenti integrazione e requisiti: Doc/ nel repository.
+OpenEMS: https://github.com/OpenEMS/openems
+Commit di riferimento per l’analisi: 769483ea2c2cc8be64fbf20094e70cea89f0f307.
+
+LEGGI PRIMA
+1. Il piano allegato per intero.
+2. AGENTS.md e le istruzioni specifiche applicabili.
+3. Doc/PIANO_Afore_Autonomous_EMS_V4.md e Doc/Afore_Autonomous_EMS_V4_Roadmap.md.
+4. Il documento EMS .docx e la tabella registri .xlsx presenti in Doc/.
+5. I sorgenti reali di runtime host/ESP32, telemetria, EMS, configurazione, MQTT e web.
+
+STRATEGIE E RIFERIMENTI
+Analizza implementazione, configurazione, test e GUI dei controller OpenEMS:
+- Controller.Ess.Balancing.
+- Controller.Ess.GridOptimizedCharge.
+- Controller.Ess.LimitTotalDischarge.
+- Controller.Ess.TimeOfUseTariff.
+- Controller.Ess.FixStateOfCharge.
+Adatta anche il coordinamento dei vincoli e la relazione fra scheduler e attuatore. Documenta cosa riusi, cosa reimplementi e cosa semplifichi. Rispetta licenze e attribuzioni: Edge/Backend dichiarano EPL-2.0, UI AGPL-3.0, il progetto di partenza MIT. Non copiare il frontend completo per ottenere soltanto gli stessi menu.
+
+STATO INIZIALE DA NON FRAINTENDERE
+La GUI Python iniziale mostrava misure fisse. È stato aggiunto deploy/live_backend.py, che legge realmente l’inverter con il profilo TOML ma è un ponte temporaneo in sola lettura. Non esegue l’EMS C++ e non rappresenta il prodotto finale.
+Il servizio remoto usa un drop-in in /etc/systemd/system/afore-shadow.service.d/live.conf. Il ponte detiene la seriale: non avviare un secondo master contemporaneamente.
+Il vecchio main host aveva un ciclo placeholder. La presenza di librerie, test e report di qualifica non dimostra integrazione nel runtime.
+Il profilo Afore è stato corretto; il decoder dedicato C++ non va considerato automaticamente allineato.
+La working tree contiene modifiche locali e documenti non tracciati. Non resettarli o cancellarli.
+
+REQUISITI ESSENZIALI
+Implementa Self Use, riserva SOC, Charge First, carica FV ottimizzata, obiettivo SOC con deadline/mantenimento, Maintenance e tariffa. Distingui strategia EMS, modalità monitor/shadow/active e modalità nativa dell’inverter.
+Home Assistant fornisce previsioni, prezzi, meteo, obiettivi e override tramite MQTT. Il controller mantiene limiti, decisione finale e autonomia locale. Le richieste remote non espandono i permessi globali e hanno scadenza.
+Un unico nucleo C++ deve decidere sia su Linux sia su ESP32. Non riscrivere gli algoritmi in Python per farli apparire funzionanti sul Pi.
+Nessun dato ignoto diventa zero. Nessun campione non verificato sblocca il controllo attivo. Separare comando assente, 0 W, inviato e applicato.
+Un solo proprietario della seriale e un solo attuatore. Registri e conversioni Afore restano nel driver/profili.
+La GUI deve avere backend reale, validazione condivisa con MQTT, persistenza atomica, revisione e feedback di applicazione. Mostra strategia effettiva, motivo della decisione, vincoli, sorgente e lease attiva.
+
+SICUREZZA E PERIMETRO
+Inizia dalle fasi offline e shadow del piano. Nessun nuovo comando all’inverter è autorizzato dal solo incarico di implementazione software.
+La fase di controllo fisico richiede un’autorizzazione che includa quelle scritture e la procedura concreta di prova. Se esiste già un’autorizzazione esplicita pertinente nella sessione, usala senza richiederla inutilmente.
+Mantieni la build shadow strutturalmente in lettura. Non indebolire ReadOnlyGuard e non rimuovere i check per ottenere una build verde.
+Non scrivere dinamicamente 0x0BC1/0x0BC2, non modificare il bus BMS, non azionare i relè per implementare il controllo batteria.
+Il timeout External EMS non prova un ritorno a SelfUse. Se il bus o l’alimentazione sono persi non promettere comandi di recupero che il controller non può trasmettere.
+Nessun flash, commit/push o modifica a servizi esterni se non compreso nell’incarico autorizzato.
+
+METODO DI LAVORO
+1. Esegui M0 e pubblica la baseline verificata.
+2. Esegui M1 e consolida contratti, ADR, matrice OpenEMS e tracciabilità.
+3. Procedi con implementazione e test secondo M2–M15 e dipendenze del piano, senza fermarti dopo la sola documentazione.
+4. Anticipa compilazioni ESP32 per rilevare problemi di portabilità.
+5. Usa test di dominio, simulazione a ciclo chiuso e replay; non chiamare il replay prova di risparmio reale.
+6. Fai avanzare attività indipendenti quando un punto hardware è in attesa. Chiedi solo informazioni che cambiano davvero il comportamento o l’autorizzazione, senza inventare dati mancanti.
+7. Aggiorna docs/ems/implementation-status.md con risultati, comandi, ambiente e prove reali.
+8. Prima di sostituire il ponte sul Pi prepara e verifica backup, package e rollback; arresta il vecchio proprietario della seriale prima di avviare il nuovo.
+
+PRIMA CONSEGNA UTILE
+Un runtime C++ host in sola lettura che esegue il core EMS shadow, con GUI per strategia, riserva e limiti. Cambiare un parametro deve modificare una decisione reale e verificabile. Non fermarti a disegnare una pagina.
+
+COMPLETAMENTO
+Non dichiarare “EMS funzionante” finché non distingui e dimostri runtime, test, deployment e attuazione. Consegna codice, build riproducibili, configurazione redatta, report test, limiti noti e manuale/rollback.
+Per il perimetro hardware non ancora autorizzato consegna la build disarmata e un protocollo di prova concreto, mantenendo operative le funzioni già autorizzate.

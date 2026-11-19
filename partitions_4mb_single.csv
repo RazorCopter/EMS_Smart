@@ -1,0 +1,7 @@
+# ESP32-C3 4MB Partition Table for bench testing (No OTA, single large app partition ~3.1MB)
+# Name,     Type, SubType,  Offset,   Size,     Flags
+nvs,        data, nvs,      0x9000,   0x5000,
+otadata,    data, ota,      0xE000,   0x2000,
+app0,       app,  ota_0,    0x10000,  0x310000,
+coredump,   data, coredump, 0x320000, 0x10000,
+spiffs,     data, spiffs,   0x330000, 0xC0000,

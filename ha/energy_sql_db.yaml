@@ -1,0 +1,452 @@
+##############################################################
+#
+# PVPerformance — Sensori SQL mensili
+#
+# Inverter: Solarman
+#
+# metadata_id:
+#   483 = sensor.solarman_etotal_inverter       (produzione)
+#   486 = sensor.solarman_etotal_to_load        (consumo casa)
+#   485 = sensor.solarman_etotal_received_from_grid (import)
+#   484 = sensor.solarman_etotal_feed_into_grid (export)
+#
+# Installazione:
+#   1. Copia questo blocco in /config/packages/ oppure
+#      includi in configuration.yaml con:
+#        sensor: !include_dir_merge_list packages/
+#   2. Riavvia Home Assistant
+#
+##############################################################
+
+sql:
+  # =========================
+  # GENNAIO 2026
+  # =========================
+
+  - name: FV 2026 01 Produzione DB
+    unique_id: fv_2026_01_produzione_db
+    db_url: sqlite:////config/home-assistant_v2.db
+    query: >
+      SELECT ROUND(COALESCE((SELECT sum FROM statistics WHERE metadata_id = 483 AND start_ts <= strftime('%s','2026-02-01 00:00:00','localtime') ORDER BY start_ts DESC LIMIT 1) - (SELECT sum FROM statistics WHERE metadata_id = 483 AND start_ts <= strftime('%s','2026-01-01 00:00:00','localtime') ORDER BY start_ts DESC LIMIT 1), 0), 2) AS value;
+    column: value
+    unit_of_measurement: "kWh"
+
+  - name: FV 2026 01 Consumo DB
+    unique_id: fv_2026_01_consumo_db
+    db_url: sqlite:////config/home-assistant_v2.db
+    query: >
+      SELECT ROUND(COALESCE((SELECT sum FROM statistics WHERE metadata_id = 486 AND start_ts <= strftime('%s','2026-02-01 00:00:00','localtime') ORDER BY start_ts DESC LIMIT 1) - (SELECT sum FROM statistics WHERE metadata_id = 486 AND start_ts <= strftime('%s','2026-01-01 00:00:00','localtime') ORDER BY start_ts DESC LIMIT 1), 0), 2) AS value;
+    column: value
+    unit_of_measurement: "kWh"
+
+  - name: FV 2026 01 Import DB
+    unique_id: fv_2026_01_import_db
+    db_url: sqlite:////config/home-assistant_v2.db
+    query: >
+      SELECT ROUND(COALESCE((SELECT sum FROM statistics WHERE metadata_id = 485 AND start_ts <= strftime('%s','2026-02-01 00:00:00','localtime') ORDER BY start_ts DESC LIMIT 1) - (SELECT sum FROM statistics WHERE metadata_id = 485 AND start_ts <= strftime('%s','2026-01-01 00:00:00','localtime') ORDER BY start_ts DESC LIMIT 1), 0), 2) AS value;
+    column: value
+    unit_of_measurement: "kWh"
+
+  - name: FV 2026 01 Export DB
+    unique_id: fv_2026_01_export_db
+    db_url: sqlite:////config/home-assistant_v2.db
+    query: >
+      SELECT ROUND(COALESCE((SELECT sum FROM statistics WHERE metadata_id = 484 AND start_ts <= strftime('%s','2026-02-01 00:00:00','localtime') ORDER BY start_ts DESC LIMIT 1) - (SELECT sum FROM statistics WHERE metadata_id = 484 AND start_ts <= strftime('%s','2026-01-01 00:00:00','localtime') ORDER BY start_ts DESC LIMIT 1), 0), 2) AS value;
+    column: value
+    unit_of_measurement: "kWh"
+
+  # =========================
+  # FEBBRAIO 2026
+  # =========================
+
+  - name: FV 2026 02 Produzione DB
+    unique_id: fv_2026_02_produzione_db
+    db_url: sqlite:////config/home-assistant_v2.db
+    query: >
+      SELECT ROUND(COALESCE((SELECT sum FROM statistics WHERE metadata_id = 483 AND start_ts <= strftime('%s','2026-03-01 00:00:00','localtime') ORDER BY start_ts DESC LIMIT 1) - (SELECT sum FROM statistics WHERE metadata_id = 483 AND start_ts <= strftime('%s','2026-02-01 00:00:00','localtime') ORDER BY start_ts DESC LIMIT 1), 0), 2) AS value;
+    column: value
+    unit_of_measurement: "kWh"
+
+  - name: FV 2026 02 Consumo DB
+    unique_id: fv_2026_02_consumo_db
+    db_url: sqlite:////config/home-assistant_v2.db
+    query: >
+      SELECT ROUND(COALESCE((SELECT sum FROM statistics WHERE metadata_id = 486 AND start_ts <= strftime('%s','2026-03-01 00:00:00','localtime') ORDER BY start_ts DESC LIMIT 1) - (SELECT sum FROM statistics WHERE metadata_id = 486 AND start_ts <= strftime('%s','2026-02-01 00:00:00','localtime') ORDER BY start_ts DESC LIMIT 1), 0), 2) AS value;
+    column: value
+    unit_of_measurement: "kWh"
+
+  - name: FV 2026 02 Import DB
+    unique_id: fv_2026_02_import_db
+    db_url: sqlite:////config/home-assistant_v2.db
+    query: >
+      SELECT ROUND(COALESCE((SELECT sum FROM statistics WHERE metadata_id = 485 AND start_ts <= strftime('%s','2026-03-01 00:00:00','localtime') ORDER BY start_ts DESC LIMIT 1) - (SELECT sum FROM statistics WHERE metadata_id = 485 AND start_ts <= strftime('%s','2026-02-01 00:00:00','localtime') ORDER BY start_ts DESC LIMIT 1), 0), 2) AS value;
+    column: value
+    unit_of_measurement: "kWh"
+
+  - name: FV 2026 02 Export DB
+    unique_id: fv_2026_02_export_db
+    db_url: sqlite:////config/home-assistant_v2.db
+    query: >
+      SELECT ROUND(COALESCE((SELECT sum FROM statistics WHERE metadata_id = 484 AND start_ts <= strftime('%s','2026-03-01 00:00:00','localtime') ORDER BY start_ts DESC LIMIT 1) - (SELECT sum FROM statistics WHERE metadata_id = 484 AND start_ts <= strftime('%s','2026-02-01 00:00:00','localtime') ORDER BY start_ts DESC LIMIT 1), 0), 2) AS value;
+    column: value
+    unit_of_measurement: "kWh"
+
+  # =========================
+  # MARZO 2026
+  # =========================
+
+  - name: FV 2026 03 Produzione DB
+    unique_id: fv_2026_03_produzione_db
+    db_url: sqlite:////config/home-assistant_v2.db
+    query: >
+      SELECT ROUND(COALESCE((SELECT sum FROM statistics WHERE metadata_id = 483 AND start_ts <= strftime('%s','2026-04-01 00:00:00','localtime') ORDER BY start_ts DESC LIMIT 1) - (SELECT sum FROM statistics WHERE metadata_id = 483 AND start_ts <= strftime('%s','2026-03-01 00:00:00','localtime') ORDER BY start_ts DESC LIMIT 1), 0), 2) AS value;
+    column: value
+    unit_of_measurement: "kWh"
+
+  - name: FV 2026 03 Consumo DB
+    unique_id: fv_2026_03_consumo_db
+    db_url: sqlite:////config/home-assistant_v2.db
+    query: >
+      SELECT ROUND(COALESCE((SELECT sum FROM statistics WHERE metadata_id = 486 AND start_ts <= strftime('%s','2026-04-01 00:00:00','localtime') ORDER BY start_ts DESC LIMIT 1) - (SELECT sum FROM statistics WHERE metadata_id = 486 AND start_ts <= strftime('%s','2026-03-01 00:00:00','localtime') ORDER BY start_ts DESC LIMIT 1), 0), 2) AS value;
+    column: value
+    unit_of_measurement: "kWh"
+
+  - name: FV 2026 03 Import DB
+    unique_id: fv_2026_03_import_db
+    db_url: sqlite:////config/home-assistant_v2.db
+    query: >
+      SELECT ROUND(COALESCE((SELECT sum FROM statistics WHERE metadata_id = 485 AND start_ts <= strftime('%s','2026-04-01 00:00:00','localtime') ORDER BY start_ts DESC LIMIT 1) - (SELECT sum FROM statistics WHERE metadata_id = 485 AND start_ts <= strftime('%s','2026-03-01 00:00:00','localtime') ORDER BY start_ts DESC LIMIT 1), 0), 2) AS value;
+    column: value
+    unit_of_measurement: "kWh"
+
+  - name: FV 2026 03 Export DB
+    unique_id: fv_2026_03_export_db
+    db_url: sqlite:////config/home-assistant_v2.db
+    query: >
+      SELECT ROUND(COALESCE((SELECT sum FROM statistics WHERE metadata_id = 484 AND start_ts <= strftime('%s','2026-04-01 00:00:00','localtime') ORDER BY start_ts DESC LIMIT 1) - (SELECT sum FROM statistics WHERE metadata_id = 484 AND start_ts <= strftime('%s','2026-03-01 00:00:00','localtime') ORDER BY start_ts DESC LIMIT 1), 0), 2) AS value;
+    column: value
+    unit_of_measurement: "kWh"
+
+  # =========================
+  # APRILE 2026
+  # =========================
+
+  - name: FV 2026 04 Produzione DB
+    unique_id: fv_2026_04_produzione_db
+    db_url: sqlite:////config/home-assistant_v2.db
+    query: >
+      SELECT ROUND(COALESCE((SELECT sum FROM statistics WHERE metadata_id = 483 AND start_ts <= strftime('%s','2026-05-01 00:00:00','localtime') ORDER BY start_ts DESC LIMIT 1) - (SELECT sum FROM statistics WHERE metadata_id = 483 AND start_ts <= strftime('%s','2026-04-01 00:00:00','localtime') ORDER BY start_ts DESC LIMIT 1), 0), 2) AS value;
+    column: value
+    unit_of_measurement: "kWh"
+
+  - name: FV 2026 04 Consumo DB
+    unique_id: fv_2026_04_consumo_db
+    db_url: sqlite:////config/home-assistant_v2.db
+    query: >
+      SELECT ROUND(COALESCE((SELECT sum FROM statistics WHERE metadata_id = 486 AND start_ts <= strftime('%s','2026-05-01 00:00:00','localtime') ORDER BY start_ts DESC LIMIT 1) - (SELECT sum FROM statistics WHERE metadata_id = 486 AND start_ts <= strftime('%s','2026-04-01 00:00:00','localtime') ORDER BY start_ts DESC LIMIT 1), 0), 2) AS value;
+    column: value
+    unit_of_measurement: "kWh"
+
+  - name: FV 2026 04 Import DB
+    unique_id: fv_2026_04_import_db
+    db_url: sqlite:////config/home-assistant_v2.db
+    query: >
+      SELECT ROUND(COALESCE((SELECT sum FROM statistics WHERE metadata_id = 485 AND start_ts <= strftime('%s','2026-05-01 00:00:00','localtime') ORDER BY start_ts DESC LIMIT 1) - (SELECT sum FROM statistics WHERE metadata_id = 485 AND start_ts <= strftime('%s','2026-04-01 00:00:00','localtime') ORDER BY start_ts DESC LIMIT 1), 0), 2) AS value;
+    column: value
+    unit_of_measurement: "kWh"
+
+  - name: FV 2026 04 Export DB
+    unique_id: fv_2026_04_export_db
+    db_url: sqlite:////config/home-assistant_v2.db
+    query: >
+      SELECT ROUND(COALESCE((SELECT sum FROM statistics WHERE metadata_id = 484 AND start_ts <= strftime('%s','2026-05-01 00:00:00','localtime') ORDER BY start_ts DESC LIMIT 1) - (SELECT sum FROM statistics WHERE metadata_id = 484 AND start_ts <= strftime('%s','2026-04-01 00:00:00','localtime') ORDER BY start_ts DESC LIMIT 1), 0), 2) AS value;
+    column: value
+    unit_of_measurement: "kWh"
+
+  # =========================
+  # MAGGIO 2026
+  # =========================
+
+  - name: FV 2026 05 Produzione DB
+    unique_id: fv_2026_05_produzione_db
+    db_url: sqlite:////config/home-assistant_v2.db
+    query: >
+      SELECT ROUND(COALESCE((SELECT sum FROM statistics WHERE metadata_id = 483 AND start_ts <= strftime('%s','2026-06-01 00:00:00','localtime') ORDER BY start_ts DESC LIMIT 1) - (SELECT sum FROM statistics WHERE metadata_id = 483 AND start_ts <= strftime('%s','2026-05-01 00:00:00','localtime') ORDER BY start_ts DESC LIMIT 1), 0), 2) AS value;
+    column: value
+    unit_of_measurement: "kWh"
+
+  - name: FV 2026 05 Consumo DB
+    unique_id: fv_2026_05_consumo_db
+    db_url: sqlite:////config/home-assistant_v2.db
+    query: >
+      SELECT ROUND(COALESCE((SELECT sum FROM statistics WHERE metadata_id = 486 AND start_ts <= strftime('%s','2026-06-01 00:00:00','localtime') ORDER BY start_ts DESC LIMIT 1) - (SELECT sum FROM statistics WHERE metadata_id = 486 AND start_ts <= strftime('%s','2026-05-01 00:00:00','localtime') ORDER BY start_ts DESC LIMIT 1), 0), 2) AS value;
+    column: value
+    unit_of_measurement: "kWh"
+
+  - name: FV 2026 05 Import DB
+    unique_id: fv_2026_05_import_db
+    db_url: sqlite:////config/home-assistant_v2.db
+    query: >
+      SELECT ROUND(COALESCE((SELECT sum FROM statistics WHERE metadata_id = 485 AND start_ts <= strftime('%s','2026-06-01 00:00:00','localtime') ORDER BY start_ts DESC LIMIT 1) - (SELECT sum FROM statistics WHERE metadata_id = 485 AND start_ts <= strftime('%s','2026-05-01 00:00:00','localtime') ORDER BY start_ts DESC LIMIT 1), 0), 2) AS value;
+    column: value
+    unit_of_measurement: "kWh"
+
+  - name: FV 2026 05 Export DB
+    unique_id: fv_2026_05_export_db
+    db_url: sqlite:////config/home-assistant_v2.db
+    query: >
+      SELECT ROUND(COALESCE((SELECT sum FROM statistics WHERE metadata_id = 484 AND start_ts <= strftime('%s','2026-06-01 00:00:00','localtime') ORDER BY start_ts DESC LIMIT 1) - (SELECT sum FROM statistics WHERE metadata_id = 484 AND start_ts <= strftime('%s','2026-05-01 00:00:00','localtime') ORDER BY start_ts DESC LIMIT 1), 0), 2) AS value;
+    column: value
+    unit_of_measurement: "kWh"
+
+  # =========================
+  # GIUGNO 2026
+  # =========================
+
+  - name: FV 2026 06 Produzione DB
+    unique_id: fv_2026_06_produzione_db
+    db_url: sqlite:////config/home-assistant_v2.db
+    query: >
+      SELECT ROUND(COALESCE((SELECT sum FROM statistics WHERE metadata_id = 483 AND start_ts <= strftime('%s','2026-07-01 00:00:00','localtime') ORDER BY start_ts DESC LIMIT 1) - (SELECT sum FROM statistics WHERE metadata_id = 483 AND start_ts <= strftime('%s','2026-06-01 00:00:00','localtime') ORDER BY start_ts DESC LIMIT 1), 0), 2) AS value;
+    column: value
+    unit_of_measurement: "kWh"
+
+  - name: FV 2026 06 Consumo DB
+    unique_id: fv_2026_06_consumo_db
+    db_url: sqlite:////config/home-assistant_v2.db
+    query: >
+      SELECT ROUND(COALESCE((SELECT sum FROM statistics WHERE metadata_id = 486 AND start_ts <= strftime('%s','2026-07-01 00:00:00','localtime') ORDER BY start_ts DESC LIMIT 1) - (SELECT sum FROM statistics WHERE metadata_id = 486 AND start_ts <= strftime('%s','2026-06-01 00:00:00','localtime') ORDER BY start_ts DESC LIMIT 1), 0), 2) AS value;
+    column: value
+    unit_of_measurement: "kWh"
+
+  - name: FV 2026 06 Import DB
+    unique_id: fv_2026_06_import_db
+    db_url: sqlite:////config/home-assistant_v2.db
+    query: >
+      SELECT ROUND(COALESCE((SELECT sum FROM statistics WHERE metadata_id = 485 AND start_ts <= strftime('%s','2026-07-01 00:00:00','localtime') ORDER BY start_ts DESC LIMIT 1) - (SELECT sum FROM statistics WHERE metadata_id = 485 AND start_ts <= strftime('%s','2026-06-01 00:00:00','localtime') ORDER BY start_ts DESC LIMIT 1), 0), 2) AS value;
+    column: value
+    unit_of_measurement: "kWh"
+
+  - name: FV 2026 06 Export DB
+    unique_id: fv_2026_06_export_db
+    db_url: sqlite:////config/home-assistant_v2.db
+    query: >
+      SELECT ROUND(COALESCE((SELECT sum FROM statistics WHERE metadata_id = 484 AND start_ts <= strftime('%s','2026-07-01 00:00:00','localtime') ORDER BY start_ts DESC LIMIT 1) - (SELECT sum FROM statistics WHERE metadata_id = 484 AND start_ts <= strftime('%s','2026-06-01 00:00:00','localtime') ORDER BY start_ts DESC LIMIT 1), 0), 2) AS value;
+    column: value
+    unit_of_measurement: "kWh"
+
+  # =========================
+  # LUGLIO 2026
+  # =========================
+
+  - name: FV 2026 07 Produzione DB
+    unique_id: fv_2026_07_produzione_db
+    db_url: sqlite:////config/home-assistant_v2.db
+    query: >
+      SELECT ROUND(COALESCE((SELECT sum FROM statistics WHERE metadata_id = 483 AND start_ts <= strftime('%s','2026-08-01 00:00:00','localtime') ORDER BY start_ts DESC LIMIT 1) - (SELECT sum FROM statistics WHERE metadata_id = 483 AND start_ts <= strftime('%s','2026-07-01 00:00:00','localtime') ORDER BY start_ts DESC LIMIT 1), 0), 2) AS value;
+    column: value
+    unit_of_measurement: "kWh"
+
+  - name: FV 2026 07 Consumo DB
+    unique_id: fv_2026_07_consumo_db
+    db_url: sqlite:////config/home-assistant_v2.db
+    query: >
+      SELECT ROUND(COALESCE((SELECT sum FROM statistics WHERE metadata_id = 486 AND start_ts <= strftime('%s','2026-08-01 00:00:00','localtime') ORDER BY start_ts DESC LIMIT 1) - (SELECT sum FROM statistics WHERE metadata_id = 486 AND start_ts <= strftime('%s','2026-07-01 00:00:00','localtime') ORDER BY start_ts DESC LIMIT 1), 0), 2) AS value;
+    column: value
+    unit_of_measurement: "kWh"
+
+  - name: FV 2026 07 Import DB
+    unique_id: fv_2026_07_import_db
+    db_url: sqlite:////config/home-assistant_v2.db
+    query: >
+      SELECT ROUND(COALESCE((SELECT sum FROM statistics WHERE metadata_id = 485 AND start_ts <= strftime('%s','2026-08-01 00:00:00','localtime') ORDER BY start_ts DESC LIMIT 1) - (SELECT sum FROM statistics WHERE metadata_id = 485 AND start_ts <= strftime('%s','2026-07-01 00:00:00','localtime') ORDER BY start_ts DESC LIMIT 1), 0), 2) AS value;
+    column: value
+    unit_of_measurement: "kWh"
+
+  - name: FV 2026 07 Export DB
+    unique_id: fv_2026_07_export_db
+    db_url: sqlite:////config/home-assistant_v2.db
+    query: >
+      SELECT ROUND(COALESCE((SELECT sum FROM statistics WHERE metadata_id = 484 AND start_ts <= strftime('%s','2026-08-01 00:00:00','localtime') ORDER BY start_ts DESC LIMIT 1) - (SELECT sum FROM statistics WHERE metadata_id = 484 AND start_ts <= strftime('%s','2026-07-01 00:00:00','localtime') ORDER BY start_ts DESC LIMIT 1), 0), 2) AS value;
+    column: value
+    unit_of_measurement: "kWh"
+
+  # =========================
+  # AGOSTO 2026
+  # =========================
+
+  - name: FV 2026 08 Produzione DB
+    unique_id: fv_2026_08_produzione_db
+    db_url: sqlite:////config/home-assistant_v2.db
+    query: >
+      SELECT ROUND(COALESCE((SELECT sum FROM statistics WHERE metadata_id = 483 AND start_ts <= strftime('%s','2026-09-01 00:00:00','localtime') ORDER BY start_ts DESC LIMIT 1) - (SELECT sum FROM statistics WHERE metadata_id = 483 AND start_ts <= strftime('%s','2026-08-01 00:00:00','localtime') ORDER BY start_ts DESC LIMIT 1), 0), 2) AS value;
+    column: value
+    unit_of_measurement: "kWh"
+
+  - name: FV 2026 08 Consumo DB
+    unique_id: fv_2026_08_consumo_db
+    db_url: sqlite:////config/home-assistant_v2.db
+    query: >
+      SELECT ROUND(COALESCE((SELECT sum FROM statistics WHERE metadata_id = 486 AND start_ts <= strftime('%s','2026-09-01 00:00:00','localtime') ORDER BY start_ts DESC LIMIT 1) - (SELECT sum FROM statistics WHERE metadata_id = 486 AND start_ts <= strftime('%s','2026-08-01 00:00:00','localtime') ORDER BY start_ts DESC LIMIT 1), 0), 2) AS value;
+    column: value
+    unit_of_measurement: "kWh"
+
+  - name: FV 2026 08 Import DB
+    unique_id: fv_2026_08_import_db
+    db_url: sqlite:////config/home-assistant_v2.db
+    query: >
+      SELECT ROUND(COALESCE((SELECT sum FROM statistics WHERE metadata_id = 485 AND start_ts <= strftime('%s','2026-09-01 00:00:00','localtime') ORDER BY start_ts DESC LIMIT 1) - (SELECT sum FROM statistics WHERE metadata_id = 485 AND start_ts <= strftime('%s','2026-08-01 00:00:00','localtime') ORDER BY start_ts DESC LIMIT 1), 0), 2) AS value;
+    column: value
+    unit_of_measurement: "kWh"
+
+  - name: FV 2026 08 Export DB
+    unique_id: fv_2026_08_export_db
+    db_url: sqlite:////config/home-assistant_v2.db
+    query: >
+      SELECT ROUND(COALESCE((SELECT sum FROM statistics WHERE metadata_id = 484 AND start_ts <= strftime('%s','2026-09-01 00:00:00','localtime') ORDER BY start_ts DESC LIMIT 1) - (SELECT sum FROM statistics WHERE metadata_id = 484 AND start_ts <= strftime('%s','2026-08-01 00:00:00','localtime') ORDER BY start_ts DESC LIMIT 1), 0), 2) AS value;
+    column: value
+    unit_of_measurement: "kWh"
+
+  # =========================
+  # SETTEMBRE 2026
+  # =========================
+
+  - name: FV 2026 09 Produzione DB
+    unique_id: fv_2026_09_produzione_db
+    db_url: sqlite:////config/home-assistant_v2.db
+    query: >
+      SELECT ROUND(COALESCE((SELECT sum FROM statistics WHERE metadata_id = 483 AND start_ts <= strftime('%s','2026-10-01 00:00:00','localtime') ORDER BY start_ts DESC LIMIT 1) - (SELECT sum FROM statistics WHERE metadata_id = 483 AND start_ts <= strftime('%s','2026-09-01 00:00:00','localtime') ORDER BY start_ts DESC LIMIT 1), 0), 2) AS value;
+    column: value
+    unit_of_measurement: "kWh"
+
+  - name: FV 2026 09 Consumo DB
+    unique_id: fv_2026_09_consumo_db
+    db_url: sqlite:////config/home-assistant_v2.db
+    query: >
+      SELECT ROUND(COALESCE((SELECT sum FROM statistics WHERE metadata_id = 486 AND start_ts <= strftime('%s','2026-10-01 00:00:00','localtime') ORDER BY start_ts DESC LIMIT 1) - (SELECT sum FROM statistics WHERE metadata_id = 486 AND start_ts <= strftime('%s','2026-09-01 00:00:00','localtime') ORDER BY start_ts DESC LIMIT 1), 0), 2) AS value;
+    column: value
+    unit_of_measurement: "kWh"
+
+  - name: FV 2026 09 Import DB
+    unique_id: fv_2026_09_import_db
+    db_url: sqlite:////config/home-assistant_v2.db
+    query: >
+      SELECT ROUND(COALESCE((SELECT sum FROM statistics WHERE metadata_id = 485 AND start_ts <= strftime('%s','2026-10-01 00:00:00','localtime') ORDER BY start_ts DESC LIMIT 1) - (SELECT sum FROM statistics WHERE metadata_id = 485 AND start_ts <= strftime('%s','2026-09-01 00:00:00','localtime') ORDER BY start_ts DESC LIMIT 1), 0), 2) AS value;
+    column: value
+    unit_of_measurement: "kWh"
+
+  - name: FV 2026 09 Export DB
+    unique_id: fv_2026_09_export_db
+    db_url: sqlite:////config/home-assistant_v2.db
+    query: >
+      SELECT ROUND(COALESCE((SELECT sum FROM statistics WHERE metadata_id = 484 AND start_ts <= strftime('%s','2026-10-01 00:00:00','localtime') ORDER BY start_ts DESC LIMIT 1) - (SELECT sum FROM statistics WHERE metadata_id = 484 AND start_ts <= strftime('%s','2026-09-01 00:00:00','localtime') ORDER BY start_ts DESC LIMIT 1), 0), 2) AS value;
+    column: value
+    unit_of_measurement: "kWh"
+
+  # =========================
+  # OTTOBRE 2026
+  # =========================
+
+  - name: FV 2026 10 Produzione DB
+    unique_id: fv_2026_10_produzione_db
+    db_url: sqlite:////config/home-assistant_v2.db
+    query: >
+      SELECT ROUND(COALESCE((SELECT sum FROM statistics WHERE metadata_id = 483 AND start_ts <= strftime('%s','2026-11-01 00:00:00','localtime') ORDER BY start_ts DESC LIMIT 1) - (SELECT sum FROM statistics WHERE metadata_id = 483 AND start_ts <= strftime('%s','2026-10-01 00:00:00','localtime') ORDER BY start_ts DESC LIMIT 1), 0), 2) AS value;
+    column: value
+    unit_of_measurement: "kWh"
+
+  - name: FV 2026 10 Consumo DB
+    unique_id: fv_2026_10_consumo_db
+    db_url: sqlite:////config/home-assistant_v2.db
+    query: >
+      SELECT ROUND(COALESCE((SELECT sum FROM statistics WHERE metadata_id = 486 AND start_ts <= strftime('%s','2026-11-01 00:00:00','localtime') ORDER BY start_ts DESC LIMIT 1) - (SELECT sum FROM statistics WHERE metadata_id = 486 AND start_ts <= strftime('%s','2026-10-01 00:00:00','localtime') ORDER BY start_ts DESC LIMIT 1), 0), 2) AS value;
+    column: value
+    unit_of_measurement: "kWh"
+
+  - name: FV 2026 10 Import DB
+    unique_id: fv_2026_10_import_db
+    db_url: sqlite:////config/home-assistant_v2.db
+    query: >
+      SELECT ROUND(COALESCE((SELECT sum FROM statistics WHERE metadata_id = 485 AND start_ts <= strftime('%s','2026-11-01 00:00:00','localtime') ORDER BY start_ts DESC LIMIT 1) - (SELECT sum FROM statistics WHERE metadata_id = 485 AND start_ts <= strftime('%s','2026-10-01 00:00:00','localtime') ORDER BY start_ts DESC LIMIT 1), 0), 2) AS value;
+    column: value
+    unit_of_measurement: "kWh"
+
+  - name: FV 2026 10 Export DB
+    unique_id: fv_2026_10_export_db
+    db_url: sqlite:////config/home-assistant_v2.db
+    query: >
+      SELECT ROUND(COALESCE((SELECT sum FROM statistics WHERE metadata_id = 484 AND start_ts <= strftime('%s','2026-11-01 00:00:00','localtime') ORDER BY start_ts DESC LIMIT 1) - (SELECT sum FROM statistics WHERE metadata_id = 484 AND start_ts <= strftime('%s','2026-10-01 00:00:00','localtime') ORDER BY start_ts DESC LIMIT 1), 0), 2) AS value;
+    column: value
+    unit_of_measurement: "kWh"
+
+  # =========================
+  # NOVEMBRE 2026
+  # =========================
+
+  - name: FV 2026 11 Produzione DB
+    unique_id: fv_2026_11_produzione_db
+    db_url: sqlite:////config/home-assistant_v2.db
+    query: >
+      SELECT ROUND(COALESCE((SELECT sum FROM statistics WHERE metadata_id = 483 AND start_ts <= strftime('%s','2026-12-01 00:00:00','localtime') ORDER BY start_ts DESC LIMIT 1) - (SELECT sum FROM statistics WHERE metadata_id = 483 AND start_ts <= strftime('%s','2026-11-01 00:00:00','localtime') ORDER BY start_ts DESC LIMIT 1), 0), 2) AS value;
+    column: value
+    unit_of_measurement: "kWh"
+
+  - name: FV 2026 11 Consumo DB
+    unique_id: fv_2026_11_consumo_db
+    db_url: sqlite:////config/home-assistant_v2.db
+    query: >
+      SELECT ROUND(COALESCE((SELECT sum FROM statistics WHERE metadata_id = 486 AND start_ts <= strftime('%s','2026-12-01 00:00:00','localtime') ORDER BY start_ts DESC LIMIT 1) - (SELECT sum FROM statistics WHERE metadata_id = 486 AND start_ts <= strftime('%s','2026-11-01 00:00:00','localtime') ORDER BY start_ts DESC LIMIT 1), 0), 2) AS value;
+    column: value
+    unit_of_measurement: "kWh"
+
+  - name: FV 2026 11 Import DB
+    unique_id: fv_2026_11_import_db
+    db_url: sqlite:////config/home-assistant_v2.db
+    query: >
+      SELECT ROUND(COALESCE((SELECT sum FROM statistics WHERE metadata_id = 485 AND start_ts <= strftime('%s','2026-12-01 00:00:00','localtime') ORDER BY start_ts DESC LIMIT 1) - (SELECT sum FROM statistics WHERE metadata_id = 485 AND start_ts <= strftime('%s','2026-11-01 00:00:00','localtime') ORDER BY start_ts DESC LIMIT 1), 0), 2) AS value;
+    column: value
+    unit_of_measurement: "kWh"
+
+  - name: FV 2026 11 Export DB
+    unique_id: fv_2026_11_export_db
+    db_url: sqlite:////config/home-assistant_v2.db
+    query: >
+      SELECT ROUND(COALESCE((SELECT sum FROM statistics WHERE metadata_id = 484 AND start_ts <= strftime('%s','2026-12-01 00:00:00','localtime') ORDER BY start_ts DESC LIMIT 1) - (SELECT sum FROM statistics WHERE metadata_id = 484 AND start_ts <= strftime('%s','2026-11-01 00:00:00','localtime') ORDER BY start_ts DESC LIMIT 1), 0), 2) AS value;
+    column: value
+    unit_of_measurement: "kWh"
+
+  # =========================
+  # DICEMBRE 2026
+  # =========================
+
+  - name: FV 2026 12 Produzione DB
+    unique_id: fv_2026_12_produzione_db
+    db_url: sqlite:////config/home-assistant_v2.db
+    query: >
+      SELECT ROUND(COALESCE((SELECT sum FROM statistics WHERE metadata_id = 483 AND start_ts <= strftime('%s','2027-01-01 00:00:00','localtime') ORDER BY start_ts DESC LIMIT 1) - (SELECT sum FROM statistics WHERE metadata_id = 483 AND start_ts <= strftime('%s','2026-12-01 00:00:00','localtime') ORDER BY start_ts DESC LIMIT 1), 0), 2) AS value;
+    column: value
+    unit_of_measurement: "kWh"
+
+  - name: FV 2026 12 Consumo DB
+    unique_id: fv_2026_12_consumo_db
+    db_url: sqlite:////config/home-assistant_v2.db
+    query: >
+      SELECT ROUND(COALESCE((SELECT sum FROM statistics WHERE metadata_id = 486 AND start_ts <= strftime('%s','2027-01-01 00:00:00','localtime') ORDER BY start_ts DESC LIMIT 1) - (SELECT sum FROM statistics WHERE metadata_id = 486 AND start_ts <= strftime('%s','2026-12-01 00:00:00','localtime') ORDER BY start_ts DESC LIMIT 1), 0), 2) AS value;
+    column: value
+    unit_of_measurement: "kWh"
+
+  - name: FV 2026 12 Import DB
+    unique_id: fv_2026_12_import_db
+    db_url: sqlite:////config/home-assistant_v2.db
+    query: >
+      SELECT ROUND(COALESCE((SELECT sum FROM statistics WHERE metadata_id = 485 AND start_ts <= strftime('%s','2027-01-01 00:00:00','localtime') ORDER BY start_ts DESC LIMIT 1) - (SELECT sum FROM statistics WHERE metadata_id = 485 AND start_ts <= strftime('%s','2026-12-01 00:00:00','localtime') ORDER BY start_ts DESC LIMIT 1), 0), 2) AS value;
+    column: value
+    unit_of_measurement: "kWh"
+
+  - name: FV 2026 12 Export DB
+    unique_id: fv_2026_12_export_db
+    db_url: sqlite:////config/home-assistant_v2.db
+    query: >
+      SELECT ROUND(COALESCE((SELECT sum FROM statistics WHERE metadata_id = 484 AND start_ts <= strftime('%s','2027-01-01 00:00:00','localtime') ORDER BY start_ts DESC LIMIT 1) - (SELECT sum FROM statistics WHERE metadata_id = 484 AND start_ts <= strftime('%s','2026-12-01 00:00:00','localtime') ORDER BY start_ts DESC LIMIT 1), 0), 2) AS value;
+    column: value
+    unit_of_measurement: "kWh"

@@ -1,11 +1,12 @@
 // SPDX-License-Identifier: MIT
 //
-// The local web UI. Vanilla HTML/CSS/JS, no framework, no CDN -- a bridge on an isolated
-// network must render fully offline, and a CDN reference would also leak that the device
-// exists to a third party on every page load.
+// The local web UI. Vanilla HTML/CSS/JS, no framework, no CDN -- a bridge on an
+// isolated network must render fully offline, and a CDN reference would also
+// leak that the device exists to a third party on every page load.
 //
-// Served from PROGMEM rather than LittleFS: it is a few KB, and one fewer moving part during
-// OTA (a filesystem image that can be out of step with the firmware is a real failure mode).
+// Served from PROGMEM rather than LittleFS: it is a few KB, and one fewer
+// moving part during OTA (a filesystem image that can be out of step with the
+// firmware is a real failure mode).
 
 #pragma once
 
@@ -38,19 +39,19 @@ inline const char kIndexHtml[] PROGMEM = R"HTML(<!DOCTYPE html>
    progress bar, the icon and the outline of a "this one" marker (update available, wizard
    step), while buttons and links stay neutral, so a control never looks like a reading. Warnings are orange rather than amber for the same
    reason: the two must not be mistaken for each other at a glance. */
-:root{--bg:#141415;--card:#1b1b1d;--fg:#ededed;--dim:#a1a1a6;--mid:#cfcfd3;--ok:#4cc38a;--bad:#ec5d62;--warn:#f0883e;--acc:#f5b335;--line:#2c2c2f;--hair:#222224}
+:root{--bg:#0b1119;--card:#121b27;--fg:#f3f7fb;--dim:#91a0b4;--mid:#ced8e5;--ok:#31d08b;--bad:#ff6670;--warn:#ff9f43;--acc:#ffc247;--line:#243246;--hair:#172231}
 @media(prefers-color-scheme:light){:root{--bg:#fafafa;--card:#fff;--fg:#171717;--dim:#5c5c61;--mid:#3a3a3d;--ok:#15803d;--bad:#dc2626;--warn:#c2410c;--acc:#c2820f;--line:#e4e4e7;--hair:#f0f0f2}}
 *{box-sizing:border-box}
-body{margin:0;font:15px/1.5 system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--fg)}
+body{margin:0;font:15px/1.5 system-ui,-apple-system,sans-serif;background:radial-gradient(circle at 80% -20%,#183052 0,transparent 42%),var(--bg);color:var(--fg);min-height:100vh}
 b{font-weight:600}
 a{color:inherit;text-decoration-color:var(--dim);text-underline-offset:2px}a:hover{text-decoration-color:currentColor}
 code{font:12px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace}
 /* --- chrome ------------------------------------------------------------------------ */
-header{padding:12px 20px;border-bottom:1px solid var(--line);display:flex;gap:12px;align-items:center;flex-wrap:wrap}
-header b{font-size:16px}
-nav{display:flex;gap:4px;padding:8px 20px;border-bottom:1px solid var(--line);flex-wrap:wrap}
-nav button{background:none;border:0;color:var(--dim);padding:6px 12px;margin:0;border-radius:6px;cursor:pointer;font:inherit}
-nav button.on{background:var(--card);color:var(--fg)}
+header{padding:14px 24px;border-bottom:1px solid var(--line);display:flex;gap:12px;align-items:center;flex-wrap:wrap;background:#0d1520cc;backdrop-filter:blur(14px);position:sticky;top:0;z-index:4}
+header b{font-size:17px;letter-spacing:.02em}
+nav{display:flex;gap:6px;padding:9px 20px;border-bottom:1px solid var(--line);flex-wrap:wrap;background:#0d1520aa}
+nav button{background:none;border:0;color:var(--dim);padding:7px 13px;margin:0;border-radius:8px;cursor:pointer;font:inherit;font-weight:600}
+nav button.on{background:linear-gradient(135deg,#20354e,#172638);color:var(--fg);box-shadow:inset 0 0 0 1px #315071}
 .chips{display:flex;gap:12px;padding:12px 20px;border-bottom:1px solid var(--line);flex-wrap:wrap;align-items:center}
 .chip{display:inline-flex;align-items:center;gap:8px;font-size:13px;color:var(--dim)}
 /* One centred column for the whole page, chrome included, so the header lines up with the
@@ -104,7 +105,7 @@ select.tiny{width:auto;padding:4px 8px;border-radius:6px;font-size:12px}
 .note{display:flex;align-items:center;gap:8px;margin-top:12px;padding:8px 12px;border:1px solid var(--line);border-radius:8px;font-size:13px}
 .note.ok{border-color:var(--ok)}
 /* --- live -------------------------------------------------------------------------- */
-.hero{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:24px;align-items:end}
+.hero{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:24px;align-items:end;background:linear-gradient(135deg,#152235,#101923);border:1px solid var(--line);border-radius:18px;padding:24px;box-shadow:0 16px 50px #0004}
 .big{font-size:56px;font-weight:500;letter-spacing:-.02em;line-height:1.05;font-variant-numeric:tabular-nums}
 .bar{margin-top:8px;height:6px;background:var(--card);border:1px solid var(--line);border-radius:99px;overflow:hidden}
 svg{display:block}
@@ -116,6 +117,12 @@ svg{display:block}
 .fleetrow .num{flex:0 1 90px;text-align:right}
 .fleetrow .num b{font-size:20px;font-weight:500;font-variant-numeric:tabular-nums;display:block}
 .fleetrow .when{flex:0 1 140px;text-align:right;font-size:13px}
+.energy-flow{display:grid;grid-template-columns:repeat(4,1fr);gap:30px;align-items:center;margin:20px 0;padding:24px;border:1px solid var(--line);border-radius:18px;background:linear-gradient(145deg,#101a27,#0d151f);box-shadow:0 18px 45px #0004}
+.flow-node{position:relative;text-align:center;padding:16px 10px;border:1px solid #2b3d54;border-radius:14px;background:#152131;min-height:108px;display:flex;flex-direction:column;justify-content:center}
+.flow-node:not(:last-child):after{content:'➜';position:absolute;right:-24px;top:39%;color:var(--acc);font-size:25px;filter:drop-shadow(0 0 7px #ffc24788);animation:flowPulse 1.6s ease-in-out infinite}
+.flow-icon{font-size:27px;line-height:1}.flow-value{font-size:22px;font-weight:650;margin-top:5px;font-variant-numeric:tabular-nums}.flow-label{font-size:12px;color:var(--dim);text-transform:uppercase;letter-spacing:.08em}
+@keyframes flowPulse{50%{opacity:.35;transform:translateX(4px)}}
+@media(max-width:700px){.energy-flow{grid-template-columns:1fr 1fr}.flow-node:after{display:none}}
 .soc{display:flex;align-items:center;gap:16px;margin-top:12px;flex-wrap:wrap}
 .soc .pct{font-size:32px;font-weight:500;font-variant-numeric:tabular-nums}
 .soc .track{flex:1 1 200px;min-width:160px}
@@ -140,7 +147,7 @@ dialog::backdrop{background:#000a}
 </style></head><body>
 <div id="srs" class="sr" role="status"></div><div id="sra" class="sr" role="alert"></div>
 
-<header><b>Heliograph</b>
+<header><b>⚡ Afore Autonomous EMS</b>
 <span id="host" class="dim" style="font-size:12px"></span>
 <span style="flex:1"></span>
 <button id="pending" class="tag warn hide" style="cursor:pointer;background:none" onclick="goTab('bridge')"></button>
@@ -148,7 +155,7 @@ dialog::backdrop{background:#000a}
 <span id="ver" class="dim" style="font-size:12px"></span></header>
 
 <nav>
-<button data-t="live" class="on">Live</button>
+<button data-t="live" class="on">Dashboard</button>
 <button data-t="inv">Inverters</button>
 <button data-t="int">Integrations</button>
 <button data-t="health">Health</button>
@@ -643,6 +650,16 @@ function paintLive(){
         </div>
       </div></div>`;
   }
+  const flowPv=Number((m['dc.power.total']||m['ac.power.total']||{}).value??tot.ac_power_w??0);
+  const flowGrid=Number((m['grid.power']||{}).value??0);
+  const flowBatt=Number((m['battery.power']||{}).value??0);
+  const flowHome=Math.max(0,flowPv+(flowBatt<0?-flowBatt:0)+flowGrid-(flowBatt>0?flowBatt:0));
+  h+=`<div class="energy-flow" aria-label="Live energy flow">
+    <div class="flow-node"><div class="flow-icon">☀</div><div class="flow-value">${esc(sp(Math.round(flowPv)))} W</div><div class="flow-label">Solar PV</div></div>
+    <div class="flow-node"><div class="flow-icon">▣</div><div class="flow-value">${esc(sp(Math.round(flowGrid)))} W</div><div class="flow-label">Grid</div></div>
+    <div class="flow-node"><div class="flow-icon">▰</div><div class="flow-value">${esc(sp(Math.round(Math.abs(flowBatt))))} W</div><div class="flow-label">Battery</div></div>
+    <div class="flow-node"><div class="flow-icon">⌂</div><div class="flow-value">${esc(sp(Math.round(flowHome)))} W</div><div class="flow-label">Home</div></div>
+  </div>`;
   // Battery, when any device reports one. Direction is carried by an ARROW as well as a colour,
   // so it survives a reader who cannot tell red from green, and the sign of the number never
   // has to be decoded.
@@ -2826,4 +2843,4 @@ setInterval(()=>{const c=$('#bridge_clock');if(c&&Date.now()-sAt<15000)c.textCon
 </script></body></html>
 )HTML";
 
-}  // namespace heliograph::web
+} // namespace heliograph::web

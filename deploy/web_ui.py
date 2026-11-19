@@ -36,8 +36,8 @@ def get_active_config_path() -> pathlib.Path:
 class EmsWebHandler(SimpleHTTPRequestHandler):
     def end_headers(self):
         self.send_header("Access-Control-Allow-Origin", "*")
-        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-        self.send_header("Access-Control-Allow-Headers", "Content-Type")
+        self.send_header("Access-Control-Allow-Methods", "GET, POST, PATCH, OPTIONS")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type, Authorization")
         super().end_headers()
 
     def do_OPTIONS(self):
@@ -70,6 +70,8 @@ class EmsWebHandler(SimpleHTTPRequestHandler):
             self.serve_device_detail(url)
         elif url == "/api/v1/diagnostics":
             self.serve_diagnostics()
+        elif url == "/api/v1/logs":
+            self.serve_logs()
         elif url == "/api/v1/drivers":
             self.serve_drivers()
         elif url == "/api/v1/wifi/scan":
@@ -82,6 +84,9 @@ class EmsWebHandler(SimpleHTTPRequestHandler):
         else:
             self.send_error(404, "Not Found")
 
+    def do_PATCH(self):
+        self._save_config(merge=True)
+
     def do_POST(self):
         url = self.path.split("?")[0]
         content_len = int(self.headers.get("Content-Length", 0))
@@ -90,21 +95,71 @@ class EmsWebHandler(SimpleHTTPRequestHandler):
         if url in ("/api/v1/config", "/api/v1/setup"):
             try:
                 data = json.loads(body)
-                cfg_path = get_active_config_path()
-                cfg_path.parent.mkdir(parents=True, exist_ok=True)
-                with open(cfg_path, "w", encoding="utf-8") as f:
-                    json.dump(data, f, indent=2)
-                self.send_response(200)
-                self.send_header("Content-Type", "application/json")
-                self.end_headers()
-                self.wfile.write(b'{"status":"saved","message":"Configuration updated successfully"}')
+                self.write_config(data)
+                self.send_json({"status": "saved", "message": "Configuration updated successfully"})
             except Exception as e:
-                self.send_response(400)
-                self.send_header("Content-Type", "application/json")
-                self.end_headers()
-                self.wfile.write(json.dumps({"status":"error", "error": str(e)}).encode())
+                self.send_json({"status": "error", "error": str(e)}, 400)
         else:
             self.send_error(404, "Not Found")
+
+    @staticmethod
+    def merge_dict(base, patch):
+        for key, value in patch.items():
+            if isinstance(value, dict) and isinstance(base.get(key), dict):
+                EmsWebHandler.merge_dict(base[key], value)
+            else:
+                base[key] = value
+        return base
+
+    def _save_config(self, merge=False):
+        if self.path.split("?")[0] != "/api/v1/config":
+            self.send_error(404, "Not Found")
+            return
+        try:
+            content_len = int(self.headers.get("Content-Length", 0))
+            patch = json.loads(self.rfile.read(content_len).decode("utf-8") or "{}")
+            data = self.load_config() if merge else patch
+            if merge:
+                self.merge_dict(data, patch)
+            self.write_config(data)
+            self.send_json({"status": "saved", "pending_restart": []})
+        except Exception as e:
+            self.send_json({"status": "error", "error": str(e)}, 400)
+
+    def send_json(self, data, status=200):
+        payload = json.dumps(data).encode("utf-8")
+        self.send_response(status)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(payload)))
+        self.end_headers()
+        self.wfile.write(payload)
+
+    def load_config(self):
+        cfg_path = get_active_config_path()
+        defaults = {
+            "version": 2, "bridge_name": "Afore EMS",
+            "wifi": {"ssid": "Ethernet", "hostname": "afore-ems", "ip": "", "password_set": False},
+            "mqtt": {"enabled": False, "host": "127.0.0.1", "port": 1883, "base_topic": "afore-ems", "discovery_prefix": "homeassistant", "discovery_enabled": True, "qos": 0, "username_set": False, "password_set": False},
+            "modbus": {"enabled": True, "port": 502, "unit_id": 1, "diagnostics_unit_id": 250, "max_clients": 4, "idle_timeout_seconds": 20, "write_enabled": False},
+            "polling": {"interval_seconds": 3}, "logging": {"level": "info"},
+            "driver": {"id": "afore_sun", "label": "Afore Inverter 1", "options": {"address": 1}},
+            "additional_devices": [], "serial": {"port": "/dev/ttyUSB0", "baud_rate": 9600, "parity": "none", "data_bits": 8, "stop_bits": 1},
+            "ntp": {"enabled": True, "use_dhcp": True, "server": "pool.ntp.org", "timezone": "CET-1CEST,M3.5.0,M10.5.0/3"},
+            "updates": {"enabled": False}, "relays": {"enabled": False, "roles": []}
+        }
+        if cfg_path.exists():
+            try:
+                with open(cfg_path, "r", encoding="utf-8") as f:
+                    return self.merge_dict(defaults, json.load(f))
+            except Exception:
+                pass
+        return defaults
+
+    def write_config(self, data):
+        cfg_path = get_active_config_path()
+        cfg_path.parent.mkdir(parents=True, exist_ok=True)
+        with open(cfg_path, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=2)
 
     def serve_asset(self, header_filename: str, content_type: str):
         # Support both repository layout (/src/web/assets) and deployment layout (/opt/afore-ems/src/web/assets)
@@ -141,26 +196,7 @@ class EmsWebHandler(SimpleHTTPRequestHandler):
         self.wfile.write(payload)
 
     def serve_config(self):
-        cfg_path = get_active_config_path()
-        if cfg_path.exists():
-            try:
-                with open(cfg_path, "r", encoding="utf-8") as f:
-                    data = json.load(f)
-            except Exception:
-                data = {}
-        else:
-            data = {
-                "serial_port": "/dev/ttyUSB0",
-                "baud_rate": 9600,
-                "inverter_address": 1,
-                "mqtt": {"enabled": False, "host": "127.0.0.1", "port": 1883}
-            }
-        payload = json.dumps(data).encode("utf-8")
-        self.send_response(200)
-        self.send_header("Content-Type", "application/json")
-        self.send_header("Content-Length", str(len(payload)))
-        self.end_headers()
-        self.wfile.write(payload)
+        self.send_json(self.load_config())
 
     def get_standard_measurements(self):
         return {
@@ -276,11 +312,24 @@ class EmsWebHandler(SimpleHTTPRequestHandler):
 
     def serve_diagnostics(self):
         diag = {
-            "uptime_seconds": 12450,
-            "heap_free_bytes": 104857600,
-            "poll_cycles_total": 2490,
-            "poll_cycles_failed": 0,
-            "last_reset_reason": "power_on"
+            "uptime_seconds": int(time.monotonic()),
+            "free_heap_bytes": 104857600,
+            "minimum_free_heap_bytes": 94371840,
+            "max_alloc_heap_bytes": 52428800,
+            "poll_success_total": int(time.monotonic() / 3),
+            "poll_failure_total": 0,
+            "consecutive_poll_failures": 0,
+            "checksum_error_total": 0,
+            "rs485_timeout_total": 0,
+            "invalid_frame_total": 0,
+            "wifi_rssi_dbm": -42,
+            "mqtt_reconnect_total": 0,
+            "mqtt_publish_failure_total": 0,
+            "modbus_client_connections_total": 0,
+            "rest_requests_total": 0,
+            "reset_reason": 1,
+            "board": "raspberry-pi",
+            "last_error": ""
         }
         payload = json.dumps(diag).encode("utf-8")
         self.send_response(200)
@@ -288,6 +337,10 @@ class EmsWebHandler(SimpleHTTPRequestHandler):
         self.send_header("Content-Length", str(len(payload)))
         self.end_headers()
         self.wfile.write(payload)
+
+    def serve_logs(self):
+        self.send_json({"level": self.load_config().get("logging", {}).get("level", "info"),
+                        "dropped": 0, "lines": ["Afore EMS web bridge running", "RS485 polling active"]})
 
     def serve_drivers(self):
         drivers = {

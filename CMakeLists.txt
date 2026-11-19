@@ -270,6 +270,18 @@ if(BUILD_TESTING)
     target_include_directories(test-power-balance PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
     add_test(NAME power-balance-tests COMMAND test-power-balance)
 
+    # EMS Common Core & Constraint Pipeline M3-M4-M5-M6-M7-M8 tests
+    add_executable(test-ems-core
+        test/test_ems_core/test_main.cpp
+        src/ems/ems_core_contracts.cpp
+        src/ems/constraint_pipeline.cpp
+        src/ems/strategy_engine.cpp
+        src/ems/ems_rest_api.cpp
+    )
+    target_include_directories(test-ems-core PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+    target_link_libraries(test-ems-core PRIVATE unity pthread)
+    add_test(NAME ems-core-tests COMMAND test-ems-core)
+
     # Secure Provisioning tests
     add_executable(test-secure-provisioning
         test/test_secure_provisioning/test_main.cpp

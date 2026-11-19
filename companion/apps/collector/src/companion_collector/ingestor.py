@@ -582,18 +582,22 @@ class IngestionEngine:
 
         if not from_backfill and self.state.last_seq is not None and dec.seq > self.state.last_seq + 1:
             missing = dec.seq - self.state.last_seq - 1
+            # ESP32 ticks at 1 Hz while MQTT telemetry_s publishes every 5-30s;
+            # sync intermediate records silently via bounded REST backfill unless
+            # the jump exceeds the 256-slot PSRAM ring buffer (unrecoverable gap).
             if missing <= 250:
                 self.state.needs_backfill = True
-            COLLECTOR_GAPS_TOTAL.inc()
-            await self._emit_event(
-                session,
-                occurred_at=src_ts,
-                event_type="DECISION_GAP",
-                severity="warning",
-                title=f"Gap sequenza decisioni ({missing} record)",
-                detail=f"Sequenza passata da #{self.state.last_seq} a #{dec.seq}",
-                metadata={"prev_seq": self.state.last_seq, "curr_seq": dec.seq, "missing": missing},
-            )
+            if missing > 250:
+                COLLECTOR_GAPS_TOTAL.inc()
+                await self._emit_event(
+                    session,
+                    occurred_at=src_ts,
+                    event_type="DECISION_GAP",
+                    severity="warning",
+                    title=f"Gap sequenza decisioni ({missing} record)",
+                    detail=f"Sequenza passata da #{self.state.last_seq} a #{dec.seq} oltre il ring PSRAM",
+                    metadata={"prev_seq": self.state.last_seq, "curr_seq": dec.seq, "missing": missing},
+                )
 
         stmt = (
             insert(EmsDecision)

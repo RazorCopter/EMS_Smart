@@ -84,11 +84,11 @@ async def test_collector_ingestion_dedup_out_of_order_and_reboot():
             "modbus_write_count": 0,
         }
         await ingestor.ingest_mqtt_message("afore/afore-ems/v1/ems/decision", json.dumps(base_dec).encode(), received_at=t0)
-        # Gap: seq jumps from 10 to 15
+        # Unrecoverable gap (> 250 ring buffer): seq jumps from 10 to 300
         await ingestor.ingest_mqtt_message(
             "afore/afore-ems/v1/ems/decision",
-            json.dumps({**base_dec, "seq": 15, "timestamp": (t0 + timedelta(seconds=25)).isoformat(), "uptime_ms": 35000}).encode(),
-            received_at=t0 + timedelta(seconds=25),
+            json.dumps({**base_dec, "seq": 300, "timestamp": (t0 + timedelta(seconds=290)).isoformat(), "uptime_ms": 300000}).encode(),
+            received_at=t0 + timedelta(seconds=290),
         )
         # Reboot: seq resets to 1 and uptime_ms resets to 2000
         await ingestor.ingest_mqtt_message(

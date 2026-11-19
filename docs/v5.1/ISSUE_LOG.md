@@ -11,6 +11,7 @@
 | V51-06 | RTC replies over I2C but reports oscillator-stop. | Low | G3 | Check backup supply and set trusted UTC in a later authorized step. Keep reporting unknown UTC until valid. |
 | V51-07 | HTTP Basic and setup POST carry credentials in cleartext at the HTTP layer. | Medium | G8 | Limit prototype access to a trusted local network. Qualify TLS or a trusted management tunnel before wider deployment. |
 | V51-08 | The earlier USB upload console hit an encoding error on Windows. | Low | G2 | Use PYTHONIOENCODING=utf-8 and verify the uploader digest and boot log. |
+| V51-09 | The health contract reports only the global minimum task stack. During Mission 9B all 240 samples named IDLE0 (236 free bytes), so the required per-application-task >=1024-byte pre-OTA gate cannot be evaluated. | High | G2/G3 | Expose per-task high-water marks, or at minimum the minimum after excluding IDLE tasks, in an authenticated diagnostic endpoint; repeat the two-hour gate before OTA. |
 
 ## Step 1 evidence
 

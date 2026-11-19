@@ -79,7 +79,8 @@ std::string audit(const EnergyState& e,const Policy& p,const Decision& d,
     out<<",\"recommended_charge_a\":"<<d.recommendedChargeA;
     out<<",\"season\":\""<<d.seasonName<<"\",\"predictive_phase\":\""<<d.phase<<"\"";
     out<<",\"fog_active\":"<<(d.fogActive ? "true":"false")<<",\"low_sun_mode\":"<<(d.lowSunMode ? "true":"false");
-    out<<",\"reason\":\""<<d.reason<<"\",\"executed\":false,\"applied\":null,\"aux1\":\""<<(auxOn()?"ON":"OFF")<<"\",\"modbus_write_count\":0}";
+    out<<",\"reason\":\""<<d.reason<<"\",\"disposition\":\""<<d.disposition
+       <<"\",\"executed\":false,\"applied\":null,\"aux1\":\""<<(auxOn()?"ON":"OFF")<<"\",\"modbus_write_count\":0}";
     return out.str();
 }
 

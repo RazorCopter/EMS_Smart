@@ -1,0 +1,105 @@
+diff --git a/src/v51/ems_runtime.cpp b/src/v51/ems_runtime.cpp
+index e6df8ed..cbab0b0 100644
+--- a/src/v51/ems_runtime.cpp
++++ b/src/v51/ems_runtime.cpp
+@@ -79,7 +79,8 @@ std::string audit(const EnergyState& e,const Policy& p,const Decision& d,
+     out<<",\"recommended_charge_a\":"<<d.recommendedChargeA;
+     out<<",\"season\":\""<<d.seasonName<<"\",\"predictive_phase\":\""<<d.phase<<"\"";
+     out<<",\"fog_active\":"<<(d.fogActive ? "true":"false")<<",\"low_sun_mode\":"<<(d.lowSunMode ? "true":"false");
+-    out<<",\"reason\":\""<<d.reason<<"\",\"executed\":false,\"applied\":null,\"aux1\":\""<<(auxOn()?"ON":"OFF")<<"\",\"modbus_write_count\":0}";
++    out<<",\"reason\":\""<<d.reason<<"\",\"disposition\":\""<<d.disposition
++       <<"\",\"executed\":false,\"applied\":null,\"aux1\":\""<<(auxOn()?"ON":"OFF")<<"\",\"modbus_write_count\":0}";
+     return out.str();
+ }
+ 
+diff --git a/src/v51/shadow_core.h b/src/v51/shadow_core.h
+index 08022a8..2bae74b 100644
+--- a/src/v51/shadow_core.h
++++ b/src/v51/shadow_core.h
+@@ -83,6 +83,10 @@ struct Decision {
+     bool usedForecast=false, usedRatio=false, usedWeather=false, usedLoadProfile=false;
+     const char* phase="MANUAL";
+     const char* seasonName="UNKNOWN";
++    // Why the final simulated power differs from the candidate. APPLICABLE means unchanged.
++    const char* disposition="NOT_EVALUATED";
++    int surplusW=0;
++    bool gridPermitted=false;
+ };
+ struct CommandExecutor {
+     virtual ~CommandExecutor() = default;
+@@ -218,6 +222,7 @@ public:
+                 return sample.status==Quality::Valid && now-sample.stamp>uint32_t(p.staleMs);
+             };
+             d.safetyReason=stale(e.soc)||stale(e.grid)||stale(e.battery)?"STALE_TELEMETRY":"ESSENTIAL_DATA_UNAVAILABLE";
++            d.disposition="INPUT_UNAVAILABLE";
+             return complete(d,now);
+         }
+ 
+@@ -263,6 +268,7 @@ public:
+             d.state=d.strategy==Strategy::Native ? "OBSERVE" : "SAFE";
+             d.safetyReason=d.strategy==Strategy::Native?"OBSERVATION":"SAFE_MODE";
+             d.reason=d.strategy==Strategy::Native ? "NATIVE_OBSERVATION" : "SAFE_REQUESTED";
++            d.disposition=d.strategy==Strategy::Native ? "OBSERVATION_ONLY" : "SAFE_MODE";
+             return complete(d,now);
+         }
+ 
+@@ -276,6 +282,7 @@ public:
+         d.lower=reserve_ || charging ? 0 : -p.discharge;
+         if(p.dischargeA) d.lower=std::max(*d.lower,haveVoltage ? -int(p.dischargeA**volt):0);
+         d.upper=*soc>=p.ceiling ? 0 : std::min(cap,permitGrid ? cap : std::max(0,surplus));
++        d.surplusW=surplus; d.gridPermitted=permitGrid;
+         if(p.chargeA) d.upper=std::min(*d.upper,haveVoltage ? int(p.chargeA**volt):0);
+         if(p.exportLimit) d.lower=std::min(*d.upper,std::max(*d.lower,surplus-p.exportLimit));
+         if(!voltageSafe) {d.lower=0;d.upper=0;}
+@@ -508,6 +515,7 @@ private:
+             const bool permitGrid = p.gridCharge && !p.surplusOnly;
+             d.lower = 0; // Block battery discharge strictly while capturing solar / holding 100%
+             d.upper = soc >= p.ceiling ? 0 : std::min(cap, permitGrid ? cap : std::max(0, surplus));
++            d.surplusW = surplus; d.gridPermitted = permitGrid;
+             d.candidate = cap;
+             d.missingWh = deficitFullKwh * 1000.0;
+             d.recommendedChargeA = p.chargeA;
+@@ -533,6 +541,7 @@ private:
+             d.recommendedChargeA = std::max(1, int(std::ceil(targetCapW / std::max(10.0, refVolt))));
+             d.lower = 0;
+             d.upper = soc >= p.ceiling ? 0 : std::min(targetCapW, permitGrid ? targetCapW : std::max(0, surplus));
++            d.surplusW = surplus; d.gridPermitted = permitGrid;
+             d.candidate = targetCapW;
+             d.reason = "GENTLE_TARGET_CHARGE";
+         } else {
+@@ -542,6 +551,7 @@ private:
+             d.lower = reserve_ ? 0 : -p.discharge;
+             if (p.dischargeA) d.lower = std::max(*d.lower, haveVoltage ? -int(p.dischargeA * *volt) : 0);
+             d.upper = soc >= p.ceiling ? 0 : std::min(fullChargeCap, std::max(0, surplus));
++            d.surplusW = surplus; d.gridPermitted = false;
+             if (p.exportLimit) d.lower = std::min(*d.upper, std::max(*d.lower, surplus - p.exportLimit));
+             d.candidate = balance;
+             d.recommendedChargeA = p.chargeA;
+@@ -570,6 +580,27 @@ private:
+         if (!keepCustomReason && selected != *d.finalWatts && d.safetyReason == std::string_view("NONE"))
+             d.safetyReason = "POWER_LIMIT";
+ 
++        // Explicit disposition: never leave a modified or cancelled candidate without a cause.
++        const int cand = *d.candidate, fin = *d.finalWatts;
++        if (fin == cand) {
++            d.disposition = "APPLICABLE";
++        } else if (!voltageSafe || d.safetyReason == std::string_view("SOC_RESERVE") ||
++                   d.safetyReason == std::string_view("SOC_CEILING")) {
++            d.disposition = fin == 0 ? "SAFETY_LIMIT" : "PARTIAL_SAFETY_LIMIT";
++        } else if (bounded != cand) {
++            if (cand > 0 && *d.upper == 0 && d.surplusW <= 0 && !d.gridPermitted) {
++                d.disposition = (!p.gridCharge && !p.surplusOnly) ? "GRID_CHARGE_DISABLED" : "NO_PV_SURPLUS";
++            } else if (fin == 0) {
++                d.disposition = "AVAILABLE_POWER_ZERO";
++            } else if (cand > 0 && !d.gridPermitted && *d.upper == std::max(0, d.surplusW)) {
++                d.disposition = "PARTIAL_PV_SURPLUS";
++            } else {
++                d.disposition = "PARTIAL_POWER_LIMIT";
++            }
++        } else {
++            d.disposition = "RAMP_OR_DEADBAND";
++        }
++
+         if (!keepCustomReason || d.unreachable) {
+             const bool charging = d.strategy != Strategy::SelfUse;
+             const bool holding = d.strategy == Strategy::Maintenance && holdSince_.has_value();

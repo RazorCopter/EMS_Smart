@@ -6,6 +6,28 @@
 .badge{color:var(--green);border:1px solid #315946;border-radius:7px;padding:7px 10px;font-size:11px;font-weight:750;letter-spacing:.04em}nav{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:28px;border-bottom:1px solid var(--line);padding-bottom:12px}button,input,select{font:inherit}button{cursor:pointer;min-height:44px;padding:8px 13px;border:1px solid var(--line);border-radius:8px;background:#19292a;color:var(--text)}button[aria-selected=true],.primary{background:var(--green);color:#10251e;border-color:transparent;font-weight:750}h1{font-size:clamp(27px,4vw,42px);letter-spacing:-.06em;margin:0 0 7px}h2{font-size:17px;margin:0 0 12px}p{line-height:1.55}.sub,small{color:var(--muted)}.metrics{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:11px;margin:21px 0}.card,article{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px}.card .number{font-size:31px;font-weight:700;letter-spacing:-.055em;margin:10px 0 3px}.card:nth-child(1) .number{color:var(--sun)}.card:nth-child(2) .number{color:var(--grid)}.card:nth-child(3) .number{color:var(--green)}.card:nth-child(4) .number{color:var(--load)}.split{display:grid;gap:12px;grid-template-columns:1.1fr 1fr}.flow{display:grid;grid-template-columns:1fr auto 1fr;gap:12px;align-items:center;margin:22px 0}.flow span{padding:9px;background:#192a2a;border-radius:7px;text-align:center}.rows{display:grid;gap:0}.row{display:flex;justify-content:space-between;gap:12px;padding:8px 0;border-bottom:1px solid var(--line)}.row:last-child{border:0}.row strong{text-align:right}.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}label{display:grid;gap:6px;color:var(--muted)}input,select{width:100%;background:#0c1718;color:var(--text);padding:9px 10px;min-height:44px;border:1px solid #3b5353;border-radius:7px}input[type=checkbox]{width:22px;min-height:22px;accent-color:var(--green)}.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}a{color:var(--green)}.status{min-height:27px;color:var(--green);margin-top:12px}.status[data-error=true]{color:#ff9b9b}code{overflow-wrap:anywhere}.empty{color:var(--muted)}details{margin-top:12px}summary{cursor:pointer;padding:10px 0}.tag{font-size:11px;color:var(--muted)}[hidden]{display:none!important}@media(max-width:660px){header,main{padding:13px 14px}header{align-items:flex-start;flex-direction:column;gap:10px}.metrics{grid-template-columns:repeat(2,1fr)}.split{grid-template-columns:1fr}.card,article{padding:13px}.card .number{font-size:25px}.grid{grid-template-columns:1fr}nav{margin-bottom:16px}nav button{font-size:13px}.badge{line-height:1.4}}
 #powerFlow{width:100%;height:auto;display:block;margin-top:8px}.edges path{fill:none;stroke:#445655;stroke-width:2;stroke-linecap:round}.edges path.active{stroke-dasharray:4 8;animation:stream 1.15s linear infinite;marker-end:url(#arrow)}.edges path.reverse{marker-start:url(#arrow);marker-end:none;animation-direction:reverse}@keyframes stream{to{stroke-dashoffset:-24}}.nodes g{--node:#a4accc}.nodes .solar{--node:#f6cf6b}.nodes .house{--node:#90c9fb}.nodes .battery{--node:#7dd9ba}.nodes rect{fill:#142324;stroke:var(--node);stroke-width:1.4}.nodes text{text-anchor:middle;fill:var(--node);font-size:13px;font-weight:700}.nodes .idle{opacity:.4}@media(prefers-reduced-motion:reduce){.edges path.active{animation:none}}
 header{padding-top:17px;padding-bottom:10px}main{padding-top:8px}nav{margin-bottom:15px}h1{margin-bottom:13px}.grid,.metrics,.groups{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.groups{align-items:start}.groups article{min-width:0}.groups .grid{grid-template-columns:minmax(0,1fr)}.groups .formGroup{margin-top:0}.groups article h2{margin-bottom:8px}.fieldhead,.control{display:flex;align-items:center;gap:8px;min-width:0}.fieldhead{justify-content:space-between;min-height:31px}.fieldhead label{line-height:1.2}.fieldhelp{min-width:0}.fieldhelp input,.fieldhelp select{min-width:0}.fieldhelp input[type=checkbox]{margin:0 10px}.control{border:1px solid #3b5353;border-radius:7px;min-height:44px;background:#0c1718}.control:focus-within{outline:2px solid var(--green);outline-offset:2px}.control input,.control select{border:0;background:transparent;outline:0;min-height:42px}.control select option{background:#0c1718}.control .timeUnit{width:auto;max-width:7.3rem}.control small{padding-right:9px;white-space:nowrap}.control input[type=range]{width:42%;min-width:42%;padding:0 5px;accent-color:var(--green)}.help{padding:0;width:30px;min-height:30px;flex:none;border-radius:50%;font-weight:700}.error.duration{color:var(--muted)}.error{color:#ff9b9b;display:block;min-height:15px;font-size:11px;line-height:1.1;margin-top:3px}.formLayout{display:grid;grid-template-columns:minmax(0,1fr);gap:14px;align-items:start}.formLayout:has(.helpPanel:not([hidden])){grid-template-columns:minmax(0,1fr) minmax(220px,28%)}.helpPanel{background:#17292a;border-color:#426260}.helpPanel p{font-size:14px;margin:8px 0}.helpPanel button{margin-top:8px}.formGroup+.formGroup{margin-top:14px}.strategyTabs{display:flex;flex-wrap:wrap;gap:7px;margin:12px 0}.strategyTabs button{min-height:40px}.metrics{margin:0}.split{grid-template-columns:repeat(2,minmax(0,1fr))}.overviewStack{display:grid;gap:12px}.overviewStack article{min-width:0}.overviewDetails,.clockCard{margin-bottom:12px}.overviewDetails{margin-top:12px}.clockCard .actions{margin-top:9px}.clockCard details{margin-top:0}.overviewDetails details:first-child{margin-top:0}.overviewDetails .row{font-size:13px}.tag{font-size:13px}.fresh{color:var(--green);font-size:12px}.fresh[data-warn=true]{color:var(--sun)}#powerFlow{max-height:234px;margin:0 auto}#conversion{margin-top:8px}.powerComparison{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-top:10px}.powerComparison .row{font-size:13px}.powerComparison .row:last-child strong{color:var(--green)}.row strong{overflow-wrap:anywhere;min-width:0}.technical pre{white-space:pre-wrap;overflow-wrap:anywhere;font-size:12px}.sub{margin:0 0 10px}@media(max-width:760px){.formLayout:has(.helpPanel:not([hidden])),.grid,.split,.groups,.metrics{grid-template-columns:minmax(0,1fr)}.formLayout .helpPanel:not([hidden]){margin-top:8px;border-radius:14px 14px 8px 8px}.powerComparison{grid-template-columns:1fr}.grid>.helpPanel{margin:0 0 5px}.strategyTabs button{min-height:43px}#powerFlow{max-height:175px}.overviewStack{gap:8px}.overviewStack article{padding:11px}.overviewStack .row{padding:5px 0}}
+
+.inputTable{width:100%;border-collapse:collapse;font-size:14px;line-height:1.4}
+.inputTable th,.inputTable td{padding:10px 12px;text-align:left;vertical-align:top;border-bottom:1px solid var(--line)}
+.inputTable thead th{font-size:12px;color:var(--muted)}
+.inputTable tbody th{font-weight:650}
+.inputTable tbody tr:last-child>*{border-bottom:0}
+.inputTable time{font-variant-numeric:tabular-nums}
+.inputState{display:table;margin-top:4px;padding:2px 6px;border-radius:5px;color:var(--muted);background:#213335;font-size:11px;font-weight:600}
+.inputState[data-state=valid]{color:var(--green)}
+.inputState[data-state=stale]{color:var(--sun)}
+.inputTable small{display:block;margin-top:3px}
+.inputCellLabel{display:none}
+@media(max-width:800px){
+ .inputTable,.inputTable tbody{display:block}
+ .inputTable thead{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}
+ .inputTable tbody tr{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 12px;margin:8px 0;padding:12px;border:1px solid var(--line);border-radius:8px}
+ .inputTable tbody th,.inputTable td,.inputTable tbody tr:last-child>*{padding:0;border:0;min-width:0;overflow-wrap:anywhere}
+ .inputTable tbody th,.inputTable tbody td:last-child{grid-column:1/-1}
+ .inputTable tbody th{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px}
+ .inputState{margin-top:0}
+ .inputCellLabel{display:block;color:var(--muted);font-size:12px;margin-bottom:2px}
+}
 </style></head><body><header><div class="brand"><span class="mark" aria-hidden="true"><span class="mark-sun"></span><span class="mark-panel"></span></span><b>Afore Autonomous EMS</b></div><span class="badge">SHADOW – DECISIONI SIMULATE – NESSUN COMANDO APPLICATO</span></header><main>
 <nav aria-label="Sezioni"><button data-pane="overview" aria-selected="true">Overview</button><button data-pane="strategies">Strategie EMS</button><button data-pane="limits">Batteria e limiti</button><button data-pane="mqtt">MQTT</button><button data-pane="system">Sistema</button></nav>
 <section id="overview"><h1>Flussi energetici</h1><div class="sub" id="live">Connessione al dispositivo…</div><div class="split"><article><h2>Flusso istantaneo</h2><svg id="powerFlow" viewBox="0 0 420 274" role="img" aria-label="Flusso energetico fra fotovoltaico, casa, batteria e rete">
@@ -15,7 +37,9 @@ header{padding-top:17px;padding-bottom:10px}main{padding-top:8px}nav{margin-bott
 <g id="node-load" class="house" transform="translate(306 106)"><rect width="104" height="62" rx="15"/><text x="52" y="23">Casa</text><text id="flow-load" x="52" y="45">—</text></g>
 <g id="node-grid" class="utility" transform="translate(14 106)"><rect width="104" height="62" rx="15"/><text x="52" y="23">Rete</text><text id="flow-grid" x="52" y="45">—</text></g>
 <g id="node-battery" class="battery" transform="translate(158 204)"><rect width="104" height="62" rx="15"/><text id="flow-soc" x="52" y="23">Batteria</text><text id="flow-battery" x="52" y="45">—</text></g></g>
-<circle cx="210" cy="137" r="15" fill="#223635" stroke="#a8b7b1"/><path d="M213 128l-7 10h5l-3 8 8-11h-5z" fill="#ddf5e7"/></svg><p class="tag" id="flowBadges"></p></article><div class="overviewStack"><article><h2>Batteria</h2><div class="rows" id="cards"></div></article><article><h2>Decisione EMS</h2><div class="rows" id="decision"></div></article></div></div><article class="overviewDetails"><details><summary>Dettagli telemetria</summary><div class="rows" id="signals"></div></details><details><summary>Previsioni e input Home Assistant</summary><div id="forecastRows"></div></details></article></section>
+<circle cx="210" cy="137" r="15" fill="#223635" stroke="#a8b7b1"/><path d="M213 128l-7 10h5l-3 8 8-11h-5z" fill="#ddf5e7"/></svg><p class="tag" id="flowBadges"></p></article><div class="overviewStack"><article><h2>Batteria</h2><div class="rows" id="cards"></div></article><article><h2>Decisione EMS</h2><div class="rows" id="decision"></div></article></div></div><article class="overviewDetails"><details><summary>Dettagli telemetria</summary><div class="rows" id="signals"></div></details><details><summary>Previsioni e input Home Assistant</summary><div id="forecastRows"></div><details><summary>Provenienza, età e scadenze</summary><table class="inputTable" role="table" aria-label="Provenienza, età e scadenze degli input Home Assistant">
+<thead role="rowgroup"><tr role="row"><th scope="col" role="columnheader">Input</th><th scope="col" role="columnheader">Origine</th><th scope="col" role="columnheader">Tipo</th><th scope="col" role="columnheader">Aggiornato</th><th scope="col" role="columnheader">Età dato</th><th scope="col" role="columnheader">Scadenza</th></tr></thead>
+<tbody id="inputDetail" role="rowgroup"></tbody></table></details></details></article></section>
 <section id="strategies" hidden><h1>Strategie EMS</h1><article><h2>Strategia attiva</h2><div id="strategyStatus" class="rows"></div></article><form id="strategyForm"><div class="strategyTabs" id="strategyTabs" role="group" aria-label="Strategia locale"></div><div class="formLayout"><div class="formBody"></div><article class="helpPanel" hidden></article></div><div class="actions"><button class="primary">Salva strategia</button></div></form></section>
 <section id="limits" hidden><h1>Batteria e limiti</h1><form id="limitsForm"><div class="formLayout"><div class="formBody groups"></div><article class="helpPanel" hidden></article></div><div class="actions"><button class="primary">Salva limiti</button></div></form></section>
 <section id="mqtt" hidden><h1>MQTT</h1><p class="sub" id="brokerStatus">Lettura dello stato broker…</p><article><h2>Attività broker</h2><div id="brokerInfo"></div><details class="technical"><summary>Dettagli tecnici</summary><pre id="brokerTech"></pre></details></article><article class="formGroup"><h2>Connessione</h2><form id="brokerForm"><div class="grid"></div><div class="actions"><button class="primary">Salva MQTT</button><button type="button" id="mqttTest">Test connessione</button></div></form></article></section>
@@ -312,11 +336,46 @@ function freshness(q){
 }
 async function savePolicy(values){return call('ems/config',{method:'POST',body:new URLSearchParams(values)})}
 async function saveBroker(values){return call('mqtt',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(values)})}
+function renderInputDetails(data){
+ const entries=[['Solcast','forecast_solar'],['Rapporto reale / previsto','forecast_ratio'],['Meteo','weather'],['Profilo di carico','load_profile'],['Heartbeat','heartbeat']];
+ const states={valid:'Disponibile',stale:'Obsoleto',unavailable:'Non disponibile'};
+ const types={forecast:'Previsione',derived:'Calcolato',observed:'Osservato',profile:'Profilo',legacy:'Formato precedente'};
+ const sources={home_assistant:'Home Assistant',legacy_home_assistant:'Home Assistant'};
+ const timeCell=(stamp)=>{
+  if(!stamp||!Number.isFinite(Date.parse(stamp)))return '—';
+  const value=element('time',absoluteLocal(stamp));
+  value.dateTime=stamp;
+  return value;
+ };
+ const cell=(label,value)=>{
+  const td=element('td');
+  td.setAttribute('role','cell');
+  const caption=element('span',label,'inputCellLabel');
+  caption.setAttribute('aria-hidden','true');
+  td.append(caption,typeof value==='string'?element('span',value):value);
+  return td;
+ };
+ $('inputDetail').replaceChildren(...entries.map(([label,key])=>{
+  const input=data[key]??{}, row=element('tr'), title=element('th',label);
+  row.setAttribute('role','row');
+  title.scope='row';title.setAttribute('role','rowheader');
+  const status=element('span',states[input.status]??states.unavailable,'inputState');
+  status.dataset.state=input.status??'unavailable';
+  title.append(status);
+  const age=cell('Età dato',input.age_s==null?'—':duration(input.age_s));
+  if(key==='forecast_solar'&&input.age_s!=null)age.append(element('small','Dal polling Solcast'));
+  row.append(title,cell('Origine',sources[input.source]??(input.source||'—')),
+   cell('Tipo',types[input.quality]??(input.quality||'—')),
+   cell('Aggiornato',timeCell(input.timestamp)),age,cell('Scadenza',timeCell(input.expires_at)));
+  return row;
+ }));
+}
 async function update(){
 try{const [h,t,d,s,b,m,f,c]=await Promise.all(['health','telemetry','ems/decision','system','mqtt','manual','ha/inputs'].map(x=>call(x)).concat(call('time').catch(()=>null)));
 if(c)renderClock(c);
 flow(t);$('opMode').value=m.operating_mode;$('auxStatus').textContent='AUX1 '+m.aux1+' · stato comandato · feedback fisico non disponibile'+(m.aux_auto_off_ms?' · '+duration(Math.ceil(m.aux_auto_off_ms/1000)):'');
 const solar=f.forecast_solar;rows('forecastRows',[['Home Assistant',f.ha_online?'Online':'Offline'],['Solcast',solar.status+' · '+fmt(solar.age_s,'s')],['Periodi oggi / domani',solar.data?(solar.data.today.length+' / '+solar.data.tomorrow.length):'Non disponibile'],['Prossimo periodo FV',(()=>{let slot=[...(solar.data?.today??[]),...(solar.data?.tomorrow??[])].find(p=>p.start+1800>Date.now()/1000);return slot?new Date(slot.start*1000).toLocaleTimeString('it-IT',{timeZone:clockState?.zone??'Europe/Rome',hour:'2-digit',minute:'2-digit'})+' · '+fmt(slot.kw,'kW'):'Non disponibile'})()],['Rapporto reale / previsto',fmt(f.forecast_ratio.data?.ratio)],['Nebbia',f.weather.data?.fog==null?'Non disponibile':f.weather.data.fog?'Sì':'No'],['Profilo carico oggi',fmt(f.load_profile.data?.today_kw,'kW')]]);
+renderInputDetails(f);
 $('live').textContent=t.telemetry_valid?'Telemetria FC04 valida · '+fmt(t.reads)+' letture':'Telemetria non disponibile o scaduta';
 const batteryStatus=t.battery_w==null?'Non disponibile':Math.abs(t.battery_w)<20?'Inattiva':t.battery_w>0?'In carica':'In scarica';
 rows('cards',[['Stato di carica',fmt(t.soc,'%')],['Stato batteria',batteryStatus],['Potenza',fmt(t.battery_w,'W')]]);

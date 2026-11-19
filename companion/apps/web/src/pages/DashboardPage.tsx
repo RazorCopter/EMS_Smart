@@ -19,6 +19,7 @@ import { EChart } from "../components/EChart";
 import { HelpTip } from "../components/HelpTip";
 import { PowerFlow } from "../components/PowerFlow";
 import { ShadowBanner } from "../components/ShadowBanner";
+import { useTheme } from "../theme/useTheme";
 
 type LiveChartRange = "1h" | "3h" | "6h" | "12h" | "today";
 
@@ -182,6 +183,7 @@ function formatStartedAtLabel(iso: string | null | undefined, startedToday: bool
 }
 
 export function DashboardPage() {
+  const { chartPalette } = useTheme();
   const [chartRange, setChartRange] = useState<LiveChartRange>("6h");
 
   const { data: live, isLoading, error } = useQuery({
@@ -196,22 +198,23 @@ export function DashboardPage() {
     refetchInterval: 30000,
   });
 
-  const isLight = typeof document !== "undefined" && document.documentElement.dataset.theme === "light";
-
   const compactChartOption: EChartsOption = useMemo(() => {
     const s = hist?.series ?? [];
-    const axisColor = isLight ? "#5a7471" : "#7c9491";
-    const splitColor = isLight ? "#d5e1df" : "#1f3134";
-    const socLineColor = isLight ? "#0f201e" : "#eef5f3";
     return {
       grid: { top: 34, right: 44, bottom: 26, left: 46 },
-      tooltip: { trigger: "axis", confine: true },
+      tooltip: {
+        trigger: "axis",
+        confine: true,
+        backgroundColor: chartPalette.tooltipBg,
+        borderColor: chartPalette.tooltipBorder,
+        textStyle: { color: chartPalette.textPrimary, fontSize: 12 },
+      },
       legend: {
         top: 0,
         left: 0,
         itemWidth: 12,
         itemHeight: 8,
-        textStyle: { color: axisColor, fontSize: 11.5 },
+        textStyle: { color: chartPalette.axisLabel, fontSize: 11.5 },
       },
       xAxis: {
         type: "category",
@@ -219,23 +222,23 @@ export function DashboardPage() {
           const d = new Date(p.timestamp);
           return d.toLocaleTimeString("it-IT", { timeZone: live?.timezone ?? "Europe/Rome", hour: "2-digit", minute: "2-digit" });
         }),
-        axisLabel: { color: axisColor, fontSize: 10.5 },
+        axisLabel: { color: chartPalette.axisLabel, fontSize: 10.5 },
       },
       yAxis: [
         {
           type: "value",
           axisLabel: {
-            color: axisColor,
+            color: chartPalette.axisLabel,
             fontSize: 10.5,
             formatter: (v: number) => (Math.abs(v) >= 1000 ? `${(v / 1000).toFixed(1)}k` : `${Math.round(v)} W`),
           },
-          splitLine: { lineStyle: { color: splitColor } },
+          splitLine: { lineStyle: { color: chartPalette.splitLine } },
         },
         {
           type: "value",
           min: 0,
           max: 100,
-          axisLabel: { color: axisColor, fontSize: 10.5, formatter: "{value}%" },
+          axisLabel: { color: chartPalette.axisLabel, fontSize: 10.5, formatter: "{value}%" },
           splitLine: { show: false },
         },
       ],
@@ -246,9 +249,9 @@ export function DashboardPage() {
           showSymbol: false,
           smooth: 0.2,
           connectNulls: false,
-          lineStyle: { color: "#f5b942", width: 2.2 },
-          itemStyle: { color: "#f5b942" },
-          areaStyle: { color: "rgba(245,185,66,0.12)" },
+          lineStyle: { color: chartPalette.pv, width: 2.2 },
+          itemStyle: { color: chartPalette.pv },
+          areaStyle: { color: chartPalette.pvArea },
           data: s.map((p) => p.pv_w),
         },
         {
@@ -257,8 +260,8 @@ export function DashboardPage() {
           showSymbol: false,
           smooth: 0.2,
           connectNulls: false,
-          lineStyle: { color: "#a78bfa", width: 2 },
-          itemStyle: { color: "#a78bfa" },
+          lineStyle: { color: chartPalette.home, width: 2 },
+          itemStyle: { color: chartPalette.home },
           data: s.map((p) => p.load_w),
         },
         {
@@ -267,8 +270,8 @@ export function DashboardPage() {
           showSymbol: false,
           smooth: 0.2,
           connectNulls: false,
-          lineStyle: { color: "#34d399", width: 2 },
-          itemStyle: { color: "#34d399" },
+          lineStyle: { color: chartPalette.battery, width: 2 },
+          itemStyle: { color: chartPalette.battery },
           data: s.map((p) => p.battery_w),
         },
         {
@@ -277,8 +280,8 @@ export function DashboardPage() {
           showSymbol: false,
           smooth: 0.2,
           connectNulls: false,
-          lineStyle: { color: "#60a5fa", width: 1.8 },
-          itemStyle: { color: "#60a5fa" },
+          lineStyle: { color: chartPalette.grid, width: 1.8 },
+          itemStyle: { color: chartPalette.grid },
           data: s.map((p) => p.grid_w),
         },
         {
@@ -287,13 +290,13 @@ export function DashboardPage() {
           yAxisIndex: 1,
           showSymbol: false,
           connectNulls: false,
-          lineStyle: { color: socLineColor, width: 1.6, type: "dashed" },
-          itemStyle: { color: socLineColor },
+          lineStyle: { color: chartPalette.soc, width: 1.6, type: "dashed" },
+          itemStyle: { color: chartPalette.soc },
           data: s.map((p) => p.soc),
         },
       ],
     };
-  }, [hist, isLight, live?.timezone]);
+  }, [hist, chartPalette, live?.timezone]);
 
   if (isLoading) {
     return <div className="card">Caricamento telemetria live...</div>;

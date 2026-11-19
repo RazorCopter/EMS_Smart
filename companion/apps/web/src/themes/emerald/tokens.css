@@ -1,0 +1,92 @@
+:root[data-style="emerald"][data-theme="dark"] {
+  color-scheme: dark;
+  --bg-canvas: #071110;
+  --bg-sidebar: #081412;
+  --bg-surface: #0C1917;
+  --bg-surface-2: #11211E;
+  --bg-elevated: #162925;
+  --bg-inset: #0A1614;
+  --border-subtle: #19312C;
+  --border-strong: #28423D;
+
+  --text-primary: #F3F8F6;
+  --text-secondary: #A9BDB7;
+  --text-muted: #71857F;
+
+  --accent-teal: #34D6A0;
+  --accent-teal-hover: #57E4B7;
+  --accent-teal-contrast: #052019;
+  --accent-teal-soft: rgba(52, 214, 160, 0.14);
+
+  --pv-color: #F7C948;
+  --pv-soft: rgba(247, 201, 72, 0.14);
+  --home-color: #A78BFA;
+  --home-soft: rgba(167, 139, 250, 0.14);
+  --battery-color: #34D399;
+  --battery-soft: rgba(52, 211, 153, 0.15);
+  --grid-color: #4EA8FF;
+  --grid-soft: rgba(78, 168, 255, 0.14);
+
+  --safety-amber: #F59E0B;
+  --safety-soft: rgba(245, 158, 11, 0.15);
+  --fault-red: #F05D6C;
+  --fault-soft: rgba(240, 93, 108, 0.15);
+  --missing-grey: #53645F;
+  --missing-soft: rgba(83, 100, 95, 0.18);
+  --shadow-blue: #38BDF8;
+  --shadow-soft: rgba(56, 189, 248, 0.13);
+
+  --shadow-sm: 0 1px 2px rgba(3, 10, 8, 0.35);
+  --shadow-md: 0 14px 36px rgba(2, 8, 7, 0.55);
+  --card-pad: 18px;
+  --grid-gap: 16px;
+}
+
+:root[data-style="emerald"][data-theme="light"] {
+  color-scheme: light;
+  --bg-canvas: #F4F7F5;
+  --bg-sidebar: #EDF2EF;
+  --bg-surface: #FAFCFB;
+  --bg-surface-2: #F2F7F4;
+  --bg-elevated: #EAF1ED;
+  --bg-inset: #E6EEEA;
+  --border-subtle: #D2DFD9;
+  --border-strong: #9EB8AD;
+
+  --text-primary: #0D1F1B;
+  --text-secondary: #324D47;
+  --text-muted: #4D6862;
+
+  --accent-teal: #047857;
+  --accent-teal-hover: #065F46;
+  --accent-teal-contrast: #FAFCFB;
+  --accent-teal-soft: rgba(4, 120, 87, 0.11);
+
+  --pv-color: #B45309;
+  --pv-soft: rgba(180, 83, 9, 0.11);
+  --home-color: #6D28D9;
+  --home-soft: rgba(109, 40, 217, 0.11);
+  --battery-color: #047857;
+  --battery-soft: rgba(4, 120, 87, 0.12);
+  --grid-color: #1D4ED8;
+  --grid-soft: rgba(29, 78, 216, 0.11);
+
+  --safety-amber: #B45309;
+  --safety-soft: rgba(180, 83, 9, 0.13);
+  --fault-red: #B91C1C;
+  --fault-soft: rgba(185, 28, 28, 0.13);
+  --missing-grey: #53645F;
+  --missing-soft: rgba(83, 100, 95, 0.14);
+  --shadow-blue: #0369A1;
+  --shadow-soft: rgba(3, 105, 161, 0.12);
+
+  --shadow-sm: 0 1px 3px rgba(13, 31, 27, 0.06);
+  --shadow-md: 0 12px 28px rgba(13, 31, 27, 0.11);
+  --card-pad: 18px;
+  --grid-gap: 16px;
+}
+
+:root[data-style="emerald"][data-density="compact"] {
+  --card-pad: 12px;
+  --grid-gap: 11px;
+}

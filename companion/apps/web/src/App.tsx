@@ -1,29 +1,129 @@
-import { useEffect, useState } from "react";
+import { lazy, Suspense, useEffect } from "react";
 import { BrowserRouter, Route, Routes } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiFetch, type AuthUser } from "./lib/api";
+import { ThemeProvider } from "./theme/ThemeProvider";
+import { useTheme } from "./theme/useTheme";
+import { ThemeErrorBoundary } from "./components/shared/ThemeErrorBoundary";
 import { Layout } from "./components/Layout";
 import { LoginScreen } from "./components/LoginScreen";
 import { DashboardPage } from "./pages/DashboardPage";
-import { HistoryPage } from "./pages/HistoryPage";
-import { DecisionsPage } from "./pages/DecisionsPage";
-import { AnalysisPage } from "./pages/AnalysisPage";
-import { ComparisonPage } from "./pages/ComparisonPage";
-import { BatteryPage } from "./pages/BatteryPage";
-import { ReportPage } from "./pages/ReportPage";
-import { SettingsPage } from "./pages/SettingsPage";
+
+const HistoryPage = lazy(() => import("./pages/HistoryPage").then((m) => ({ default: m.HistoryPage })));
+const DecisionsPage = lazy(() => import("./pages/DecisionsPage").then((m) => ({ default: m.DecisionsPage })));
+const AnalysisPage = lazy(() => import("./pages/AnalysisPage").then((m) => ({ default: m.AnalysisPage })));
+const ComparisonPage = lazy(() => import("./pages/ComparisonPage").then((m) => ({ default: m.ComparisonPage })));
+const BatteryPage = lazy(() => import("./pages/BatteryPage").then((m) => ({ default: m.BatteryPage })));
+const ReportPage = lazy(() => import("./pages/ReportPage").then((m) => ({ default: m.ReportPage })));
+const SettingsPage = lazy(() => import("./pages/SettingsPage").then((m) => ({ default: m.SettingsPage })));
+
+function ThemedShell({
+  activeUser,
+  onLoginSuccess,
+  onLogout,
+}: {
+  activeUser: AuthUser | null;
+  onLoginSuccess: (user: AuthUser) => void;
+  onLogout: () => void;
+}) {
+  const { effectiveStyle, activateTemporaryClassicFallback, resetToDefault } = useTheme();
+
+  const systemQuery = useQuery({
+    queryKey: ["system-status"],
+    queryFn: () => apiFetch<any>("/api/v1/system/status"),
+    enabled: Boolean(activeUser),
+    refetchInterval: 10000,
+  });
+
+  if (!activeUser) {
+    return <LoginScreen onSuccess={onLoginSuccess} />;
+  }
+
+  const pageFallback = <div className="card">Caricamento sezione...</div>;
+
+  return (
+    <ThemeErrorBoundary
+      styleName={effectiveStyle}
+      onFallbackToClassic={activateTemporaryClassicFallback}
+      onResetDefault={resetToDefault}
+    >
+      <BrowserRouter>
+        <Routes>
+          <Route
+            element={
+              <Layout
+                user={activeUser}
+                system={systemQuery.data ?? null}
+                onLogout={onLogout}
+              />
+            }
+          >
+            <Route index element={<DashboardPage />} />
+            <Route
+              path="/storico"
+              element={
+                <Suspense fallback={pageFallback}>
+                  <HistoryPage />
+                </Suspense>
+              }
+            />
+            <Route
+              path="/decisioni"
+              element={
+                <Suspense fallback={pageFallback}>
+                  <DecisionsPage />
+                </Suspense>
+              }
+            />
+            <Route
+              path="/analisi"
+              element={
+                <Suspense fallback={pageFallback}>
+                  <AnalysisPage />
+                </Suspense>
+              }
+            />
+            <Route
+              path="/confronto-sem"
+              element={
+                <Suspense fallback={pageFallback}>
+                  <ComparisonPage />
+                </Suspense>
+              }
+            />
+            <Route
+              path="/batteria"
+              element={
+                <Suspense fallback={pageFallback}>
+                  <BatteryPage />
+                </Suspense>
+              }
+            />
+            <Route
+              path="/report"
+              element={
+                <Suspense fallback={pageFallback}>
+                  <ReportPage />
+                </Suspense>
+              }
+            />
+            <Route
+              path="/impostazioni"
+              element={
+                <Suspense fallback={pageFallback}>
+                  <SettingsPage user={activeUser} />
+                </Suspense>
+              }
+            />
+          </Route>
+        </Routes>
+      </BrowserRouter>
+    </ThemeErrorBoundary>
+  );
+}
 
 export function App() {
   const qc = useQueryClient();
-  const [theme, setTheme] = useState<"dark" | "light">(() => {
-    const saved = localStorage.getItem("afore_companion_theme");
-    return saved === "light" ? "light" : "dark";
-  });
-
-  useEffect(() => {
-    document.documentElement.dataset.theme = theme;
-    localStorage.setItem("afore_companion_theme", theme);
-  }, [theme]);
 
   const authQuery = useQuery({
     queryKey: ["auth-me"],
@@ -34,14 +134,7 @@ export function App() {
   const activeUser: AuthUser | null =
     authQuery.data && authQuery.data.authenticated !== false && authQuery.data.username ? authQuery.data : null;
 
-  const systemQuery = useQuery({
-    queryKey: ["system-status"],
-    queryFn: () => apiFetch<any>("/api/v1/system/status"),
-    enabled: Boolean(activeUser),
-    refetchInterval: 10000,
-  });
-
-  // Live WebSocket stream for <2s updates on telemetry/decisions
+  // Live WebSocket stream lives above ThemeProvider so switching themes never closes WS
   useEffect(() => {
     if (!activeUser) return;
     const proto = window.location.protocol === "https:" ? "wss:" : "ws:";
@@ -70,44 +163,16 @@ export function App() {
     return <div style={{ padding: 32 }}>Inizializzazione Afore EMS Companion...</div>;
   }
 
-  if (!activeUser) {
-    return (
-      <LoginScreen
-        onSuccess={(user) => {
+  return (
+    <ThemeProvider username={activeUser?.username ?? null}>
+      <ThemedShell
+        activeUser={activeUser}
+        onLoginSuccess={(user) => {
           qc.setQueryData(["auth-me"], { ...user, authenticated: true });
         }}
+        onLogout={handleLogout}
       />
-    );
-  }
-
-  return (
-    <BrowserRouter>
-      <Routes>
-        <Route
-          element={
-            <Layout
-              user={activeUser}
-              system={systemQuery.data ?? null}
-              theme={theme}
-              onToggleTheme={() => setTheme((t) => (t === "dark" ? "light" : "dark"))}
-              onLogout={handleLogout}
-            />
-          }
-        >
-          <Route index element={<DashboardPage />} />
-          <Route path="/storico" element={<HistoryPage />} />
-          <Route path="/decisioni" element={<DecisionsPage />} />
-          <Route path="/analisi" element={<AnalysisPage />} />
-          <Route path="/confronto-sem" element={<ComparisonPage />} />
-          <Route path="/batteria" element={<BatteryPage />} />
-          <Route path="/report" element={<ReportPage />} />
-          <Route
-            path="/impostazioni"
-            element={<SettingsPage user={activeUser} theme={theme} onChangeTheme={setTheme} />}
-          />
-        </Route>
-      </Routes>
-    </BrowserRouter>
+    </ThemeProvider>
   );
 }
 

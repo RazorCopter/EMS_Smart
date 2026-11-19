@@ -1,6 +1,11 @@
-import { useEffect, useState, type KeyboardEvent } from "react";
+import { lazy, Suspense, useEffect, useMemo, useState, type KeyboardEvent } from "react";
 import { X } from "lucide-react";
-import { fmtAbsKw, fmtAge, fmtNum, fmtPct, fmtWatts } from "../lib/format";
+import { fmtAbsKw, fmtPct, fmtWatts } from "../lib/format";
+import { useOptionalTheme } from "../theme/useTheme";
+import { ThemeErrorBoundary } from "./shared/ThemeErrorBoundary";
+import { buildEnergyFlowModel, type NodeId } from "./shared/energyFlowModel";
+
+const EmeraldEnergyMonitor = lazy(() => import("./emerald/EmeraldEnergyMonitor"));
 
 export interface TelemetryLive {
   age_s?: number | null;
@@ -26,8 +31,6 @@ export interface TelemetryLive {
   errors?: number | null;
   quality?: Record<string, { age_ms?: number | null; source?: string; state?: string }>;
 }
-
-type NodeId = "pv" | "grid" | "home" | "battery" | "inverter";
 
 interface Props {
   telemetry: TelemetryLive | null;
@@ -84,6 +87,7 @@ export function PowerFlow({
   selfConsumptionPct,
   deadbandW = 20,
 }: Props) {
+  const { effectiveStyle, activateTemporaryClassicFallback, resetToDefault } = useOptionalTheme();
   const [activeNode, setActiveNode] = useState<NodeId | null>(null);
   const [compactViewport, setCompactViewport] = useState<boolean>(() =>
     typeof window !== "undefined" && typeof window.matchMedia === "function"
@@ -99,54 +103,40 @@ export function PowerFlow({
     return () => mq.removeEventListener("change", onChange);
   }, []);
 
-  const isStale = Boolean(telemetry?.stale);
-  const pv = telemetry?.pv_w ?? null;
-  const load = telemetry?.load_w ?? null;
-  const grid = telemetry?.grid_w ?? null;
-  const batt = telemetry?.battery_w ?? null;
-  const soc = telemetry?.soc ?? null;
+  const model = useMemo(
+    () => buildEnergyFlowModel(telemetry, deadbandW, safetyMinW, safetyMaxW, selfConsumptionPct),
+    [telemetry, deadbandW, safetyMinW, safetyMaxW, selfConsumptionPct],
+  );
 
-  const pvActive = !isStale && pv != null && pv > deadbandW;
-  const loadActive = !isStale && load != null && load > deadbandW;
-  const gridImport = !isStale && grid != null && grid > deadbandW;
-  const gridExport = !isStale && grid != null && grid < -deadbandW;
-  const gridActive = gridImport || gridExport;
-  const battCharge = !isStale && batt != null && batt > deadbandW;
-  const battDischarge = !isStale && batt != null && batt < -deadbandW;
-  const battActive = battCharge || battDischarge;
-
-  const inactiveColor = "var(--missing-grey)";
-  const pvColor = pv == null || isStale ? inactiveColor : pvActive ? "var(--pv-color)" : inactiveColor;
-  const loadColor = load == null || isStale ? inactiveColor : loadActive ? "var(--home-color)" : inactiveColor;
-  const gridColor = grid == null || isStale ? inactiveColor : gridActive ? "var(--grid-color)" : inactiveColor;
-  const battColor = batt == null || isStale ? inactiveColor : battActive ? "var(--battery-color)" : inactiveColor;
-
-  const pvQualityKind = pv == null ? "unavailable" : isStale ? "stale" : "measured";
-  const gridQualityKind = grid == null ? "unavailable" : isStale ? "stale" : "measured";
-  const loadQualityKind =
-    load == null
-      ? "unavailable"
-      : isStale
-      ? "stale"
-      : (telemetry?.quality?.load_w?.source ?? "derived") === "derived"
-      ? "derived"
-      : "measured";
-  const battQualityKind = batt == null && soc == null ? "unavailable" : isStale ? "stale" : "measured";
-
-  const pvStateLabel = pv == null ? "Non disp." : pvActive ? "↓ Produzione" : "Inattivo";
-  const gridDirLabel =
-    grid == null ? "Non disp." : gridImport ? "→ Prelievo" : gridExport ? "← Immissione" : "In equilibrio";
-  const loadDirLabel = load == null ? "Non disp." : loadActive ? "← Consumo" : "Standby";
-  const battDirLabel =
-    batt == null ? "Non disp." : battCharge ? "↑ In carica" : battDischarge ? "↓ In scarica" : "Inattiva";
-
-  const invStatusLabel = !telemetry
-    ? "In attesa"
-    : telemetry.fault
-    ? "Anomalia"
-    : isStale
-    ? "Non agg."
-    : "Operativo";
+  const {
+    isStale,
+    pv,
+    load,
+    grid,
+    batt,
+    soc,
+    pvActive,
+    loadActive,
+    gridExport,
+    gridActive,
+    battDischarge,
+    battActive,
+    pvColor,
+    loadColor,
+    gridColor,
+    battColor,
+    inactiveColor,
+    pvQualityKind,
+    gridQualityKind,
+    loadQualityKind,
+    battQualityKind,
+    pvStateLabel,
+    gridDirLabel,
+    loadDirLabel,
+    battDirLabel,
+    invStatusLabel,
+    specs,
+  } = model;
 
   function toggleNode(id: NodeId) {
     setActiveNode((cur) => (cur === id ? null : id));
@@ -208,70 +198,6 @@ export function PowerFlow({
 
   const renderPopoverContent = () => {
     if (!activeNode) return null;
-    const age = telemetry ? fmtAge(telemetry.age_s) : "Non disponibile";
-    const qualityStatus = !telemetry ? "Non disponibile" : isStale ? "Non aggiornato (stale)" : "Valido";
-
-    const specs: Record<NodeId, { title: string; accent: string; rows: Array<[string, string]> }> = {
-      pv: {
-        title: "Dettaglio nodo · Fotovoltaico",
-        accent: "var(--pv-color)",
-        rows: [
-          ["Potenza totale", fmtAbsKw(pv)],
-          ["Stringa PV1", `${telemetry?.pv1_w != null ? `${Math.round(telemetry.pv1_w)} W` : "—"} · ${fmtNum(telemetry?.pv1_v, "V", 1)}`],
-          ["Stringa PV2", `${telemetry?.pv2_w != null ? `${Math.round(telemetry.pv2_w)} W` : "—"} · ${fmtNum(telemetry?.pv2_v, "V", 1)}`],
-          ["Provenienza", "Misurato FC04"],
-          ["Età campione", age],
-          ["Qualità dato", qualityStatus],
-        ],
-      },
-      grid: {
-        title: "Dettaglio nodo · Rete elettrica",
-        accent: "var(--grid-color)",
-        rows: [
-          ["Scambio netto", fmtWatts(grid)],
-          ["Tensione / Frequenza", `${fmtNum(telemetry?.grid_v, "V", 1)} · ${fmtNum(telemetry?.hz, "Hz", 2)}`],
-          ["Provenienza", "Misurato FC04"],
-          ["Età campione", age],
-          ["Qualità dato", qualityStatus],
-        ],
-      },
-      home: {
-        title: "Dettaglio nodo · Utenze Casa",
-        accent: "var(--home-color)",
-        rows: [
-          ["Consumo istantaneo", fmtAbsKw(load)],
-          ["Autoconsumo oggi", fmtPct(selfConsumptionPct)],
-          ["Tensione / Frequenza", `${fmtNum(telemetry?.grid_v, "V", 1)} · ${fmtNum(telemetry?.hz, "Hz", 2)}`],
-          ["Provenienza", telemetry?.quality?.load_w?.source === "derived" || !telemetry?.quality?.load_w ? "Derivato AC (bilancio inverter)" : String(telemetry.quality.load_w.source)],
-          ["Età campione", age],
-          ["Qualità dato", qualityStatus],
-        ],
-      },
-      battery: {
-        title: "Dettaglio nodo · Batteria",
-        accent: "var(--battery-color)",
-        rows: [
-          ["SOC attuale", fmtPct(soc)],
-          ["Potenza istantanea", `${fmtWatts(batt)} (${battDirLabel})`],
-          ["Tensione / Corrente", `${fmtNum(telemetry?.battery_v, "V", 1)} · ${fmtNum(telemetry?.battery_a, "A", 1)}`],
-          ["Limiti Safety", safetyMinW != null && safetyMaxW != null ? `${Math.round(safetyMinW)} / ${Math.round(safetyMaxW)} W` : "Non disponibile"],
-          ["Provenienza", "Misurato FC04"],
-          ["Età campione", age],
-        ],
-      },
-      inverter: {
-        title: "Dettaglio nodo · Inverter Afore",
-        accent: "var(--accent-teal)",
-        rows: [
-          ["Stato sistema", invStatusLabel],
-          ["Temperatura interna", fmtNum(telemetry?.temp_c, "°C", 1)],
-          ["Letture / Errori RS485", `${telemetry?.reads ?? "—"} / ${telemetry?.errors ?? "—"}`],
-          ["Deadband flussi", `±${deadbandW} W`],
-          ["Età campione", age],
-        ],
-      },
-    };
-
     const spec = specs[activeNode];
     return (
       <div
@@ -304,6 +230,29 @@ export function PowerFlow({
       </div>
     );
   };
+
+  if (effectiveStyle === "emerald") {
+    return (
+      <ThemeErrorBoundary
+        styleName={effectiveStyle}
+        onFallbackToClassic={activateTemporaryClassicFallback}
+        onResetDefault={resetToDefault}
+      >
+        <Suspense fallback={<div className="energy-stage" style={{ minHeight: 320 }} />}>
+          <EmeraldEnergyMonitor
+            telemetry={telemetry}
+            model={model}
+            deadbandW={deadbandW}
+            compactViewport={compactViewport}
+            activeNode={activeNode}
+            onToggleNode={toggleNode}
+            onNodeKey={handleNodeKey}
+            popover={renderPopoverContent()}
+          />
+        </Suspense>
+      </ThemeErrorBoundary>
+    );
+  }
 
   const socWidth = soc != null ? Math.max(4, Math.min(284, (soc / 100) * 284)) : 0;
 

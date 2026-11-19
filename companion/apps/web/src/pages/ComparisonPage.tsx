@@ -4,8 +4,10 @@ import type { EChartsOption } from "echarts";
 import { apiFetch } from "../lib/api";
 import { fmtPct, fmtWatts, strategyLabel, type TimeRange } from "../lib/format";
 import { EChart } from "../components/EChart";
+import { useTheme } from "../theme/useTheme";
 
 export function ComparisonPage() {
+  const { chartPalette } = useTheme();
   const [range, setRange] = useState<TimeRange>("today");
   const [thresholdW, setThresholdW] = useState<number>(100);
 
@@ -20,28 +22,34 @@ export function ComparisonPage() {
 
   const chartOption: EChartsOption = useMemo(() => {
     return {
-      tooltip: { trigger: "axis", confine: true },
-      legend: { top: 0, textStyle: { color: "#98b0ad", fontSize: 11 } },
+      tooltip: {
+        trigger: "axis",
+        confine: true,
+        backgroundColor: chartPalette.tooltipBg,
+        borderColor: chartPalette.tooltipBorder,
+        textStyle: { color: chartPalette.textPrimary, fontSize: 12 },
+      },
+      legend: { top: 0, textStyle: { color: chartPalette.textSecondary, fontSize: 11 } },
       grid: { top: 52, right: 24, bottom: 32, left: 52 },
       xAxis: {
         type: "category",
         data: series.map((p) => new Date(p.timestamp).toLocaleTimeString("it-IT", { timeZone: "Europe/Rome" })),
-        axisLabel: { color: "#6e8683", fontSize: 10 },
+        axisLabel: { color: chartPalette.axisLabel, fontSize: 10 },
       },
       yAxis: {
         type: "value",
         name: "W",
-        axisLabel: { color: "#6e8683", fontSize: 10 },
-        splitLine: { lineStyle: { color: "#1f3134" } },
+        axisLabel: { color: chartPalette.axisLabel, fontSize: 10 },
+        splitLine: { lineStyle: { color: chartPalette.splitLine } },
       },
       series: [
-        { name: "SEM (reale / target)", type: "line", showSymbol: false, connectNulls: false, lineStyle: { color: "#c084fc", width: 2.2 }, data: series.map((p) => p.sem_target_w) },
-        { name: "ESP (SHADOW simulato)", type: "line", showSymbol: false, connectNulls: false, lineStyle: { color: "#38bdf8", width: 2.2, type: "dashed" }, data: series.map((p) => p.esp_simulated_w) },
-        { name: "Batteria misurata", type: "line", showSymbol: false, connectNulls: false, lineStyle: { color: "#34d399", width: 1.8 }, data: series.map((p) => p.actual_battery_w) },
-        { name: "Rete misurata", type: "line", showSymbol: false, connectNulls: false, lineStyle: { color: "#60a5fa", width: 1.6 }, data: series.map((p) => p.actual_grid_w) },
+        { name: "SEM (reale / target)", type: "line", showSymbol: false, connectNulls: false, lineStyle: { color: chartPalette.sem, width: 2.2 }, itemStyle: { color: chartPalette.sem }, data: series.map((p) => p.sem_target_w) },
+        { name: "ESP (SHADOW simulato)", type: "line", showSymbol: false, connectNulls: false, lineStyle: { color: chartPalette.shadow, width: 2.2, type: "dashed" }, itemStyle: { color: chartPalette.shadow }, data: series.map((p) => p.esp_simulated_w) },
+        { name: "Batteria misurata", type: "line", showSymbol: false, connectNulls: false, lineStyle: { color: chartPalette.battery, width: 1.8 }, itemStyle: { color: chartPalette.battery }, data: series.map((p) => p.actual_battery_w) },
+        { name: "Rete misurata", type: "line", showSymbol: false, connectNulls: false, lineStyle: { color: chartPalette.grid, width: 1.6 }, itemStyle: { color: chartPalette.grid }, data: series.map((p) => p.actual_grid_w) },
       ],
     };
-  }, [series]);
+  }, [series, chartPalette]);
 
   return (
     <>

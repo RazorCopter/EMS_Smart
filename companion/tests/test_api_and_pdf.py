@@ -68,3 +68,27 @@ def test_group_dashboard_events_filters_legacy_gaps_and_groups_repetitive():
     soc_grp = next(g for g in grouped if g["event_type"] == "SOC_LIMIT")
     assert soc_grp["count"] == 2
     assert "2 volte" in soc_grp["title"]
+
+
+def test_user_theme_preferences_validation_and_isolation():
+    from companion_api.main import UserPreferencesPayload, _user_prefs_key
+
+    default_prefs = UserPreferencesPayload()
+    assert default_prefs.style == "classic"
+    assert default_prefs.color_scheme == "dark"
+    assert default_prefs.density == "comfortable"
+    assert default_prefs.reduced_motion is False
+
+    emerald = UserPreferencesPayload(
+        style="emerald",
+        color_scheme="system",
+        density="compact",
+        reduced_motion=True,
+    )
+    assert emerald.model_dump() == {
+        "style": "emerald",
+        "color_scheme": "system",
+        "density": "compact",
+        "reduced_motion": True,
+    }
+    assert _user_prefs_key("admin") != _user_prefs_key("viewer")

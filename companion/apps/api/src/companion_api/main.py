@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 import io
 import json
 import logging
-from typing import Any
+from typing import Any, Literal
 
 import asyncpg
 from fastapi import (
@@ -42,6 +42,7 @@ from .auth import (
     login_rate_limiter,
     require_admin_csrf,
     require_viewer,
+    require_viewer_csrf,
     sign_session,
     verify_session,
 )
@@ -135,6 +136,13 @@ class SettingsPatchRequest(BaseModel):
     retention_raw_mqtt_days: int | None = Field(default=None, ge=1, le=3650)
     retention_telemetry_days: int | None = Field(default=None, ge=1, le=3650)
     retention_agg_1m_days: int | None = Field(default=None, ge=7, le=3650)
+
+
+class UserPreferencesPayload(BaseModel):
+    style: Literal["classic", "emerald"] = "classic"
+    color_scheme: Literal["dark", "light", "system"] = "dark"
+    density: Literal["comfortable", "compact"] = "comfortable"
+    reduced_motion: bool = False
 
 
 @asynccontextmanager
@@ -262,6 +270,45 @@ async def auth_me(
     if info is None:
         return {"authenticated": False, "username": None, "role": None, "csrf_token": None}
     return {"authenticated": True, "username": info.username, "role": info.role, "csrf_token": info.csrf_token}
+
+
+def _user_prefs_key(username: str) -> str:
+    return f"user_prefs:{username}"
+
+
+@app.get("/api/v1/user/preferences")
+async def get_user_preferences(
+    user: SessionInfo = Depends(require_viewer),
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, Any]:
+    row = await db.get(CompanionSetting, _user_prefs_key(user.username))
+    defaults = UserPreferencesPayload()
+    if row is not None and isinstance(row.value_json, dict):
+        try:
+            defaults = UserPreferencesPayload.model_validate(row.value_json)
+        except Exception:
+            defaults = UserPreferencesPayload()
+    return {**defaults.model_dump(), "username": user.username}
+
+
+@app.put("/api/v1/user/preferences")
+async def put_user_preferences(
+    body: UserPreferencesPayload,
+    user: SessionInfo = Depends(require_viewer_csrf),
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, Any]:
+    payload = body.model_dump()
+    stmt = (
+        insert(CompanionSetting)
+        .values(key=_user_prefs_key(user.username), value_json=payload)
+        .on_conflict_do_update(
+            index_elements=["key"],
+            set_={"value_json": payload, "updated_at": datetime.now(timezone.utc)},
+        )
+    )
+    await db.execute(stmt)
+    await db.commit()
+    return {**payload, "username": user.username}
 
 
 @app.get("/api/v1/system/status")

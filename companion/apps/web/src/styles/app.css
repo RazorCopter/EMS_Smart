@@ -903,10 +903,12 @@
   padding: 0;
 }
 
-.tip-btn:hover, .tip-wrap.is-open .tip-btn {
+.tip-btn:hover,
+.tip-wrap.is-open .tip-btn {
   border-color: var(--accent-teal);
   color: var(--accent-teal);
 }
+
 .tip-bubble {
   display: none;
   position: absolute;
@@ -926,8 +928,16 @@
   white-space: normal;
   pointer-events: none;
 }
-.tip-bubble.align-left { left: 0; }
-.tip-bubble.align-right { right: 0; left: auto; }
+
+.tip-bubble.align-left {
+  left: 0;
+}
+
+.tip-bubble.align-right {
+  right: 0;
+  left: auto;
+}
+
 .tip-wrap:hover .tip-bubble,
 .tip-wrap:focus-within .tip-bubble,
 .tip-wrap.is-open .tip-bubble {

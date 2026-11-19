@@ -19,6 +19,7 @@ import {
   X,
 } from "lucide-react";
 import type { AuthUser } from "../lib/api";
+import { useTheme } from "../theme/useTheme";
 
 interface SystemStatus {
   components?: Record<string, { status: string; detail?: Record<string, unknown> }>;
@@ -27,8 +28,8 @@ interface SystemStatus {
 interface Props {
   user: AuthUser;
   system: SystemStatus | null;
-  theme: "dark" | "light";
-  onToggleTheme: () => void;
+  theme?: "dark" | "light";
+  onToggleTheme?: () => void;
   onLogout: () => void;
 }
 
@@ -58,6 +59,9 @@ function statusText(status?: string): string {
 }
 
 export function Layout({ user, system, theme, onToggleTheme, onLogout }: Props) {
+  const ctxTheme = useTheme();
+  const activeScheme = theme ?? ctxTheme.resolvedScheme;
+  const handleToggleScheme = onToggleTheme ?? ctxTheme.toggleColorScheme;
   const [collapsed, setCollapsed] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
@@ -68,6 +72,9 @@ export function Layout({ user, system, theme, onToggleTheme, onLogout }: Props) 
 
   return (
     <div className={`app-shell ${collapsed ? "sidebar-collapsed" : ""}`}>
+      <a href="#main-content" className="skip-link">
+        Salta al contenuto principale
+      </a>
       {/* Desktop Sidebar */}
       <aside className="sidebar" aria-label="Menu principale">
         <div>
@@ -149,11 +156,11 @@ export function Layout({ user, system, theme, onToggleTheme, onLogout }: Props) 
               type="button"
               className="btn"
               style={{ flex: 1, padding: "6px 8px" }}
-              onClick={onToggleTheme}
+              onClick={handleToggleScheme}
               aria-label="Cambia tema chiaro/scuro"
             >
-              {theme === "dark" ? <Sun size={14} /> : <Moon size={14} />}
-              {!collapsed && <span>{theme === "dark" ? "Chiaro" : "Scuro"}</span>}
+              {activeScheme === "dark" ? <Sun size={14} /> : <Moon size={14} />}
+              {!collapsed && <span>{activeScheme === "dark" ? "Chiaro" : "Scuro"}</span>}
             </button>
             <button
               type="button"
@@ -219,8 +226,8 @@ export function Layout({ user, system, theme, onToggleTheme, onLogout }: Props) 
                 ))}
               </nav>
               <div style={{ marginTop: 18, display: "flex", flexDirection: "column", gap: 8 }}>
-                <button type="button" className="btn" onClick={onToggleTheme}>
-                  {theme === "dark" ? <Sun size={15} /> : <Moon size={15} />} Tema {theme === "dark" ? "Chiaro" : "Scuro"}
+                <button type="button" className="btn" onClick={handleToggleScheme}>
+                  {activeScheme === "dark" ? <Sun size={15} /> : <Moon size={15} />} Tema {activeScheme === "dark" ? "Chiaro" : "Scuro"}
                 </button>
                 <button type="button" className="btn" onClick={onLogout}>
                   <LogOut size={15} /> Esci ({user.role})
@@ -230,7 +237,7 @@ export function Layout({ user, system, theme, onToggleTheme, onLogout }: Props) 
           </div>
         )}
 
-        <main className="main">
+        <main id="main-content" className="main" tabIndex={-1}>
           <Outlet />
         </main>
 

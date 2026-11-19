@@ -4,6 +4,7 @@ import type { EChartsOption } from "echarts";
 import { apiFetch } from "../lib/api";
 import { fmtKwh, fmtNum, fmtPct, fmtTime, fmtWatts, type TimeRange } from "../lib/format";
 import { EChart } from "../components/EChart";
+import { useTheme } from "../theme/useTheme";
 
 function ProvBadge({ provenance }: { provenance: string }) {
   const labels: Record<string, string> = {
@@ -17,6 +18,7 @@ function ProvBadge({ provenance }: { provenance: string }) {
 }
 
 export function BatteryPage() {
+  const { chartPalette } = useTheme();
   const [range, setRange] = useState<TimeRange>("today");
   const { data, isLoading } = useQuery({
     queryKey: ["battery", range],
@@ -28,24 +30,30 @@ export function BatteryPage() {
 
   const chartOption: EChartsOption = useMemo(() => {
     return {
-      tooltip: { trigger: "axis", confine: true },
-      legend: { top: 0, textStyle: { color: "#98b0ad", fontSize: 11 } },
+      tooltip: {
+        trigger: "axis",
+        confine: true,
+        backgroundColor: chartPalette.tooltipBg,
+        borderColor: chartPalette.tooltipBorder,
+        textStyle: { color: chartPalette.textPrimary, fontSize: 12 },
+      },
+      legend: { top: 0, textStyle: { color: chartPalette.textSecondary, fontSize: 11 } },
       grid: { top: 38, right: 48, bottom: 28, left: 48 },
       xAxis: {
         type: "category",
         data: hist.map((p) => new Date(p.timestamp).toLocaleTimeString("it-IT", { timeZone: "Europe/Rome", hour: "2-digit", minute: "2-digit" })),
-        axisLabel: { color: "#6e8683", fontSize: 10 },
+        axisLabel: { color: chartPalette.axisLabel, fontSize: 10 },
       },
       yAxis: [
-        { type: "value", name: "SOC %", min: 0, max: 100, axisLabel: { color: "#6e8683", formatter: "{value}%" }, splitLine: { lineStyle: { color: "#1f3134" } } },
-        { type: "value", name: "W", axisLabel: { color: "#6e8683" }, splitLine: { show: false } },
+        { type: "value", name: "SOC %", min: 0, max: 100, axisLabel: { color: chartPalette.axisLabel, formatter: "{value}%" }, splitLine: { lineStyle: { color: chartPalette.splitLine } } },
+        { type: "value", name: "W", axisLabel: { color: chartPalette.axisLabel }, splitLine: { show: false } },
       ],
       series: [
-        { name: "SOC %", type: "line", showSymbol: false, connectNulls: false, lineStyle: { color: "#34d399", width: 2.2 }, areaStyle: { color: "rgba(52,211,153,0.14)" }, data: hist.map((p) => p.soc) },
-        { name: "Potenza (W)", type: "line", yAxisIndex: 1, showSymbol: false, connectNulls: false, lineStyle: { color: "#60a5fa", width: 1.8 }, data: hist.map((p) => p.battery_w) },
+        { name: "SOC %", type: "line", showSymbol: false, connectNulls: false, lineStyle: { color: chartPalette.battery, width: 2.2 }, itemStyle: { color: chartPalette.battery }, areaStyle: { color: chartPalette.batteryArea }, data: hist.map((p) => p.soc) },
+        { name: "Potenza (W)", type: "line", yAxisIndex: 1, showSymbol: false, connectNulls: false, lineStyle: { color: chartPalette.grid, width: 1.8 }, itemStyle: { color: chartPalette.grid }, data: hist.map((p) => p.battery_w) },
       ],
     };
-  }, [hist]);
+  }, [hist, chartPalette]);
 
   if (isLoading || !data) {
     return <div className="card">Caricamento dati batteria...</div>;

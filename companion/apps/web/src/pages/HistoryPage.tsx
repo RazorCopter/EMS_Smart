@@ -7,6 +7,7 @@ import { apiFetch, rangeQuery } from "../lib/api";
 import { fmtNum, fmtWatts, strategyLabel, type TimeRange } from "../lib/format";
 import { EChart } from "../components/EChart";
 import { ShadowBanner } from "../components/ShadowBanner";
+import { useTheme } from "../theme/useTheme";
 
 const RANGES: Array<{ id: TimeRange; label: string }> = [
   { id: "today", label: "Oggi" },
@@ -18,6 +19,7 @@ const RANGES: Array<{ id: TimeRange; label: string }> = [
 ];
 
 export function HistoryPage() {
+  const { chartPalette } = useTheme();
   const [range, setRange] = useState<TimeRange>("today");
   const [customStart, setCustomStart] = useState("");
   const [customEnd, setCustomEnd] = useState("");
@@ -44,9 +46,9 @@ export function HistoryPage() {
       tooltip: {
         trigger: "axis",
         confine: true,
-        backgroundColor: "#0e191b",
-        borderColor: "#2d464a",
-        textStyle: { color: "#eef5f3", fontSize: 12 },
+        backgroundColor: chartPalette.tooltipBg,
+        borderColor: chartPalette.tooltipBorder,
+        textStyle: { color: chartPalette.textPrimary, fontSize: 12 },
         formatter: (params: any) => {
           const idx = params?.[0]?.dataIndex;
           const pt = series[idx];
@@ -59,10 +61,10 @@ export function HistoryPage() {
           return [
             `<strong>${dt}</strong>`,
             `SOC: <b>${pt.soc != null ? `${pt.soc}%` : "Dato mancante"}</b>`,
-            `<span style="color:#f5b942">Produzione:</span> <b>${fmtWatts(pt.pv_w)}</b>`,
-            `<span style="color:#a78bfa">Consumo (der.):</span> <b>${fmtWatts(pt.load_w)}</b>`,
-            `<span style="color:#34d399">Batteria:</span> <b>${fmtWatts(pt.battery_w)}${battDir}</b>`,
-            `<span style="color:#60a5fa">Rete:</span> <b>${fmtWatts(pt.grid_w)}${gridDir}</b>`,
+            `<span style="color:${chartPalette.pv}">Produzione:</span> <b>${fmtWatts(pt.pv_w)}</b>`,
+            `<span style="color:${chartPalette.home}">Consumo (der.):</span> <b>${fmtWatts(pt.load_w)}</b>`,
+            `<span style="color:${chartPalette.battery}">Batteria:</span> <b>${fmtWatts(pt.battery_w)}${battDir}</b>`,
+            `<span style="color:${chartPalette.grid}">Rete:</span> <b>${fmtWatts(pt.grid_w)}${gridDir}</b>`,
             `Strategia: <b>${strategyLabel(pt.strategy)}</b>`,
             `Setpoint ESP: <b>${fmtWatts(pt.simulated_w)} (simulato)</b>`,
             `Decisione SEM: <b>${pt.sem_decision ?? "Non disponibile"}</b>`,
@@ -73,11 +75,11 @@ export function HistoryPage() {
       },
       legend: {
         top: 0,
-        textStyle: { color: "#98b0ad", fontSize: 11 },
+        textStyle: { color: chartPalette.textSecondary, fontSize: 11 },
       },
       dataZoom: [
         { type: "inside", start: 0, end: 100 },
-        { type: "slider", bottom: 4, height: 20, borderColor: "#1f3134" },
+        { type: "slider", bottom: 4, height: 20, borderColor: chartPalette.sliderBorder },
       ],
       grid: { top: 54, right: 52, bottom: 52, left: 56 },
       xAxis: {
@@ -90,41 +92,41 @@ export function HistoryPage() {
             ...(range === "7d" || range === "30d" || range === "12m" ? { day: "2-digit", month: "2-digit" } : {}),
           })
         ),
-        axisLabel: { color: "#6e8683", fontSize: 11 },
+        axisLabel: { color: chartPalette.axisLabel, fontSize: 11 },
       },
       yAxis: [
         {
           type: "value",
           name: "kW",
-          nameTextStyle: { color: "#6e8683" },
-          axisLabel: { color: "#6e8683", formatter: (v: number) => `${(v / 1000).toFixed(1)}` },
-          splitLine: { lineStyle: { color: "#1f3134" } },
+          nameTextStyle: { color: chartPalette.axisLabel },
+          axisLabel: { color: chartPalette.axisLabel, formatter: (v: number) => `${(v / 1000).toFixed(1)}` },
+          splitLine: { lineStyle: { color: chartPalette.splitLine } },
         },
         {
           type: "value",
           name: "SOC %",
           min: 0,
           max: 100,
-          nameTextStyle: { color: "#6e8683" },
-          axisLabel: { color: "#6e8683", formatter: "{value}%" },
+          nameTextStyle: { color: chartPalette.axisLabel },
+          axisLabel: { color: chartPalette.axisLabel, formatter: "{value}%" },
           splitLine: { show: false },
         },
       ],
       series: [
-        { name: "FV", type: "line", showSymbol: false, connectNulls: false, lineStyle: { color: "#f5b942", width: 2 }, areaStyle: { color: "rgba(245,185,66,0.16)" }, data: series.map((p) => p.pv_w) },
-        { name: "Consumo", type: "line", showSymbol: false, connectNulls: false, lineStyle: { color: "#a78bfa", width: 2 }, data: series.map((p) => p.load_w) },
-        { name: "Batteria", type: "line", showSymbol: false, connectNulls: false, lineStyle: { color: "#34d399", width: 2 }, data: series.map((p) => p.battery_w) },
-        { name: "Rete", type: "line", showSymbol: false, connectNulls: false, lineStyle: { color: "#60a5fa", width: 1.8 }, data: series.map((p) => p.grid_w) },
-        { name: "Setpoint ESP (sim.)", type: "line", showSymbol: false, connectNulls: false, lineStyle: { color: "#38bdf8", width: 1.6, type: "dashed" }, data: series.map((p) => p.simulated_w) },
-        { name: "Limite Safety Max", type: "line", showSymbol: false, connectNulls: false, lineStyle: { color: "#f59e0b", width: 1, type: "dotted" }, data: series.map((p) => p.safety_max_w) },
-        { name: "Limite Safety Min", type: "line", showSymbol: false, connectNulls: false, lineStyle: { color: "#f59e0b", width: 1, type: "dotted" }, data: series.map((p) => p.safety_min_w) },
-        { name: "SOC", type: "line", yAxisIndex: 1, showSymbol: false, connectNulls: false, lineStyle: { color: "#eef5f3", width: 2, type: "dashed" }, data: series.map((p) => p.soc) },
+        { name: "FV", type: "line", showSymbol: false, connectNulls: false, lineStyle: { color: chartPalette.pv, width: 2 }, itemStyle: { color: chartPalette.pv }, areaStyle: { color: chartPalette.pvArea }, data: series.map((p) => p.pv_w) },
+        { name: "Consumo", type: "line", showSymbol: false, connectNulls: false, lineStyle: { color: chartPalette.home, width: 2 }, itemStyle: { color: chartPalette.home }, data: series.map((p) => p.load_w) },
+        { name: "Batteria", type: "line", showSymbol: false, connectNulls: false, lineStyle: { color: chartPalette.battery, width: 2 }, itemStyle: { color: chartPalette.battery }, data: series.map((p) => p.battery_w) },
+        { name: "Rete", type: "line", showSymbol: false, connectNulls: false, lineStyle: { color: chartPalette.grid, width: 1.8 }, itemStyle: { color: chartPalette.grid }, data: series.map((p) => p.grid_w) },
+        { name: "Setpoint ESP (sim.)", type: "line", showSymbol: false, connectNulls: false, lineStyle: { color: chartPalette.shadow, width: 1.6, type: "dashed" }, itemStyle: { color: chartPalette.shadow }, data: series.map((p) => p.simulated_w) },
+        { name: "Limite Safety Max", type: "line", showSymbol: false, connectNulls: false, lineStyle: { color: chartPalette.safety, width: 1, type: "dotted" }, itemStyle: { color: chartPalette.safety }, data: series.map((p) => p.safety_max_w) },
+        { name: "Limite Safety Min", type: "line", showSymbol: false, connectNulls: false, lineStyle: { color: chartPalette.safety, width: 1, type: "dotted" }, itemStyle: { color: chartPalette.safety }, data: series.map((p) => p.safety_min_w) },
+        { name: "SOC", type: "line", yAxisIndex: 1, showSymbol: false, connectNulls: false, lineStyle: { color: chartPalette.soc, width: 2, type: "dashed" }, itemStyle: { color: chartPalette.soc }, data: series.map((p) => p.soc) },
       ],
     };
-  }, [series, range]);
+  }, [series, range, chartPalette]);
 
   function saveImage() {
-    const url = chartInstanceRef.current?.getDataURL({ type: "png", backgroundColor: "#091011" });
+    const url = chartInstanceRef.current?.getDataURL({ type: "png", backgroundColor: chartPalette.canvasBg });
     if (!url) return;
     const a = document.createElement("a");
     a.href = url;

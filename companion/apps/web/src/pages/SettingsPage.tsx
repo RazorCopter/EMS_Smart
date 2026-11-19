@@ -4,14 +4,15 @@ import { apiFetch, type AuthUser } from "../lib/api";
 import { fmtTime } from "../lib/format";
 import { HelpTip } from "../components/HelpTip";
 import { ShadowBanner } from "../components/ShadowBanner";
+import { ThemeSettingsCard } from "../components/shared/ThemeControls";
+import { useTheme } from "../theme/useTheme";
 
 interface Props {
   user: AuthUser;
-  theme: "dark" | "light";
-  onChangeTheme: (next: "dark" | "light") => void;
 }
 
-export function SettingsPage({ user, theme, onChangeTheme }: Props) {
+export function SettingsPage({ user }: Props) {
+  const { resolvedScheme } = useTheme();
   const qc = useQueryClient();
   const { data, isLoading } = useQuery({
     queryKey: ["settings"],
@@ -65,7 +66,7 @@ export function SettingsPage({ user, theme, onChangeTheme }: Props) {
       sem_concordance_watt_threshold: thresholdW,
       timezone,
       units_power: unitsPower,
-      theme,
+      theme: resolvedScheme,
     });
   }
 
@@ -91,6 +92,7 @@ export function SettingsPage({ user, theme, onChangeTheme }: Props) {
         <div className="card">Caricamento configurazione...</div>
       ) : (
         <section className="grid-2">
+          <ThemeSettingsCard />
           <article className="card">
             <div className="card-header">
               <h2 className="card-title">Stato Integrazioni (Sola Lettura)</h2>
@@ -188,17 +190,10 @@ export function SettingsPage({ user, theme, onChangeTheme }: Props) {
                 </select>
               </label>
 
-              <label style={{ display: "grid", gap: 5, fontSize: 12.5, color: "var(--text-secondary)" }}>
-                Tema interfaccia
-                <select
-                  className="input-field"
-                  value={theme}
-                  onChange={(e) => onChangeTheme(e.target.value === "light" ? "light" : "dark")}
-                >
-                  <option value="dark">Scuro (predefinito)</option>
-                  <option value="light">Chiaro</option>
-                </select>
-              </label>
+              <p className="card-sub" style={{ margin: 0 }}>
+                Lo schema colore, lo stile (Classic / Emerald Control) e la densità si gestiscono nella sezione{" "}
+                <strong>Aspetto &amp; Tema Multi-Style</strong> sopra, con salvataggio per singolo utente.
+              </p>
 
               {isAdmin && (
                 <button type="submit" className="btn primary" disabled={saveMutation.isPending}>

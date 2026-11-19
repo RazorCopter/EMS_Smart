@@ -138,14 +138,20 @@ def require_viewer(
     return info
 
 
-def require_admin_csrf(
+def require_viewer_csrf(
     request: Request,
     info: SessionInfo = Depends(require_viewer),
     x_csrf_token: str | None = Header(default=None, alias="X-CSRF-Token"),
 ) -> SessionInfo:
-    if info.role != "admin":
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Richiesti privilegi Admin")
     if request.method in {"POST", "PUT", "PATCH", "DELETE"}:
         if not x_csrf_token or not hmac.compare_digest(x_csrf_token, info.csrf_token):
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Token CSRF mancante o non valido")
+    return info
+
+
+def require_admin_csrf(
+    info: SessionInfo = Depends(require_viewer_csrf),
+) -> SessionInfo:
+    if info.role != "admin":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Richiesti privilegi Admin")
     return info

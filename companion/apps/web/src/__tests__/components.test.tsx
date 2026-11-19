@@ -1,8 +1,11 @@
-import { describe, expect, it } from "vitest";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { describe, expect, it, vi } from "vitest";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 import { ShadowBanner } from "../components/ShadowBanner";
 import { PowerFlow } from "../components/PowerFlow";
+import { ThemeProvider } from "../theme/ThemeProvider";
+import { ThemeSettingsCard } from "../components/shared/ThemeControls";
+import { ThemeErrorBoundary } from "../components/shared/ThemeErrorBoundary";
 import { fmtKwh, fmtWatts, humanDecisionDetail } from "../lib/format";
 
 describe("formatting preserves null without substituting zero", () => {
@@ -63,5 +66,57 @@ describe("PowerFlow", () => {
     fireEvent.click(screen.getByRole("button", { name: /Batteria:/i }));
     expect(screen.getByRole("dialog", { name: /Dettaglio nodo · Batteria/i })).toBeInTheDocument();
     expect(screen.getByText(/Misurato FC04/i)).toBeInTheDocument();
+  });
+});
+
+describe("Multi-Theme Provider, Emerald Energy Monitor & Fallback", () => {
+  it("defaults to Classic + Scuro and switches style, color scheme, density, and motion live", async () => {
+    window.localStorage.clear();
+    render(
+      <ThemeProvider username={null}>
+        <ThemeSettingsCard />
+        <PowerFlow telemetry={{ age_s: 2, soc: 55, pv_w: 1800, load_w: 400, grid_w: -10, battery_w: 1390 }} />
+      </ThemeProvider>
+    );
+
+    expect(document.documentElement.dataset.style).toBe("classic");
+    expect(document.documentElement.dataset.theme).toBe("dark");
+
+    fireEvent.click(screen.getByRole("radio", { name: /Emerald Control/i }));
+    expect(document.documentElement.dataset.style).toBe("emerald");
+    await waitFor(() => {
+      expect(screen.getByText(/Bilancio energetico radiale in tempo reale/i)).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole("radio", { name: /Chiaro/i }));
+    expect(document.documentElement.dataset.theme).toBe("light");
+
+    fireEvent.click(screen.getByRole("radio", { name: /Compatta/i }));
+    expect(document.documentElement.dataset.density).toBe("compact");
+
+    fireEvent.click(screen.getByRole("checkbox"));
+    expect(document.documentElement.dataset.motion).toBe("reduced");
+
+    fireEvent.click(screen.getByRole("button", { name: /Ripristina tema predefinito/i }));
+    expect(document.documentElement.dataset.style).toBe("classic");
+    expect(document.documentElement.dataset.theme).toBe("dark");
+    expect(document.documentElement.dataset.density).toBe("comfortable");
+  });
+
+  it("recovers via ThemeErrorBoundary and offers fallback to Classic without crashing", () => {
+    const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const onFallback = vi.fn();
+    function BrokenEmerald(): JSX.Element {
+      throw new Error("boom-emerald");
+    }
+    render(
+      <ThemeErrorBoundary styleName="emerald" onFallbackToClassic={onFallback}>
+        <BrokenEmerald />
+      </ThemeErrorBoundary>
+    );
+    expect(screen.getByRole("alert")).toHaveTextContent(/Fallback automatico disponibile/i);
+    fireEvent.click(screen.getByRole("button", { name: /Passa temporaneamente a Classic/i }));
+    expect(onFallback).toHaveBeenCalledTimes(1);
+    spy.mockRestore();
   });
 });

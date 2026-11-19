@@ -22,7 +22,7 @@ export function EChart({ option, height = 320, ariaLabel, onChartReady }: Props)
     if (!el) return;
     const chart = echarts.init(el);
     chartRef.current = chart;
-    chart.setOption(optionRef.current, { notMerge: true });
+    chart.setOption(optionRef.current, { notMerge: false, lazyUpdate: true });
     readyRef.current?.(chart);
 
     const observer = new ResizeObserver(() => {
@@ -37,7 +37,8 @@ export function EChart({ option, height = 320, ariaLabel, onChartReady }: Props)
   }, []);
 
   useEffect(() => {
-    chartRef.current?.setOption(option, { notMerge: true });
+    // Update options in place without tearing down zoom or legend state on live WS / theme switches
+    chartRef.current?.setOption(option, { notMerge: false, lazyUpdate: true });
   }, [option]);
 
   return (

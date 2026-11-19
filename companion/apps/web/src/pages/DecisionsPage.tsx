@@ -7,6 +7,7 @@ import { apiFetch } from "../lib/api";
 import { fmtTime, fmtWatts, reasonLabel, strategyLabel, type TimeRange } from "../lib/format";
 import { EChart } from "../components/EChart";
 import { ShadowBanner } from "../components/ShadowBanner";
+import { useTheme } from "../theme/useTheme";
 
 const STRATEGY_COLORS: Record<string, { bg: string; fg: string }> = {
   SELF_USE: { bg: "rgba(45, 212, 191, 0.18)", fg: "#5eead4" },
@@ -18,6 +19,7 @@ const STRATEGY_COLORS: Record<string, { bg: string; fg: string }> = {
 };
 
 export function DecisionsPage() {
+  const { chartPalette } = useTheme();
   const [searchParams] = useSearchParams();
   const [range, setRange] = useState<TimeRange>("today");
   const [strategyFilter, setStrategyFilter] = useState<string>("");
@@ -53,31 +55,37 @@ export function DecisionsPage() {
 
   const chartOption: EChartsOption = useMemo(() => {
     return {
-      tooltip: { trigger: "axis", confine: true },
-      legend: { top: 0, textStyle: { color: "#98b0ad", fontSize: 11 } },
+      tooltip: {
+        trigger: "axis",
+        confine: true,
+        backgroundColor: chartPalette.tooltipBg,
+        borderColor: chartPalette.tooltipBorder,
+        textStyle: { color: chartPalette.textPrimary, fontSize: 12 },
+      },
+      legend: { top: 0, textStyle: { color: chartPalette.textSecondary, fontSize: 11 } },
       grid: { top: 52, right: 20, bottom: 32, left: 52 },
       xAxis: {
         type: "category",
         data: decisions.map((d) => new Date(d.source_timestamp).toLocaleTimeString("it-IT", { timeZone: "Europe/Rome" })),
-        axisLabel: { color: "#6e8683", fontSize: 10 },
+        axisLabel: { color: chartPalette.axisLabel, fontSize: 10 },
       },
       yAxis: {
         type: "value",
         name: "W",
-        axisLabel: { color: "#6e8683", fontSize: 10 },
-        splitLine: { lineStyle: { color: "#1f3134" } },
+        axisLabel: { color: chartPalette.axisLabel, fontSize: 10 },
+        splitLine: { lineStyle: { color: chartPalette.splitLine } },
       },
       series: [
-        { name: "Candidato", type: "line", showSymbol: false, connectNulls: false, lineStyle: { color: "#94a3b8", width: 1.5, type: "dotted" }, data: decisions.map((d) => d.candidate_w) },
-        { name: "Safety-limited", type: "line", showSymbol: false, connectNulls: false, lineStyle: { color: "#f59e0b", width: 2 }, data: decisions.map((d) => d.limited_w) },
-        { name: "Simulato ESP", type: "line", showSymbol: false, connectNulls: false, lineStyle: { color: "#38bdf8", width: 2.4 }, data: decisions.map((d) => d.simulated_w) },
-        { name: "Batteria misurata", type: "line", showSymbol: false, connectNulls: false, lineStyle: { color: "#34d399", width: 2 }, data: decisions.map((d) => d.battery_w) },
-        { name: "Rete misurata", type: "line", showSymbol: false, connectNulls: false, lineStyle: { color: "#60a5fa", width: 1.5 }, data: decisions.map((d) => d.grid_w) },
-        { name: "Envelope Max", type: "line", showSymbol: false, connectNulls: false, lineStyle: { color: "#f59e0b", width: 1, type: "dashed" }, data: decisions.map((d) => d.safety_max_w) },
-        { name: "Envelope Min", type: "line", showSymbol: false, connectNulls: false, lineStyle: { color: "#f59e0b", width: 1, type: "dashed" }, data: decisions.map((d) => d.safety_min_w) },
+        { name: "Candidato", type: "line", showSymbol: false, connectNulls: false, lineStyle: { color: chartPalette.candidate, width: 1.5, type: "dotted" }, itemStyle: { color: chartPalette.candidate }, data: decisions.map((d) => d.candidate_w) },
+        { name: "Safety-limited", type: "line", showSymbol: false, connectNulls: false, lineStyle: { color: chartPalette.safety, width: 2 }, itemStyle: { color: chartPalette.safety }, data: decisions.map((d) => d.limited_w) },
+        { name: "Simulato ESP", type: "line", showSymbol: false, connectNulls: false, lineStyle: { color: chartPalette.shadow, width: 2.4 }, itemStyle: { color: chartPalette.shadow }, data: decisions.map((d) => d.simulated_w) },
+        { name: "Batteria misurata", type: "line", showSymbol: false, connectNulls: false, lineStyle: { color: chartPalette.battery, width: 2 }, itemStyle: { color: chartPalette.battery }, data: decisions.map((d) => d.battery_w) },
+        { name: "Rete misurata", type: "line", showSymbol: false, connectNulls: false, lineStyle: { color: chartPalette.grid, width: 1.5 }, itemStyle: { color: chartPalette.grid }, data: decisions.map((d) => d.grid_w) },
+        { name: "Envelope Max", type: "line", showSymbol: false, connectNulls: false, lineStyle: { color: chartPalette.safety, width: 1, type: "dashed" }, itemStyle: { color: chartPalette.safety }, data: decisions.map((d) => d.safety_max_w) },
+        { name: "Envelope Min", type: "line", showSymbol: false, connectNulls: false, lineStyle: { color: chartPalette.safety, width: 1, type: "dashed" }, itemStyle: { color: chartPalette.safety }, data: decisions.map((d) => d.safety_min_w) },
       ],
     };
-  }, [decisions]);
+  }, [decisions, chartPalette]);
 
   const activeDetail = detailQuery.data;
 
@@ -169,7 +177,7 @@ export function DecisionsPage() {
             <span className="badge simulated">Seleziona riga per dettagli</span>
           </div>
           <div className="table-wrap" style={{ maxHeight: 380 }}>
-            <table className="data-table">
+            <table className="data-table resp-cards">
               <thead>
                 <tr>
                   <th>Ora / Seq</th>
@@ -186,15 +194,15 @@ export function DecisionsPage() {
                     className={selectedId === d.id ? "selected" : ""}
                     onClick={() => setSelectedId(d.id)}
                   >
-                    <td>
+                    <td data-label="Ora / Seq">
                       {new Date(d.source_timestamp).toLocaleTimeString("it-IT", { timeZone: "Europe/Rome" })} · #{d.seq}
                     </td>
-                    <td>{strategyLabel(d.strategy)}</td>
-                    <td>{fmtWatts(d.candidate_w, "W")}</td>
-                    <td style={{ color: "var(--shadow-blue)", fontWeight: 600 }}>{fmtWatts(d.simulated_w, "W")}</td>
-                    <td>
+                    <td data-label="Strategia">{strategyLabel(d.strategy)}</td>
+                    <td data-label="Candidato">{fmtWatts(d.candidate_w, "W")}</td>
+                    <td data-label="Simulato" style={{ color: "var(--shadow-blue)", fontWeight: 600 }}>{fmtWatts(d.simulated_w, "W")}</td>
+                    <td data-label="Safety / Motivo">
                       <span className={`badge ${d.safety_reason !== "NONE" ? "safety" : "measured"}`}>
-                        {d.safety_reason !== "NONE" ? d.safety_reason : reasonLabel(d.reason)}
+                        {d.safety_reason !== "NONE" ? reasonLabel(d.safety_reason) : reasonLabel(d.reason)}
                       </span>
                     </td>
                   </tr>

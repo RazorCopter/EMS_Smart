@@ -34,6 +34,7 @@ from energy_domain import (
     EnergyAccumulator,
     ExternalInputEnvelope,
     ManualStatePayload,
+    ProcessResourceSampler,
     SemComparisonThresholds,
     SemSnapshotPayload,
     TelemetryPayload,
@@ -104,6 +105,8 @@ class IngestionEngine:
         self.max_energy_gap_s = max_energy_gap_s
         self.sem_thresholds = sem_thresholds or SemComparisonThresholds()
         self.state = DeviceRuntimeState()
+        self.resource_sampler = ProcessResourceSampler("/")
+        self._esp32_diag_cache: dict[str, Any] = {}
 
     async def bootstrap_from_db(self) -> None:
         """Restores last known boot_id, seq, and uptime_ms on collector restart."""
@@ -242,6 +245,52 @@ class IngestionEngine:
             await self._notify_live("ems/decision")
         return inserted
 
+    def _merge_esp32_detail(self, raw: dict[str, Any]) -> dict[str, Any]:
+        """Merges partial REST /health and MQTT diagnostics payloads for ESP32 resource monitoring."""
+        keys = (
+            "firmware",
+            "mode",
+            "uptime_ms",
+            "reset_reason",
+            "rssi_dbm",
+            "ota_slot",
+            "ota_state",
+            "heap",
+            "heap_total",
+            "heap_min",
+            "heap_max_alloc",
+            "heap_used_pct",
+            "psram",
+            "psram_free",
+            "psram_min",
+            "psram_used_pct",
+            "cpu_pct",
+            "cpu0_pct",
+            "cpu1_pct",
+            "cpu_mhz",
+            "task_count",
+            "min_task_stack_free_b",
+            "nvs_used_entries",
+            "nvs_free_entries",
+            "nvs_total_entries",
+            "nvs_used_pct",
+            "flash_size",
+            "sketch_size",
+            "sketch_free",
+            "reads",
+            "errors",
+        )
+        for k in keys:
+            val = raw.get(k)
+            if val is not None:
+                self._esp32_diag_cache[k] = val
+        return {
+            **self._esp32_diag_cache,
+            "mode": self._esp32_diag_cache.get("mode", "SHADOW"),
+            "executed": False,
+            "modbus_write_count": 0,
+        }
+
     async def ingest_rest_health_bundle(
         self,
         *,
@@ -254,20 +303,14 @@ class IngestionEngine:
         now = datetime.now(timezone.utc)
         async with self.session_factory() as session:
             if health is not None:
+                normalized = dict(health)
+                if "min_heap" in normalized and "heap_min" not in normalized:
+                    normalized["heap_min"] = normalized["min_heap"]
                 await self._upsert_health(
                     session,
                     "esp32",
                     "online",
-                    {
-                        "firmware": health.get("firmware"),
-                        "mode": health.get("mode", "SHADOW"),
-                        "uptime_ms": health.get("uptime_ms"),
-                        "rssi_dbm": health.get("rssi_dbm"),
-                        "heap": health.get("heap"),
-                        "ota_slot": health.get("ota_slot"),
-                        "executed": False,
-                        "modbus_write_count": 0,
-                    },
+                    self._merge_esp32_detail(normalized),
                     now,
                 )
                 await self._upsert_device(
@@ -286,7 +329,13 @@ class IngestionEngine:
             if ha_inputs is not None:
                 await self._handle_ha_inputs(session, ha_inputs, now)
 
-            await self._upsert_health(session, "collector", "online", {"device_id": self.device_id}, now)
+            await self._upsert_health(
+                session,
+                "collector",
+                "online",
+                {"device_id": self.device_id, **self.resource_sampler.sample()},
+                now,
+            )
             await self._upsert_health(session, "database", "online", {"engine": "timescaledb"}, now)
             await session.commit()
 
@@ -842,21 +891,13 @@ class IngestionEngine:
 
     async def _handle_diagnostics(self, session: AsyncSession, data: dict[str, Any], now: datetime) -> None:
         diag = DiagnosticsPayload.model_validate(data)
+        raw = diag.model_dump(mode="json", exclude_none=True)
+        raw["rssi_dbm"] = diag.rssi
         await self._upsert_health(
             session,
             "esp32",
             "online",
-            {
-                "firmware": diag.firmware,
-                "rssi_dbm": diag.rssi,
-                "heap": diag.heap,
-                "psram": diag.psram,
-                "uptime_ms": diag.uptime_ms,
-                "reset_reason": diag.reset_reason,
-                "reads": diag.reads,
-                "errors": diag.errors,
-                "modbus_write_count": 0,
-            },
+            self._merge_esp32_detail(raw),
             now,
         )
         await self._upsert_device(session, firmware=diag.firmware, seen_at=now)

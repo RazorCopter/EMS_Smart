@@ -2,6 +2,7 @@ import { FormEvent, useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiFetch, type AuthUser } from "../lib/api";
 import { fmtTime } from "../lib/format";
+import { HelpTip } from "../components/HelpTip";
 import { ShadowBanner } from "../components/ShadowBanner";
 
 interface Props {
@@ -122,7 +123,8 @@ export function SettingsPage({ user, theme, onChangeTheme }: Props) {
             <div className="kv-row">
               <span className="kv-label">Retention TimescaleDB / Backup</span>
               <span className="kv-val">
-                Raw {ret.raw_mqtt_days}g · 5s {ret.telemetry_days}g · 1m {ret.agg_1m_days}g · Backup {ret.backup_retention_days}g
+                Raw {ret.raw_mqtt_days}g · 5s {ret.telemetry_days}g · Decisioni {ret.decisions_days ?? 180}g · 1m {ret.agg_1m_days}g · Backup{" "}
+                {ret.backup_retention_days}g
               </span>
             </div>
 
@@ -212,6 +214,117 @@ export function SettingsPage({ user, theme, onChangeTheme }: Props) {
           </article>
         </section>
       )}
+
+      {!isLoading && data?.resources && (() => {
+        const esp = data.resources.esp32 ?? {};
+        const api = data.resources.containers?.api ?? {};
+        const coll = data.resources.containers?.collector ?? {};
+        const db = data.resources.database ?? {};
+        const fmtKb = (b: unknown) => (typeof b === "number" ? `${Math.round(b / 1024)} KB` : "N/D");
+        const fmtMb = (b: unknown) => (typeof b === "number" ? `${(b / (1024 * 1024)).toFixed(2)} MB` : "N/D");
+        return (
+          <section className="grid-2" style={{ marginTop: 16 }}>
+            <article className="card">
+              <div className="card-header">
+                <div>
+                  <h2 className="card-title">Diagnostica Risorse ESP32 ({esp.ota_slot || "app"})</h2>
+                  <p className="card-sub">CPU FreeRTOS, SRAM interna, PSRAM ring buffer e Flash NVS</p>
+                </div>
+                <span className="badge measured">{esp.firmware || "v5.1"}</span>
+              </div>
+              <div className="kv-row">
+                <span className="kv-label">
+                  Utilizzo CPU media (Core 0 / Core 1)
+                  <HelpTip id="tip-set-esp-cpu" title="CPU ESP32" text="Calcolata via FreeRTOS uxTaskGetSystemState (timer hardware microsecondi)." align="left" />
+                </span>
+                <span className="kv-val">
+                  {typeof esp.cpu_pct === "number"
+                    ? `${esp.cpu_pct.toFixed(1)}% (C0 ${esp.cpu0_pct?.toFixed(1) ?? "?"}% · C1 ${esp.cpu1_pct?.toFixed(1) ?? "?"}%) @ ${esp.cpu_mhz ?? 240} MHz`
+                    : "In attesa campione"}
+                </span>
+              </div>
+              <div className="kv-row">
+                <span className="kv-label">SRAM interna (occupata / libera)</span>
+                <span className="kv-val">
+                  {typeof esp.heap_used_pct === "number" ? `${esp.heap_used_pct.toFixed(1)}%` : "N/D"} · libera {fmtKb(esp.heap_free)} / {fmtKb(esp.heap_total)}
+                </span>
+              </div>
+              <div className="kv-row">
+                <span className="kv-label">Minimo storico SRAM / Blocco contiguo max</span>
+                <span className="kv-val">
+                  min {fmtKb(esp.heap_min)} · max block {fmtKb(esp.heap_max_alloc)}
+                </span>
+              </div>
+              <div className="kv-row">
+                <span className="kv-label">PSRAM (8 MB, incl. ring 256 decisioni)</span>
+                <span className="kv-val">
+                  {typeof esp.psram_used_pct === "number" ? `${esp.psram_used_pct.toFixed(1)}% usata` : "N/D"} · libera {fmtMb(esp.psram_free)} / {fmtMb(esp.psram_total)}
+                </span>
+              </div>
+              <div className="kv-row">
+                <span className="kv-label">Flash NVS &amp; Sketch</span>
+                <span className="kv-val">
+                  NVS {esp.nvs_used_entries ?? "?"}/{esp.nvs_total_entries ?? "?"} ({esp.nvs_used_pct ?? "?"}%) · Sketch {fmtMb(esp.sketch_size)} / {fmtMb(esp.sketch_free)}
+                </span>
+              </div>
+              <div className="kv-row">
+                <span className="kv-label">Task attivi / Stack min libero / Wi-Fi RSSI</span>
+                <span className="kv-val">
+                  {esp.task_count ?? "?"} task · min stack {esp.min_task_stack_free_b ?? "?"} B · {esp.rssi_dbm ?? "?"} dBm
+                </span>
+              </div>
+            </article>
+
+            <article className="card">
+              <div className="card-header">
+                <div>
+                  <h2 className="card-title">Risorse Container, TimescaleDB &amp; Disco</h2>
+                  <p className="card-sub">Protezione anti-saturazione disco e consumo container LXC</p>
+                </div>
+                <span className="badge measured">{typeof db.db_size_mb === "number" ? `${db.db_size_mb.toFixed(1)} MB DB` : "TimescaleDB"}</span>
+              </div>
+              <div className="kv-row">
+                <span className="kv-label">Container API (CPU / RAM RSS / cgroup)</span>
+                <span className="kv-val">
+                  CPU {api.cpu_pct ?? "?"}% · RSS {api.process_rss_mb ?? "?"} MB · cgroup {api.cgroup_mem_mb ?? "?"} MB
+                </span>
+              </div>
+              <div className="kv-row">
+                <span className="kv-label">Container Collector (CPU / RAM RSS / cgroup)</span>
+                <span className="kv-val">
+                  CPU {coll.cpu_pct ?? "?"}% · RSS {coll.process_rss_mb ?? "?"} MB · cgroup {coll.cgroup_mem_mb ?? "?"} MB
+                </span>
+              </div>
+              <div className="kv-row">
+                <span className="kv-label">Filesystem LXC (/ host volume)</span>
+                <span className="kv-val">
+                  {api.disk_used_gb ?? "?"} / {api.disk_total_gb ?? "?"} GB ({api.disk_used_pct ?? "?"}% · {api.disk_free_gb ?? "?"} GB liberi)
+                </span>
+              </div>
+              {Array.isArray(db.hypertables) && db.hypertables.length > 0 && (
+                <table className="diag-table">
+                  <thead>
+                    <tr>
+                      <th>Hypertable</th>
+                      <th>Dimensione</th>
+                      <th>Chunk (compressi)</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {db.hypertables.map((ht: any) => (
+                      <tr key={ht.name}>
+                        <td><code>{ht.name}</code></td>
+                        <td>{ht.size_mb.toFixed(2)} MB</td>
+                        <td>{ht.chunks} ({ht.compressed_chunks})</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </article>
+          </section>
+        );
+      })()}
     </>
   );
 }

@@ -30,6 +30,7 @@ from .redaction import (
     redact_dict,
     verify_password,
 )
+from .runtime_resources import ProcessResourceSampler
 from .sem_compare import (
     ComparisonAggregate,
     ComparisonPoint,
@@ -58,6 +59,7 @@ __all__ = [
     "NormalizedDecision",
     "NormalizedTelemetry",
     "OperatingMode",
+    "ProcessResourceSampler",
     "ProvenanceKind",
     "QualityState",
     "SecretRedactingFilter",

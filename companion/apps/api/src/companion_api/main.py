@@ -49,6 +49,7 @@ from .config import ApiSettings
 from .pdf_export import build_simple_pdf
 from .queries import (
     get_live_payload,
+    get_system_resources,
     get_system_status,
     is_legacy_stride_gap,
     load_companion_settings,
@@ -270,6 +271,16 @@ async def system_status(
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, Any]:
     return await get_system_status(db, request.app.state.settings.device_id)
+
+
+@app.get("/api/v1/system/resources")
+async def system_resources(
+    request: Request,
+    _user: SessionInfo = Depends(require_viewer),
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, Any]:
+    sys_status = await get_system_status(db, request.app.state.settings.device_id)
+    return await get_system_resources(db, sys_status)
 
 
 @app.get("/api/v1/live")
@@ -671,6 +682,7 @@ async def get_settings(
     runtime = await load_companion_settings(db)
     sys_status = await get_system_status(db, cfg.device_id)
     comps = sys_status["components"]
+    resources = await get_system_resources(db, sys_status)
 
     return {
         "operating_mode": "SHADOW",
@@ -688,8 +700,10 @@ async def get_settings(
             "raw_mqtt_days": runtime.get("retention_raw_mqtt_days", {}).get("value", cfg.retention_raw_mqtt_days),
             "telemetry_days": runtime.get("retention_telemetry_days", {}).get("value", cfg.retention_telemetry_days),
             "agg_1m_days": runtime.get("retention_agg_1m_days", {}).get("value", cfg.retention_agg_1m_days),
+            "decisions_days": cfg.retention_decisions_days,
             "backup_retention_days": cfg.backup_retention_days,
         },
+        "resources": resources,
         "integrations": {
             "mqtt": {
                 "enabled": cfg.mqtt_enabled,

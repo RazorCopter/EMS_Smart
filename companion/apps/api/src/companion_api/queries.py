@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 import re
+import time
 from typing import Any
 from zoneinfo import ZoneInfo
 
@@ -24,12 +25,134 @@ from companion_db.models import (
 )
 from energy_domain import (
     EnergyTotals,
+    ProcessResourceSampler,
     SemComparisonThresholds,
     compute_kpis,
     compute_setpoint_churn,
     summarize_comparisons,
 )
 from energy_domain.sem_compare import ComparisonPoint
+
+_API_RESOURCE_SAMPLER = ProcessResourceSampler("/")
+_DB_FOOTPRINT_CACHE: dict[str, Any] = {"ts": 0.0, "data": None}
+
+
+async def query_database_footprint(session: AsyncSession) -> dict[str, Any]:
+    """Queries live TimescaleDB size, compressed chunks, and retention jobs (cached 30s)."""
+    now_mono = time.monotonic()
+    cached = _DB_FOOTPRINT_CACHE["data"]
+    if cached is not None and (now_mono - float(_DB_FOOTPRINT_CACHE["ts"])) < 30.0:
+        return cached
+
+    dialect = session.bind.dialect.name if session.bind is not None else ""
+    if dialect != "postgresql":
+        return {"engine": dialect or "sqlite", "db_size_mb": None, "hypertables": [], "retention_policies": []}
+
+    db_info: dict[str, Any] = {
+        "engine": "timescaledb",
+        "db_size_mb": None,
+        "hypertables": [],
+        "retention_policies": [],
+    }
+    try:
+        size_bytes = (await session.execute(text("SELECT pg_database_size(current_database())"))).scalar_one()
+        db_info["db_size_mb"] = round(float(size_bytes) / (1024 * 1024), 2)
+
+        ht_rows = (
+            await session.execute(
+                text(
+                    """
+                    SELECT ht.hypertable_name,
+                           hypertable_size(format('%I.%I', ht.hypertable_schema, ht.hypertable_name)::regclass) AS bytes,
+                           (SELECT count(*) FROM timescaledb_information.chunks ch WHERE ch.hypertable_name = ht.hypertable_name) AS chunks,
+                           (SELECT count(*) FROM timescaledb_information.chunks ch WHERE ch.hypertable_name = ht.hypertable_name AND ch.is_compressed) AS compressed_chunks
+                    FROM timescaledb_information.hypertables ht
+                    ORDER BY bytes DESC NULLS LAST
+                    """
+                )
+            )
+        ).all()
+        db_info["hypertables"] = [
+            {
+                "name": str(r[0]),
+                "size_mb": round(float(r[1] or 0) / (1024 * 1024), 2),
+                "chunks": int(r[2] or 0),
+                "compressed_chunks": int(r[3] or 0),
+            }
+            for r in ht_rows
+        ]
+
+        job_rows = (
+            await session.execute(
+                text(
+                    """
+                    SELECT j.application_name, j.schedule_interval::text, js.last_run_status
+                    FROM timescaledb_information.jobs j
+                    LEFT JOIN timescaledb_information.job_stats js USING (job_id)
+                    WHERE j.proc_name LIKE 'policy_%'
+                    ORDER BY j.job_id
+                    """
+                )
+            )
+        ).all()
+        db_info["retention_policies"] = [
+            {
+                "name": str(r[0]),
+                "interval": str(r[1]),
+                "last_status": str(r[2]) if r[2] is not None else None,
+            }
+            for r in job_rows
+        ]
+    except Exception:
+        pass
+
+    _DB_FOOTPRINT_CACHE["ts"] = now_mono
+    _DB_FOOTPRINT_CACHE["data"] = db_info
+    return db_info
+
+
+async def get_system_resources(session: AsyncSession, sys_status: dict[str, Any]) -> dict[str, Any]:
+    """Combines ESP32 CPU/RAM/PSRAM/NVS metrics with container CPU/RAM/disk & DB size."""
+    comps = sys_status.get("components", {})
+    esp_detail = comps.get("esp32", {}).get("detail") or {}
+    coll_detail = comps.get("collector", {}).get("detail") or {}
+    api_sample = _API_RESOURCE_SAMPLER.sample()
+    db_footprint = await query_database_footprint(session)
+    return {
+        "esp32": {
+            "firmware": esp_detail.get("firmware"),
+            "ota_slot": esp_detail.get("ota_slot"),
+            "uptime_ms": esp_detail.get("uptime_ms"),
+            "rssi_dbm": esp_detail.get("rssi_dbm"),
+            "cpu_pct": esp_detail.get("cpu_pct"),
+            "cpu0_pct": esp_detail.get("cpu0_pct"),
+            "cpu1_pct": esp_detail.get("cpu1_pct"),
+            "cpu_mhz": esp_detail.get("cpu_mhz"),
+            "task_count": esp_detail.get("task_count"),
+            "min_task_stack_free_b": esp_detail.get("min_task_stack_free_b"),
+            "heap_free": esp_detail.get("heap"),
+            "heap_total": esp_detail.get("heap_total"),
+            "heap_min": esp_detail.get("heap_min"),
+            "heap_max_alloc": esp_detail.get("heap_max_alloc"),
+            "heap_used_pct": esp_detail.get("heap_used_pct"),
+            "psram_total": esp_detail.get("psram"),
+            "psram_free": esp_detail.get("psram_free"),
+            "psram_min": esp_detail.get("psram_min"),
+            "psram_used_pct": esp_detail.get("psram_used_pct"),
+            "nvs_used_entries": esp_detail.get("nvs_used_entries"),
+            "nvs_free_entries": esp_detail.get("nvs_free_entries"),
+            "nvs_total_entries": esp_detail.get("nvs_total_entries"),
+            "nvs_used_pct": esp_detail.get("nvs_used_pct"),
+            "flash_size": esp_detail.get("flash_size"),
+            "sketch_size": esp_detail.get("sketch_size"),
+            "sketch_free": esp_detail.get("sketch_free"),
+        },
+        "containers": {
+            "api": api_sample,
+            "collector": coll_detail,
+        },
+        "database": db_footprint,
+    }
 
 
 def resolve_window(
@@ -530,6 +653,7 @@ async def get_live_payload(
     sparklines = await query_hourly_sparklines(session, device_id, today_s, today_e, tz_name)
 
     sys_status = await get_system_status(session, device_id)
+    resources = await get_system_resources(session, sys_status)
     window_events = (
         await session.execute(
             select(EmsEvent)
@@ -570,6 +694,7 @@ async def get_live_payload(
         "coverage": coverage,
         "sparklines": sparklines,
         "system": sys_status,
+        "resources": resources,
         "grouped_events": grouped_events,
         "recent_events": [
             {

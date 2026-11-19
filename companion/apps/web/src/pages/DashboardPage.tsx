@@ -2,7 +2,6 @@ import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import type { EChartsOption } from "echarts";
-import { Info } from "lucide-react";
 import { apiFetch } from "../lib/api";
 import {
   fmtAge,
@@ -17,6 +16,7 @@ import {
   strategyLabel,
 } from "../lib/format";
 import { EChart } from "../components/EChart";
+import { HelpTip } from "../components/HelpTip";
 import { PowerFlow } from "../components/PowerFlow";
 import { ShadowBanner } from "../components/ShadowBanner";
 
@@ -56,6 +56,19 @@ interface LiveResponse {
     count: number;
   }>;
   recent_events: Array<{ id: number; occurred_at: string; event_type: string; severity: string; title: string; detail: string | null }>;
+  resources?: {
+    esp32?: Record<string, number | string | null | undefined>;
+    containers?: {
+      api?: Record<string, number | null | undefined>;
+      collector?: Record<string, number | null | undefined>;
+    };
+    database?: {
+      engine?: string;
+      db_size_mb?: number | null;
+      hypertables?: Array<{ name: string; size_mb: number; chunks: number; compressed_chunks: number }>;
+      retention_policies?: Array<{ name: string; interval: string; last_status: string | null }>;
+    };
+  };
 }
 
 const CHART_RANGE_TITLES: Record<LiveChartRange, string> = {
@@ -103,41 +116,6 @@ function SemiGauge({ value, color, label }: { value: number | null | undefined; 
         />
       )}
     </svg>
-  );
-}
-
-function HelpTip({
-  id,
-  title,
-  text,
-  align = "left",
-}: {
-  id: string;
-  title: string;
-  text: string;
-  align?: "left" | "right";
-}) {
-  const [open, setOpen] = useState(false);
-  return (
-    <span className={`tip-wrap ${open ? "is-open" : ""}`} onMouseLeave={() => setOpen(false)}>
-      <button
-        type="button"
-        className="tip-btn"
-        aria-label={`Spiegazione: ${title}`}
-        aria-expanded={open}
-        aria-controls={id}
-        onClick={() => setOpen((v) => !v)}
-        onKeyDown={(e) => {
-          if (e.key === "Escape") setOpen(false);
-        }}
-        onBlur={() => setOpen(false)}
-      >
-        <Info size={13} aria-hidden="true" />
-      </button>
-      <span id={id} role="tooltip" className={`tip-bubble align-${align}`}>
-        <strong>{title}:</strong> {text}
-      </span>
-    </span>
   );
 }
 
@@ -837,6 +815,87 @@ export function DashboardPage() {
               );
             })}
           </div>
+          {(() => {
+            const esp = live.resources?.esp32 ?? {};
+            const db = live.resources?.database ?? {};
+            const api = live.resources?.containers?.api ?? {};
+            const fmtKb = (b: unknown) => (typeof b === "number" ? `${Math.round(b / 1024)} KB` : "N/D");
+            const fmtMb = (b: unknown) => (typeof b === "number" ? `${(b / (1024 * 1024)).toFixed(1)} MB` : "N/D");
+            return (
+              <div className="sys-resource-grid" aria-label="Diagnostica risorse ESP32 e Container">
+                <div className="sys-res-item">
+                  <div className="sys-res-top">
+                    <span>ESP32 CPU</span>
+                    <HelpTip
+                      id="tip-res-esp-cpu"
+                      title="CPU ESP32"
+                      text="Carico medio FreeRTOS su entrambi i core (Core 0 rete/MQTT, Core 1 loop EMS e Modbus) rispetto al tempo idle."
+                      align="right"
+                    />
+                  </div>
+                  <div className="sys-res-val">{typeof esp.cpu_pct === "number" ? `${esp.cpu_pct.toFixed(1)}%` : "N/D"}</div>
+                  <div className="sys-res-sub">
+                    {typeof esp.cpu0_pct === "number" && typeof esp.cpu1_pct === "number"
+                      ? `C0 ${esp.cpu0_pct.toFixed(0)}% · C1 ${esp.cpu1_pct.toFixed(0)}% · ${esp.cpu_mhz ?? 240} MHz`
+                      : `${esp.cpu_mhz ?? 240} MHz`}
+                  </div>
+                </div>
+                <div className="sys-res-item">
+                  <div className="sys-res-top">
+                    <span>ESP32 RAM / PSRAM</span>
+                    <HelpTip
+                      id="tip-res-esp-ram"
+                      title="Memoria ESP32"
+                      text="SRAM interna usata (% sul totale di ~280 KB) e PSRAM (8 MB che ospita il ring buffer circolare da 256 decisioni senza saturare la RAM)."
+                      align="right"
+                    />
+                  </div>
+                  <div className="sys-res-val">
+                    {typeof esp.heap_used_pct === "number" ? `${esp.heap_used_pct.toFixed(1)}%` : fmtKb(esp.heap_free)}
+                  </div>
+                  <div className="sys-res-sub">
+                    Libera {fmtKb(esp.heap_free)} · PSRAM {fmtMb(esp.psram_free)}
+                  </div>
+                </div>
+                <div className="sys-res-item">
+                  <div className="sys-res-top">
+                    <span>Flash NVS ESP32</span>
+                    <HelpTip
+                      id="tip-res-esp-nvs"
+                      title="Flash NVS"
+                      text="Entry usate nella partizione non volatile (solo configurazione; nessun log o serie temporale viene scritta su Flash)."
+                      align="right"
+                    />
+                  </div>
+                  <div className="sys-res-val">
+                    {typeof esp.nvs_used_pct === "number" ? `${esp.nvs_used_pct.toFixed(1)}%` : "N/D"}
+                  </div>
+                  <div className="sys-res-sub">
+                    {typeof esp.nvs_used_entries === "number"
+                      ? `${esp.nvs_used_entries}/${esp.nvs_total_entries} entry · min ${fmtKb(esp.heap_min)}`
+                      : "Nessun file system scrivibile"}
+                  </div>
+                </div>
+                <div className="sys-res-item">
+                  <div className="sys-res-top">
+                    <span>DB &amp; Disco LXC</span>
+                    <HelpTip
+                      id="tip-res-db"
+                      title="Storage Companion"
+                      text="Dimensione TimescaleDB (con compressione e retention automatica anche su ems_decisions a 180 giorni) e spazio disco sul container LXC."
+                      align="right"
+                    />
+                  </div>
+                  <div className="sys-res-val">{typeof db.db_size_mb === "number" ? `${db.db_size_mb.toFixed(1)} MB` : "N/D"}</div>
+                  <div className="sys-res-sub">
+                    {typeof api.disk_used_pct === "number"
+                      ? `Disco ${api.disk_used_pct.toFixed(0)}% (${api.disk_free_gb ?? "?"} GB liberi)`
+                      : "Retention automatica attiva"}
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
         </article>
       </section>
     </>

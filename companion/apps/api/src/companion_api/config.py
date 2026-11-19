@@ -39,6 +39,7 @@ class ApiSettings(BaseSettings):
     retention_raw_mqtt_days: int = 30
     retention_telemetry_days: int = 90
     retention_agg_1m_days: int = 730
+    retention_decisions_days: int = 180
     backup_retention_days: int = 14
 
     sem_concordance_watt_threshold: float = 100.0

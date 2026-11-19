@@ -1,504 +1,660 @@
-import type { KeyboardEvent, ReactNode } from "react";
-import { fmtAbsKw, fmtNum, fmtPct, fmtWatts } from "../../lib/format";
-import { useOptionalTheme } from "../../theme/useTheme";
+import { useState, type KeyboardEvent } from "react";
+import { fmtAbsKw, fmtPct } from "../../lib/format";
+import { buildEnergyFlowModel, type NodeId, type QualityKind } from "../shared/energyFlowModel";
 import type { TelemetryLive } from "../PowerFlow";
-import type { DerivedEnergyFlow, NodeId, QualityKind } from "../shared/energyFlowModel";
+import { EmeraldDetailDrawer, EmeraldStatusPill } from "./EmeraldChrome";
 
 interface Props {
   telemetry: TelemetryLive | null;
-  model: DerivedEnergyFlow;
-  deadbandW: number;
-  compactViewport: boolean;
-  activeNode: NodeId | null;
-  onToggleNode: (id: NodeId) => void;
-  onNodeKey: (id: NodeId, e: KeyboardEvent<SVGGElement>) => void;
-  popover: ReactNode;
+  safetyMinW?: number | null;
+  safetyMaxW?: number | null;
+  selfConsumptionPct?: number | null;
+  deadbandW?: number;
 }
 
-function strokeWidthForWatts(watts: number | null | undefined, deadband: number): number {
+function flowStrokeWidth(watts: number | null | undefined, deadband: number): number {
   if (watts == null) return 2.2;
   const abs = Math.abs(watts);
   if (abs <= deadband) return 2.2;
-  return Number(Math.min(5.2, 2.5 + (abs / 3500) * 2.7).toFixed(2));
+  return Number(Math.min(5.2, 2.4 + (abs / 3500) * 2.8).toFixed(2));
 }
 
-function durationForWatts(watts: number | null | undefined, deadband: number): string {
+function flowSpeedSeconds(watts: number | null | undefined, deadband: number): string {
   const abs = Math.abs(watts ?? 0);
-  if (abs <= deadband) return "1.8s";
-  return `${Math.max(0.65, Math.min(2.0, 2.0 - (abs / 3500) * 1.35)).toFixed(2)}s`;
+  if (abs <= deadband) return "1.9s";
+  const dur = Math.max(0.7, Math.min(2.1, 2.1 - (abs / 3500) * 1.4));
+  return `${dur.toFixed(2)}s`;
 }
 
-function QualityBadgeSvg({ x, y, kind }: { x: number; y: number; kind: QualityKind }) {
-  const cfg = {
-    measured: { bg: "var(--battery-soft)", fg: "var(--battery-color)", glyph: "✓" },
-    derived: { bg: "var(--home-soft)", fg: "var(--home-color)", glyph: "≈" },
-    stale: { bg: "var(--safety-soft)", fg: "var(--safety-amber)", glyph: "!" },
-    unavailable: { bg: "var(--missing-soft)", fg: "var(--missing-grey)", glyph: "○" },
+function shortPvState(pv: number | null, active: boolean): string {
+  if (pv == null) return "Non disp.";
+  return active ? "Produzione" : "Inattivo";
+}
+
+function shortGridState(grid: number | null, imp: boolean, exp: boolean): string {
+  if (grid == null) return "Non disp.";
+  if (imp) return "Prelievo";
+  if (exp) return "Immissione";
+  return "Equilibrio";
+}
+
+function shortHomeState(load: number | null, active: boolean): string {
+  if (load == null) return "Non disp.";
+  return active ? "Consumo" : "Standby";
+}
+
+function shortBattState(batt: number | null, chg: boolean, dis: boolean): string {
+  if (batt == null) return "Non disp.";
+  if (chg) return "In carica";
+  if (dis) return "In scarica";
+  return "Inattiva";
+}
+
+function formatSplitPower(val: number | null, signed = false): { num: string; unit: string } {
+  const txt = signed && val != null && Math.abs(val) >= 1000
+    ? `${val >= 0 ? "+" : "-"}${(Math.abs(val) / 1000).toFixed(2)} kW`
+    : signed && val != null
+    ? `${val >= 0 ? "+" : "-"}${Math.round(Math.abs(val))} W`
+    : fmtAbsKw(val);
+
+  if (txt === "Non disponibile") return { num: "N/D", unit: "" };
+  const idx = txt.lastIndexOf(" ");
+  if (idx === -1) return { num: txt, unit: "" };
+  return { num: txt.slice(0, idx), unit: txt.slice(idx + 1) };
+}
+
+function QualityMicroGlyph({ cx, cy, kind }: { cx: number; cy: number; kind: QualityKind }) {
+  const palette = {
+    measured: { bg: "rgba(52, 214, 160, 0.2)", fg: "var(--battery-color)", glyph: "✓", title: "Dato misurato" },
+    derived: { bg: "rgba(167, 139, 250, 0.22)", fg: "var(--home-color)", glyph: "≈", title: "Dato derivato" },
+    stale: { bg: "rgba(245, 158, 11, 0.22)", fg: "var(--safety-amber)", glyph: "!", title: "Dato non aggiornato" },
+    unavailable: { bg: "rgba(100, 116, 139, 0.22)", fg: "var(--missing-grey)", glyph: "○", title: "Dato assente" },
   }[kind];
+
   return (
-    <g transform={`translate(${x}, ${y})`} aria-hidden="true">
-      <circle r="9" fill={cfg.bg} />
-      <text y="3.5" textAnchor="middle" fill={cfg.fg} fontSize="10.5" fontWeight="700">
-        {cfg.glyph}
+    <g aria-hidden="true">
+      <title>{palette.title}</title>
+      <circle cx={cx} cy={cy} r="9" fill={palette.bg} stroke={palette.fg} strokeWidth="1" />
+      <text x={cx} y={cy + 4} textAnchor="middle" fill={palette.fg} fontSize="12" fontWeight="800">
+        {palette.glyph}
       </text>
     </g>
   );
 }
 
-function RadialArcFlow({
-  d,
+function RadialFlowTrack({
+  id,
+  path,
+  active,
+  reverse,
   color,
   watts,
-  active,
   deadband,
-  markerId,
   dashed = false,
-  reducedMotion = false,
 }: {
-  d: string;
-  color: string;
-  watts: number | null | undefined;
+  id: string;
+  path: string;
   active: boolean;
+  reverse?: boolean;
+  color: string;
+  watts: number | null;
   deadband: number;
-  markerId: string;
   dashed?: boolean;
-  reducedMotion?: boolean;
 }) {
-  const sw = strokeWidthForWatts(watts, deadband);
-  const dur = durationForWatts(watts, deadband);
+  const width = flowStrokeWidth(watts, deadband);
+  const dur = flowSpeedSeconds(watts, deadband);
+
   return (
     <g>
+      <path d={path} fill="none" stroke="var(--border-subtle)" strokeWidth="2.4" strokeLinecap="round" opacity="0.55" />
       <path
-        d={d}
+        id={id}
+        d={path}
         fill="none"
-        stroke={color}
-        strokeWidth={sw}
+        stroke={active ? color : "var(--missing-grey)"}
+        strokeWidth={active ? width : 2}
         strokeLinecap="round"
-        strokeDasharray={dashed ? "6 5" : undefined}
-        opacity={active ? (dashed ? 0.62 : 0.45) : 0.35}
-        markerEnd={active ? `url(#${markerId})` : undefined}
+        strokeDasharray={dashed ? "5 5" : undefined}
+        opacity={active ? 0.94 : 0.35}
       />
-      {active && !reducedMotion && (
-        <>
-          <circle r={Math.min(4.2, sw * 0.85)} fill={color}>
-            <animateMotion dur={dur} repeatCount="indefinite" path={d} />
+      {active && (
+        <g className="flow-motion">
+          <circle r="4.2" fill={color}>
+            <animateMotion
+              dur={dur}
+              repeatCount="indefinite"
+              keyPoints={reverse ? "1;0" : "0;1"}
+              keyTimes="0;1"
+              calcMode="linear"
+            >
+              <mpath href={`#${id}`} />
+            </animateMotion>
           </circle>
-          <circle r={Math.min(3.5, sw * 0.72)} fill={color} opacity="0.65">
-            <animateMotion dur={dur} begin={`${Number.parseFloat(dur) * 0.5}s`} repeatCount="indefinite" path={d} />
+          <circle r="2.6" fill={color} opacity="0.55">
+            <animateMotion
+              dur={dur}
+              begin={`-${(parseFloat(dur) / 2).toFixed(2)}s`}
+              repeatCount="indefinite"
+              keyPoints={reverse ? "1;0" : "0;1"}
+              keyTimes="0;1"
+              calcMode="linear"
+            >
+              <mpath href={`#${id}`} />
+            </animateMotion>
           </circle>
-        </>
+        </g>
       )}
     </g>
   );
 }
 
-export default function EmeraldEnergyMonitor({
+export function EmeraldEnergyMonitor({
   telemetry,
-  model,
-  deadbandW,
-  compactViewport,
-  activeNode,
-  onToggleNode,
-  onNodeKey,
-  popover,
+  safetyMinW,
+  safetyMaxW,
+  selfConsumptionPct,
+  deadbandW = 20,
 }: Props) {
-  const { reducedMotion } = useOptionalTheme();
-  const {
-    isStale,
-    pv,
-    load,
-    grid,
-    batt,
-    soc,
-    pvActive,
-    loadActive,
-    gridExport,
-    gridActive,
-    battDischarge,
-    battActive,
-    pvColor,
-    loadColor,
-    gridColor,
-    battColor,
-    inactiveColor,
-    pvQualityKind,
-    gridQualityKind,
-    loadQualityKind,
-    battQualityKind,
-    pvStateLabel,
-    gridDirLabel,
-    loadDirLabel,
-    battDirLabel,
-    invStatusLabel,
-    accessibleSummary,
-  } = model;
+  const [selectedNode, setSelectedNode] = useState<NodeId | null>(null);
 
-  const socBarWidth = soc != null ? Math.max(6, Math.min(314, (soc / 100) * 314)) : 0;
-  const hubStroke = telemetry?.fault
-    ? "var(--fault-red)"
-    : isStale
-    ? "var(--safety-amber)"
-    : "var(--accent-teal)";
+  const flow = buildEnergyFlowModel(
+    telemetry,
+    deadbandW,
+    safetyMinW,
+    safetyMaxW,
+    selfConsumptionPct,
+  );
+
+  const onNodeKey = (node: NodeId) => (e: KeyboardEvent<SVGGElement>) => {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      setSelectedNode((cur) => (cur === node ? null : node));
+    }
+  };
+
+  const pvSplit = formatSplitPower(flow.pv, false);
+  const gridSplit = formatSplitPower(flow.grid, true);
+  const homeSplit = formatSplitPower(flow.load, false);
+  const battSplit = formatSplitPower(flow.batt, true);
+
+  const socClamped = flow.soc != null && Number.isFinite(flow.soc) ? Math.max(0, Math.min(100, flow.soc)) : 0;
+  const battRingR = 39;
+  const battRingCirc = 2 * Math.PI * battRingR;
+  const battRingDash = (socClamped / 100) * battRingCirc;
+
+  const activeSpec = selectedNode ? flow.specs[selectedNode] : null;
+  const statusPillTone = !telemetry
+    ? "warn"
+    : flow.isStale
+    ? "warn"
+    : telemetry.fault
+    ? "err"
+    : "ok";
+  const statusPillLabel = !telemetry
+    ? "In attesa di telemetria"
+    : flow.isStale
+    ? "Dati non aggiornati"
+    : telemetry.fault
+    ? "Anomalia inverter"
+    : "Flusso attivo in tempo reale";
 
   return (
-    <div className="emerald-monitor-wrap">
-      <div className="card-header">
+    <div className="em-card em-monitor-card">
+      <div className="em-monitor-header">
         <div>
-          <h2 className="card-title">Energy Monitor</h2>
-          <p className="card-sub">
-            Bilancio energetico radiale in tempo reale · Tocca un nodo per dettagli elettrici
-          </p>
+          <h2 className="em-card-title">Energy Monitor</h2>
+          <p className="em-card-sub">Flussi radiali istantanei · tocca un nodo per i dettagli elettrici</p>
         </div>
-        <div className="energy-legend-pills">
-          <span className="legend-dot-pill">
-            <span className="legend-swatch solid" aria-hidden="true" /> Misurato
-          </span>
-          <span className="legend-dot-pill">
-            <span className="legend-swatch dashed" aria-hidden="true" /> Derivato
-          </span>
-        </div>
+        <EmeraldStatusPill tone={statusPillTone} label={statusPillLabel} />
       </div>
 
-      <p className="sr-only" aria-live="polite">
-        {accessibleSummary}
-      </p>
+      <p className="sr-only">{flow.accessibleSummary}</p>
 
-      <div className="energy-stage">
-        {compactViewport ? (
-          <svg
-            viewBox="0 0 340 318"
-            className="emerald-radial-svg"
-            role="img"
-            aria-label={`Energy Monitor Emerald: ${accessibleSummary}`}
+      {/* DESKTOP RADIAL SEGMENTED RING + 4 ICONIC CIRCULAR NODES (NO RECTANGLES) */}
+      <div className="em-monitor-desktop-wrap">
+        <svg
+          className="em-radial-svg"
+          viewBox="0 0 660 410"
+          role="group"
+          aria-label="Diagramma radiale flussi energetici Emerald"
+        >
+          <defs>
+            <radialGradient id="em-center-glow" cx="50%" cy="50%" r="50%">
+              <stop offset="0%" stopColor="var(--accent-teal)" stopOpacity="0.18" />
+              <stop offset="100%" stopColor="var(--accent-teal)" stopOpacity="0" />
+            </radialGradient>
+          </defs>
+
+          {/* Outer segmented structural guide ring connecting the 4 quadrant arcs */}
+          <circle
+            cx="330"
+            cy="205"
+            r="142"
+            fill="none"
+            stroke="var(--border-subtle)"
+            strokeWidth="1.4"
+            strokeDasharray="6 7"
+            opacity="0.7"
+          />
+          <circle cx="330" cy="205" r="96" fill="url(#em-center-glow)" />
+
+          {/* Four clean radial arcs from iconic circular nodes toward center hub */}
+          <RadialFlowTrack
+            id="em-d-pv"
+            path="M 330 98 C 330 124 330 140 330 156"
+            active={flow.pvActive}
+            color={flow.pvColor}
+            watts={flow.pv}
+            deadband={deadbandW}
+          />
+          <RadialFlowTrack
+            id="em-d-grid"
+            path="M 164 205 C 210 205 244 205 278 205"
+            active={flow.gridActive}
+            reverse={flow.gridExport}
+            color={flow.gridColor}
+            watts={flow.grid}
+            deadband={deadbandW}
+          />
+          <RadialFlowTrack
+            id="em-d-home"
+            path="M 382 205 C 418 205 452 205 496 205"
+            active={flow.loadActive}
+            color={flow.loadColor}
+            watts={flow.load}
+            deadband={deadbandW}
+            dashed={flow.loadQualityKind === "derived"}
+          />
+          <RadialFlowTrack
+            id="em-d-batt"
+            path="M 330 254 C 330 272 330 288 330 308"
+            active={flow.battActive}
+            reverse={flow.battDischarge}
+            color={flow.battColor}
+            watts={flow.batt}
+            deadband={deadbandW}
+          />
+
+          {/* TOP ICONIC CIRCULAR NODE: FOTOVOLTAICO */}
+          <g
+            className={`em-circle-node ${selectedNode === "pv" ? "selected" : ""}`}
+            role="button"
+            tabIndex={0}
+            aria-label={`Fotovoltaico: ${fmtAbsKw(flow.pv)}`}
+            onClick={() => setSelectedNode((c) => (c === "pv" ? null : "pv"))}
+            onKeyDown={onNodeKey("pv")}
           >
-            <defs>
-              <marker id="em2-m-pv" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
-                <path d="M0 0L6 3L0 6Z" fill={pvColor} />
-              </marker>
-              <marker id="em2-m-home" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
-                <path d="M0 0L6 3L0 6Z" fill={loadColor} />
-              </marker>
-              <marker id="em2-m-grid" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
-                <path d="M0 0L6 3L0 6Z" fill={gridColor} />
-              </marker>
-              <marker id="em2-m-batt" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
-                <path d="M0 0L6 3L0 6Z" fill={battColor} />
-              </marker>
-            </defs>
-
-            <circle cx="170" cy="152" r="96" fill="none" stroke="var(--border-subtle)" strokeWidth="1" strokeDasharray="3 5" />
-
-            <RadialArcFlow d="M170 78 L170 116" color={pvColor} watts={pv} active={pvActive} deadband={deadbandW} markerId="em2-m-pv" reducedMotion={reducedMotion} />
-            <RadialArcFlow d={gridExport ? "M130 152 L106 152" : "M104 152 L128 152"} color={gridColor} watts={grid} active={gridActive} deadband={deadbandW} markerId="em2-m-grid" reducedMotion={reducedMotion} />
-            <RadialArcFlow d="M212 152 L234 152" color={loadColor} watts={load} active={loadActive} deadband={deadbandW} markerId="em2-m-home" dashed reducedMotion={reducedMotion} />
-            <RadialArcFlow d={battDischarge ? "M170 222 L170 188" : "M170 186 L170 220"} color={battColor} watts={batt} active={battActive} deadband={deadbandW} markerId="em2-m-batt" reducedMotion={reducedMotion} />
-
-            {/* Mobile Top: FV */}
-            <g transform="translate(74, 8)" className={`emerald-node-card ${activeNode === "pv" ? "selected" : ""}`} role="button" tabIndex={0} aria-expanded={activeNode === "pv"} aria-label={`Fotovoltaico: ${pv == null ? "Non disponibile" : fmtAbsKw(pv)}, ${pvStateLabel}`} onClick={() => onToggleNode("pv")} onKeyDown={(e) => onNodeKey("pv", e)}>
-              <rect className="node-frame" width="192" height="70" rx="14" fill="var(--bg-surface-2)" stroke={pv == null || isStale ? inactiveColor : "var(--pv-color)"} strokeWidth="1.5" />
-              <text x="14" y="22" fill="var(--text-secondary)" fontSize="12" fontWeight="650">Fotovoltaico</text>
-              <text x="14" y="45" fill={pv == null || isStale ? inactiveColor : "var(--pv-color)"} fontSize="18.5" fontWeight="750">{pv == null ? "Non disp." : fmtAbsKw(pv)}</text>
-              <text x="14" y="61" fill="var(--text-muted)" fontSize="12">{pvStateLabel}</text>
-              <QualityBadgeSvg x={174} y={19} kind={pvQualityKind} />
+            <rect x="290" y="22" width="195" height="80" rx="14" fill="transparent" />
+            <circle cx="330" cy="62" r="36" fill="var(--bg-surface-2)" stroke={flow.pvColor} strokeWidth="2.2" />
+            <circle cx="330" cy="62" r="29" fill="var(--pv-soft)" stroke="none" />
+            <g transform="translate(318, 50)" stroke={flow.pvColor} strokeWidth="1.9" fill="none" strokeLinecap="round">
+              <circle cx="12" cy="12" r="4.5" fill={flow.pvColor} opacity="0.88" />
+              <path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M19.1 4.9L17 7M7 17l-2.1 2.1" />
             </g>
-
-            {/* Mobile Left: Rete */}
-            <g transform="translate(4, 110)" className={`emerald-node-card ${activeNode === "grid" ? "selected" : ""}`} role="button" tabIndex={0} aria-expanded={activeNode === "grid"} aria-label={`Rete: ${grid == null ? "Non disponibile" : fmtWatts(grid)}, ${gridDirLabel}`} onClick={() => onToggleNode("grid")} onKeyDown={(e) => onNodeKey("grid", e)}>
-              <rect className="node-frame" width="102" height="84" rx="14" fill="var(--bg-surface-2)" stroke={grid == null || isStale ? inactiveColor : "var(--grid-color)"} strokeWidth="1.5" />
-              <text x="10" y="22" fill="var(--text-secondary)" fontSize="12" fontWeight="650">Rete</text>
-              <text x="10" y="47" fill={grid == null || isStale ? inactiveColor : "var(--grid-color)"} fontSize="15.5" fontWeight="750">{grid == null ? "Non disp." : fmtWatts(grid)}</text>
-              <text x="10" y="68" fill="var(--text-muted)" fontSize="12">{gridDirLabel}</text>
-              <QualityBadgeSvg x={86} y={19} kind={gridQualityKind} />
-            </g>
-
-            {/* Mobile Center: Inverter */}
-            <g transform="translate(170, 152)" className={`emerald-node-card ${activeNode === "inverter" ? "selected" : ""}`} role="button" tabIndex={0} aria-expanded={activeNode === "inverter"} aria-label={`Inverter Afore: ${invStatusLabel}`} onClick={() => onToggleNode("inverter")} onKeyDown={(e) => onNodeKey("inverter", e)}>
-              <circle className="node-frame" r="38" fill="var(--bg-elevated)" stroke={hubStroke} strokeWidth="2" />
-              <text y="-2" textAnchor="middle" fill="var(--text-primary)" fontSize="13.5" fontWeight="750">Afore</text>
-              <text y="15" textAnchor="middle" fill={hubStroke} fontSize="12" fontWeight="650">{invStatusLabel}</text>
-            </g>
-
-            {/* Mobile Right: Casa */}
-            <g transform="translate(234, 110)" className={`emerald-node-card ${activeNode === "home" ? "selected" : ""}`} role="button" tabIndex={0} aria-expanded={activeNode === "home"} aria-label={`Casa: ${load == null ? "Non disponibile" : fmtAbsKw(load)}, ${loadDirLabel}`} onClick={() => onToggleNode("home")} onKeyDown={(e) => onNodeKey("home", e)}>
-              <rect className="node-frame" width="102" height="84" rx="14" fill="var(--bg-surface-2)" stroke={load == null || isStale ? inactiveColor : "var(--home-color)"} strokeWidth="1.5" strokeDasharray="5 3" />
-              <text x="10" y="22" fill="var(--text-secondary)" fontSize="12" fontWeight="650">Casa</text>
-              <text x="10" y="47" fill={load == null || isStale ? inactiveColor : "var(--home-color)"} fontSize="15.5" fontWeight="750">{load == null ? "Non disp." : fmtAbsKw(load)}</text>
-              <text x="10" y="68" fill="var(--text-muted)" fontSize="12">{loadDirLabel}</text>
-              <QualityBadgeSvg x={86} y={19} kind={loadQualityKind} />
-            </g>
-
-            {/* Mobile Bottom: Batteria */}
-            <g transform="translate(22, 222)" className={`emerald-node-card ${activeNode === "battery" ? "selected" : ""}`} role="button" tabIndex={0} aria-expanded={activeNode === "battery"} aria-label={`Batteria: SOC ${fmtPct(soc)}, ${batt == null ? "Non disponibile" : fmtWatts(batt)}`} onClick={() => onToggleNode("battery")} onKeyDown={(e) => onNodeKey("battery", e)}>
-              <rect className="node-frame" width="296" height="88" rx="14" fill="var(--bg-surface-2)" stroke={batt == null && soc == null ? inactiveColor : "var(--battery-color)"} strokeWidth="1.5" />
-              <text x="14" y="22" fill="var(--text-secondary)" fontSize="12" fontWeight="650">Batteria · {battDirLabel}</text>
-              <text x="14" y="49" fill={batt == null || isStale ? inactiveColor : "var(--battery-color)"} fontSize="19" fontWeight="750">{batt == null ? "Non disp." : fmtWatts(batt)}</text>
-              <text x="260" y="48" textAnchor="end" fill={soc == null ? inactiveColor : "var(--battery-color)"} fontSize="22" fontWeight="800">{soc != null ? fmtPct(soc) : "—"}</text>
-              <QualityBadgeSvg x={278} y={20} kind={battQualityKind} />
-              <rect x="14" y="64" width="268" height="10" rx="5" fill="var(--bg-inset)" stroke="var(--border-subtle)" />
-              {soc != null && (
-                <rect x="14" y="64" width={Math.max(6, Math.min(268, (soc / 100) * 268))} height="10" rx="5" fill={isStale ? inactiveColor : "var(--battery-color)"} />
+            <QualityMicroGlyph cx={357} cy={35} kind={flow.pvQualityKind} />
+            <text x="380" y="45" fill="var(--text-secondary)" fontSize="12" fontWeight="700">
+              Fotovoltaico
+            </text>
+            <text x="380" y="72" fill={flow.pvColor} fontSize="24" fontWeight="800" className="mono">
+              {pvSplit.num}
+              {pvSplit.unit && (
+                <tspan fill="var(--text-muted)" fontSize="13" fontWeight="600">
+                  {" "}
+                  {pvSplit.unit}
+                </tspan>
               )}
-            </g>
-          </svg>
-        ) : (
-          <svg
-            viewBox="0 0 700 376"
-            className="emerald-radial-svg"
-            role="img"
-            aria-label={`Energy Monitor Emerald: ${accessibleSummary}`}
+            </text>
+            <text x="380" y="90" fill="var(--text-muted)" fontSize="12" fontWeight="600">
+              {shortPvState(flow.pv, flow.pvActive)}
+            </text>
+          </g>
+
+          {/* LEFT ICONIC CIRCULAR NODE: RETE */}
+          <g
+            className={`em-circle-node ${selectedNode === "grid" ? "selected" : ""}`}
+            role="button"
+            tabIndex={0}
+            aria-label={`Rete elettrica: ${fmtAbsKw(flow.grid)}`}
+            onClick={() => setSelectedNode((c) => (c === "grid" ? null : "grid"))}
+            onKeyDown={onNodeKey("grid")}
           >
-            <defs>
-              <marker id="em-d-pv" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
-                <path d="M0 0L6 3L0 6Z" fill={pvColor} />
-              </marker>
-              <marker id="em-d-home" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
-                <path d="M0 0L6 3L0 6Z" fill={loadColor} />
-              </marker>
-              <marker id="em-d-grid" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
-                <path d="M0 0L6 3L0 6Z" fill={gridColor} />
-              </marker>
-              <marker id="em-d-batt" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
-                <path d="M0 0L6 3L0 6Z" fill={battColor} />
-              </marker>
-            </defs>
-
-            {/* Radial orbital guide rings */}
-            <circle cx="350" cy="184" r="144" fill="none" stroke="var(--border-subtle)" strokeWidth="1" strokeDasharray="3 6" opacity="0.85" />
-            <circle cx="350" cy="184" r="76" fill="none" stroke="var(--border-subtle)" strokeWidth="1" opacity="0.65" />
-
-            {/* Curved Radial Energy Paths */}
-            <RadialArcFlow
-              d="M350 96 L350 130"
-              color={pvColor}
-              watts={pv}
-              active={pvActive}
-              deadband={deadbandW}
-              markerId="em-d-pv"
-              reducedMotion={reducedMotion}
-            />
-            <RadialArcFlow
-              d={gridExport ? "M294 184 Q248 184 202 184" : "M202 184 Q248 184 294 184"}
-              color={gridColor}
-              watts={grid}
-              active={gridActive}
-              deadband={deadbandW}
-              markerId="em-d-grid"
-              reducedMotion={reducedMotion}
-            />
-            <RadialArcFlow
-              d="M406 184 Q452 184 498 184"
-              color={loadColor}
-              watts={load}
-              active={loadActive}
-              deadband={deadbandW}
-              markerId="em-d-home"
-              dashed
-              reducedMotion={reducedMotion}
-            />
-            <RadialArcFlow
-              d={battDischarge ? "M350 266 L350 238" : "M350 238 L350 266"}
-              color={battColor}
-              watts={batt}
-              active={battActive}
-              deadband={deadbandW}
-              markerId="em-d-batt"
-              reducedMotion={reducedMotion}
-            />
-
-            {/* TOP NODE: Fotovoltaico */}
-            <g
-              transform="translate(242, 10)"
-              className={`emerald-node-card ${activeNode === "pv" ? "selected" : ""}`}
-              role="button"
-              tabIndex={0}
-              aria-expanded={activeNode === "pv"}
-              aria-label={`Fotovoltaico: ${pv == null ? "Non disponibile" : fmtAbsKw(pv)}, stato ${pvStateLabel}. Premi Invio per i dettagli`}
-              onClick={() => onToggleNode("pv")}
-              onKeyDown={(e) => onNodeKey("pv", e)}
-            >
-              <rect
-                className="node-frame"
-                width="216"
-                height="86"
-                rx="14"
-                fill="var(--bg-surface-2)"
-                stroke={pv == null || isStale ? inactiveColor : "var(--pv-color)"}
-                strokeWidth={activeNode === "pv" ? 2.2 : 1.5}
-              />
-              <g transform="translate(14,13)" stroke={pv == null || isStale ? inactiveColor : "var(--pv-color)"} strokeWidth="1.8" fill="none">
-                <circle cx="9" cy="9" r="3.6" />
-                <path d="M9 1v2.2M9 14.8V17M1 9h2.2M14.8 9H17M3.4 3.4l1.5 1.5M13.1 13.1l1.5 1.5M14.6 3.4l-1.5 1.5M4.9 13.1l-1.5 1.5" />
-              </g>
-              <text x="38" y="26" fill="var(--text-secondary)" fontSize="12.5" fontWeight="650">
-                Fotovoltaico
-              </text>
-              <text x="16" y="54" fill={pv == null || isStale ? inactiveColor : "var(--pv-color)"} fontSize="22" fontWeight="750">
-                {pv == null ? "Non disp." : fmtAbsKw(pv)}
-              </text>
-              <text x="16" y="73" fill="var(--text-muted)" fontSize="12">
-                {pvStateLabel}
-              </text>
-              <QualityBadgeSvg x={196} y={20} kind={pvQualityKind} />
+            <rect x="76" y="165" width="100" height="145" rx="14" fill="transparent" />
+            <circle cx="126" cy="205" r="36" fill="var(--bg-surface-2)" stroke={flow.gridColor} strokeWidth="2.2" />
+            <circle cx="126" cy="205" r="29" fill="var(--grid-soft)" stroke="none" />
+            <g transform="translate(114, 192)" stroke={flow.gridColor} strokeWidth="1.8" fill="none" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 2v20M7 22l5-16 5 16M5 9h14M6.5 14h11" />
             </g>
+            <QualityMicroGlyph cx={153} cy={178} kind={flow.gridQualityKind} />
+            <text x="126" y="259" textAnchor="middle" fill="var(--text-secondary)" fontSize="12" fontWeight="700">
+              Rete
+            </text>
+            <text x="126" y="285" textAnchor="middle" fill={flow.gridColor} fontSize="23" fontWeight="800" className="mono">
+              {gridSplit.num}
+              {gridSplit.unit && (
+                <tspan fill="var(--text-muted)" fontSize="13" fontWeight="600">
+                  {" "}
+                  {gridSplit.unit}
+                </tspan>
+              )}
+            </text>
+            <text x="126" y="303" textAnchor="middle" fill="var(--text-muted)" fontSize="12" fontWeight="600">
+              {shortGridState(flow.grid, flow.gridImport, flow.gridExport)}
+            </text>
+          </g>
 
-            {/* LEFT NODE: Rete */}
-            <g
-              transform="translate(16, 134)"
-              className={`emerald-node-card ${activeNode === "grid" ? "selected" : ""}`}
-              role="button"
-              tabIndex={0}
-              aria-expanded={activeNode === "grid"}
-              aria-label={`Rete elettrica: ${grid == null ? "Non disponibile" : fmtWatts(grid)}, ${gridDirLabel}. Premi Invio per i dettagli`}
-              onClick={() => onToggleNode("grid")}
-              onKeyDown={(e) => onNodeKey("grid", e)}
-            >
-              <rect
-                className="node-frame"
-                width="186"
-                height="98"
-                rx="14"
-                fill="var(--bg-surface-2)"
-                stroke={grid == null || isStale ? inactiveColor : "var(--grid-color)"}
-                strokeWidth={activeNode === "grid" ? 2.2 : 1.5}
-              />
-              <g transform="translate(14,13)" stroke={grid == null || isStale ? inactiveColor : "var(--grid-color)"} strokeWidth="1.8" fill="none" strokeLinecap="round">
-                <path d="M9 2v14M4 6h10M3 10h12M6 16l3-10 3 10" />
-              </g>
-              <text x="38" y="26" fill="var(--text-secondary)" fontSize="12.5" fontWeight="650">
-                Rete
-              </text>
-              <text x="16" y="57" fill={grid == null || isStale ? inactiveColor : "var(--grid-color)"} fontSize="20.5" fontWeight="750">
-                {grid == null ? "Non disp." : fmtWatts(grid)}
-              </text>
-              <text x="16" y="79" fill="var(--text-muted)" fontSize="12">
-                {gridDirLabel}
-              </text>
-              <QualityBadgeSvg x={166} y={20} kind={gridQualityKind} />
+          {/* RIGHT ICONIC CIRCULAR NODE: CASA */}
+          <g
+            className={`em-circle-node ${selectedNode === "home" ? "selected" : ""}`}
+            role="button"
+            tabIndex={0}
+            aria-label={`Casa: ${fmtAbsKw(flow.load)}`}
+            onClick={() => setSelectedNode((c) => (c === "home" ? null : "home"))}
+            onKeyDown={onNodeKey("home")}
+          >
+            <rect x="484" y="165" width="100" height="145" rx="14" fill="transparent" />
+            <circle cx="534" cy="205" r="36" fill="var(--bg-surface-2)" stroke={flow.loadColor} strokeWidth="2.2" />
+            <circle cx="534" cy="205" r="29" fill="var(--home-soft)" stroke="none" />
+            <g transform="translate(522, 193)" stroke={flow.loadColor} strokeWidth="1.9" fill="none" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M3 10.5L12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z" />
             </g>
+            <QualityMicroGlyph cx={561} cy={178} kind={flow.loadQualityKind} />
+            <text x="534" y="259" textAnchor="middle" fill="var(--text-secondary)" fontSize="12" fontWeight="700">
+              Casa
+            </text>
+            <text x="534" y="285" textAnchor="middle" fill={flow.loadColor} fontSize="23" fontWeight="800" className="mono">
+              {homeSplit.num}
+              {homeSplit.unit && (
+                <tspan fill="var(--text-muted)" fontSize="13" fontWeight="600">
+                  {" "}
+                  {homeSplit.unit}
+                </tspan>
+              )}
+            </text>
+            <text x="534" y="303" textAnchor="middle" fill="var(--text-muted)" fontSize="12" fontWeight="600">
+              {shortHomeState(flow.load, flow.loadActive)}
+            </text>
+          </g>
 
-            {/* RIGHT NODE: Casa (dashed derived indicator) */}
-            <g
-              transform="translate(498, 134)"
-              className={`emerald-node-card ${activeNode === "home" ? "selected" : ""}`}
-              role="button"
-              tabIndex={0}
-              aria-expanded={activeNode === "home"}
-              aria-label={`Casa: ${load == null ? "Non disponibile" : fmtAbsKw(load)}, ${loadDirLabel}. Premi Invio per i dettagli`}
-              onClick={() => onToggleNode("home")}
-              onKeyDown={(e) => onNodeKey("home", e)}
-            >
-              <rect
-                className="node-frame"
-                width="186"
-                height="98"
-                rx="14"
-                fill="var(--bg-surface-2)"
-                stroke={load == null || isStale ? inactiveColor : "var(--home-color)"}
-                strokeWidth={activeNode === "home" ? 2.2 : 1.5}
-                strokeDasharray="5 3"
-              />
-              <g transform="translate(14,13)" stroke={load == null || isStale ? inactiveColor : "var(--home-color)"} strokeWidth="1.8" fill="none" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M2 9.5L9 3l7 6.5M4 8.5V16h10V8.5" />
-              </g>
-              <text x="38" y="26" fill="var(--text-secondary)" fontSize="12.5" fontWeight="650">
-                Casa
-              </text>
-              <text x="16" y="57" fill={load == null || isStale ? inactiveColor : "var(--home-color)"} fontSize="20.5" fontWeight="750">
-                {load == null ? "Non disp." : fmtAbsKw(load)}
-              </text>
-              <text x="16" y="79" fill="var(--text-muted)" fontSize="12">
-                {loadDirLabel}
-              </text>
-              <QualityBadgeSvg x={166} y={20} kind={loadQualityKind} />
-            </g>
-
-            {/* CENTER HUB: Inverter Afore */}
-            <g
-              transform="translate(350, 184)"
-              className={`emerald-node-card ${activeNode === "inverter" ? "selected" : ""}`}
-              role="button"
-              tabIndex={0}
-              aria-expanded={activeNode === "inverter"}
-              aria-label={`Inverter Afore: ${invStatusLabel}. Premi Invio per i dettagli`}
-              onClick={() => onToggleNode("inverter")}
-              onKeyDown={(e) => onNodeKey("inverter", e)}
-            >
+          {/* BOTTOM ICONIC CIRCULAR NODE: BATTERIA WITH SOC PROGRESS RING */}
+          <g
+            className={`em-circle-node ${selectedNode === "battery" ? "selected" : ""}`}
+            role="button"
+            tabIndex={0}
+            aria-label={`Batteria: SOC ${fmtPct(flow.soc)}, potenza ${fmtAbsKw(flow.batt)}`}
+            onClick={() => setSelectedNode((c) => (c === "battery" ? null : "battery"))}
+            onKeyDown={onNodeKey("battery")}
+          >
+            <rect x="288" y="306" width="195" height="84" rx="14" fill="transparent" />
+            <circle cx="330" cy="348" r="39" fill="none" stroke="var(--border-subtle)" strokeWidth="4.5" />
+            {flow.soc != null && (
               <circle
-                className="node-frame"
-                r="52"
-                fill="var(--bg-elevated)"
-                stroke={hubStroke}
-                strokeWidth={activeNode === "inverter" ? 2.8 : 2.1}
+                cx="330"
+                cy="348"
+                r={battRingR}
+                fill="none"
+                stroke={flow.battColor}
+                strokeWidth="4.5"
+                strokeLinecap="round"
+                strokeDasharray={`${battRingDash.toFixed(1)} ${battRingCirc.toFixed(1)}`}
+                transform="rotate(-90 330 348)"
               />
-              <text y="-6" textAnchor="middle" fill="var(--text-primary)" fontSize="15" fontWeight="750">
-                Afore
-              </text>
-              <text y="14" textAnchor="middle" fill={hubStroke} fontSize="12" fontWeight="650">
-                {invStatusLabel}
-              </text>
-            </g>
+            )}
+            <circle cx="330" cy="348" r="33" fill="var(--bg-surface-2)" stroke="none" />
+            <circle cx="330" cy="348" r="27" fill="var(--battery-soft)" stroke="none" />
+            <text x="330" y="346" textAnchor="middle" fill={flow.battColor} fontSize="14.5" fontWeight="800" className="mono">
+              {flow.soc != null ? `${Math.round(flow.soc)}%` : "N/D"}
+            </text>
+            <text x="330" y="362" textAnchor="middle" fill="var(--text-muted)" fontSize="12" fontWeight="700">
+              SOC
+            </text>
+            <QualityMicroGlyph cx={359} cy={318} kind={flow.battQualityKind} />
 
-            {/* BOTTOM NODE: Batteria */}
-            <g
-              transform="translate(176, 268)"
-              className={`emerald-node-card ${activeNode === "battery" ? "selected" : ""}`}
-              role="button"
-              tabIndex={0}
-              aria-expanded={activeNode === "battery"}
-              aria-label={`Batteria: SOC ${fmtPct(soc)}, potenza ${batt == null ? "Non disponibile" : fmtWatts(batt)}, stato ${battDirLabel}. Premi Invio per i dettagli`}
-              onClick={() => onToggleNode("battery")}
-              onKeyDown={(e) => onNodeKey("battery", e)}
+            <text x="382" y="330" fill="var(--text-secondary)" fontSize="12" fontWeight="700">
+              Batteria
+            </text>
+            <text x="382" y="356" fill={flow.battColor} fontSize="23" fontWeight="800" className="mono">
+              {battSplit.num}
+              {battSplit.unit && (
+                <tspan fill="var(--text-muted)" fontSize="13" fontWeight="600">
+                  {" "}
+                  {battSplit.unit}
+                </tspan>
+              )}
+            </text>
+            <text x="382" y="374" fill="var(--text-muted)" fontSize="12" fontWeight="600">
+              {shortBattState(flow.batt, flow.battCharge, flow.battDischarge)}
+            </text>
+          </g>
+
+          {/* CENTER HUB: AFORE INVERTER CIRCLE */}
+          <g
+            className={`em-circle-node ${selectedNode === "inverter" ? "selected" : ""}`}
+            role="button"
+            tabIndex={0}
+            aria-label={`Inverter Afore: ${flow.invStatusLabel}`}
+            onClick={() => setSelectedNode((c) => (c === "inverter" ? null : "inverter"))}
+            onKeyDown={onNodeKey("inverter")}
+          >
+            <circle
+              cx="330"
+              cy="205"
+              r="50"
+              fill="var(--bg-surface)"
+              stroke={telemetry?.fault ? "var(--fault-red)" : flow.isStale ? "var(--safety-amber)" : "var(--accent-teal)"}
+              strokeWidth="2.4"
+            />
+            <circle cx="330" cy="205" r="42" fill="none" stroke="var(--border-subtle)" strokeWidth="1.2" strokeDasharray="3 4" />
+            <text x="330" y="199" textAnchor="middle" fill="var(--text-primary)" fontSize="16" fontWeight="800" letterSpacing="0.02em">
+              Afore
+            </text>
+            <text
+              x="330"
+              y="218"
+              textAnchor="middle"
+              fill={telemetry?.fault ? "var(--fault-red)" : flow.isStale ? "var(--safety-amber)" : "var(--accent-teal)"}
+              fontSize="12"
+              fontWeight="700"
             >
-              <rect
-                className="node-frame"
-                width="348"
-                height="98"
-                rx="14"
-                fill="var(--bg-surface-2)"
-                stroke={batt == null && soc == null ? inactiveColor : isStale ? inactiveColor : "var(--battery-color)"}
-                strokeWidth={activeNode === "battery" ? 2.2 : 1.5}
-              />
-              <g transform="translate(16,14)" stroke={batt == null && soc == null ? inactiveColor : "var(--battery-color)"} strokeWidth="1.8" fill="none" strokeLinecap="round">
-                <rect x="1" y="4" width="16" height="10" rx="2" />
-                <path d="M19 7v4" />
-              </g>
-              <text x="42" y="26" fill="var(--text-secondary)" fontSize="12.5" fontWeight="650">
-                Batteria · {battDirLabel}
-              </text>
-              <text x="16" y="56" fill={batt == null || isStale ? inactiveColor : "var(--battery-color)"} fontSize="22" fontWeight="750">
-                {batt == null ? "Non disp." : fmtWatts(batt)}
-              </text>
-              {telemetry?.battery_v != null && (
-                <text x="160" y="55" fill="var(--text-muted)" fontSize="12">
-                  {fmtNum(telemetry.battery_v, "V", 1)}
-                </text>
-              )}
-
-              <text x="306" y="24" textAnchor="end" fill="var(--text-secondary)" fontSize="12" fontWeight="650">
-                SOC
-              </text>
-              <text x="306" y="55" textAnchor="end" fill={soc == null ? inactiveColor : "var(--battery-color)"} fontSize="27" fontWeight="800">
-                {soc != null ? fmtPct(soc) : "—"}
-              </text>
-              <QualityBadgeSvg x={326} y={20} kind={battQualityKind} />
-
-              <rect x="16" y="70" width="316" height="11" rx="5.5" fill="var(--bg-inset)" stroke="var(--border-subtle)" />
-              {soc != null && (
-                <rect
-                  x="16"
-                  y="70"
-                  width={socBarWidth}
-                  height="11"
-                  rx="5.5"
-                  fill={isStale ? inactiveColor : "var(--battery-color)"}
-                />
-              )}
-            </g>
-          </svg>
-        )}
-
-        {popover}
+              {flow.invStatusLabel}
+            </text>
+          </g>
+        </svg>
       </div>
+
+      {/* MOBILE DEDICATED SIMPLIFIED SVG: 3 TOP CIRCULAR NODES (FV / RETE / CASA) + BATTERIA BELOW */}
+      <div className="em-monitor-mobile-wrap">
+        <svg
+          className="em-radial-svg"
+          viewBox="0 0 360 326"
+          role="group"
+          aria-label="Diagramma flussi energetici mobile Emerald"
+        >
+          <RadialFlowTrack
+            id="em-m-pv"
+            path="M 60 100 C 60 152 108 180 140 180"
+            active={flow.pvActive}
+            color={flow.pvColor}
+            watts={flow.pv}
+            deadband={deadbandW}
+          />
+          <RadialFlowTrack
+            id="em-m-grid"
+            path="M 180 100 L 180 140"
+            active={flow.gridActive}
+            reverse={flow.gridExport}
+            color={flow.gridColor}
+            watts={flow.grid}
+            deadband={deadbandW}
+          />
+          <RadialFlowTrack
+            id="em-m-home"
+            path="M 300 100 C 300 152 252 180 220 180"
+            active={flow.loadActive}
+            color={flow.loadColor}
+            watts={flow.load}
+            deadband={deadbandW}
+            dashed={flow.loadQualityKind === "derived"}
+          />
+          <RadialFlowTrack
+            id="em-m-batt"
+            path="M 180 220 C 180 236 144 238 144 252"
+            active={flow.battActive}
+            reverse={flow.battDischarge}
+            color={flow.battColor}
+            watts={flow.batt}
+            deadband={deadbandW}
+          />
+
+          {/* Top Left: PV Circle (Labels cleanly above circle) */}
+          <g
+            className="em-circle-node"
+            role="button"
+            tabIndex={0}
+            aria-label={`Fotovoltaico: ${fmtAbsKw(flow.pv)}`}
+            onClick={() => setSelectedNode("pv")}
+            onKeyDown={onNodeKey("pv")}
+          >
+            <rect x="24" y="4" width="72" height="96" rx="12" fill="transparent" />
+            <circle cx="60" cy="72" r="30" fill="transparent" />
+            <text x="60" y="16" textAnchor="middle" fill="var(--text-secondary)" fontSize="12" fontWeight="700">
+              FV
+            </text>
+            <text x="60" y="34" textAnchor="middle" fill={flow.pvColor} fontSize="14.5" fontWeight="800" className="mono">
+              {pvSplit.num} {pvSplit.unit}
+            </text>
+            <circle cx="60" cy="72" r="25" fill="var(--bg-surface-2)" stroke={flow.pvColor} strokeWidth="2.2" />
+            <g transform="translate(48, 60)" stroke={flow.pvColor} strokeWidth="1.8" fill="none">
+              <circle cx="12" cy="12" r="4" fill={flow.pvColor} />
+              <path d="M12 2v3M12 19v3M2 12h3M19 12h3" />
+            </g>
+            <QualityMicroGlyph cx={82} cy={51} kind={flow.pvQualityKind} />
+          </g>
+
+          {/* Top Center: Grid Circle */}
+          <g
+            className="em-circle-node"
+            role="button"
+            tabIndex={0}
+            aria-label={`Rete: ${fmtAbsKw(flow.grid)}`}
+            onClick={() => setSelectedNode("grid")}
+            onKeyDown={onNodeKey("grid")}
+          >
+            <rect x="144" y="4" width="72" height="96" rx="12" fill="transparent" />
+            <circle cx="180" cy="72" r="30" fill="transparent" />
+            <text x="180" y="16" textAnchor="middle" fill="var(--text-secondary)" fontSize="12" fontWeight="700">
+              Rete
+            </text>
+            <text x="180" y="34" textAnchor="middle" fill={flow.gridColor} fontSize="14.5" fontWeight="800" className="mono">
+              {gridSplit.num} {gridSplit.unit}
+            </text>
+            <circle cx="180" cy="72" r="25" fill="var(--bg-surface-2)" stroke={flow.gridColor} strokeWidth="2.2" />
+            <g transform="translate(168, 60)" stroke={flow.gridColor} strokeWidth="1.8" fill="none">
+              <path d="M12 2v20M7 22l5-16 5 16M5 9h14" />
+            </g>
+            <QualityMicroGlyph cx={202} cy={51} kind={flow.gridQualityKind} />
+          </g>
+
+          {/* Top Right: Home Circle */}
+          <g
+            className="em-circle-node"
+            role="button"
+            tabIndex={0}
+            aria-label={`Casa: ${fmtAbsKw(flow.load)}`}
+            onClick={() => setSelectedNode("home")}
+            onKeyDown={onNodeKey("home")}
+          >
+            <rect x="264" y="4" width="72" height="96" rx="12" fill="transparent" />
+            <circle cx="300" cy="72" r="30" fill="transparent" />
+            <text x="300" y="16" textAnchor="middle" fill="var(--text-secondary)" fontSize="12" fontWeight="700">
+              Casa
+            </text>
+            <text x="300" y="34" textAnchor="middle" fill={flow.loadColor} fontSize="14.5" fontWeight="800" className="mono">
+              {homeSplit.num} {homeSplit.unit}
+            </text>
+            <circle cx="300" cy="72" r="25" fill="var(--bg-surface-2)" stroke={flow.loadColor} strokeWidth="2.2" />
+            <g transform="translate(288, 60)" stroke={flow.loadColor} strokeWidth="1.8" fill="none">
+              <path d="M3 10.5L12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z" />
+            </g>
+            <QualityMicroGlyph cx={322} cy={51} kind={flow.loadQualityKind} />
+          </g>
+
+          {/* Center Afore Circle */}
+          <g
+            className="em-circle-node"
+            role="button"
+            tabIndex={0}
+            aria-label={`Inverter Afore: ${flow.invStatusLabel}`}
+            onClick={() => setSelectedNode("inverter")}
+            onKeyDown={onNodeKey("inverter")}
+          >
+            <circle cx="180" cy="180" r="39" fill="var(--bg-surface)" stroke="var(--accent-teal)" strokeWidth="2.2" />
+            <text x="180" y="176" textAnchor="middle" fill="var(--text-primary)" fontSize="14" fontWeight="800">
+              Afore
+            </text>
+            <text x="180" y="193" textAnchor="middle" fill="var(--accent-teal)" fontSize="12" fontWeight="700">
+              {flow.invStatusLabel}
+            </text>
+          </g>
+
+          {/* Bottom Battery Circle with SOC ring */}
+          <g
+            className="em-circle-node"
+            role="button"
+            tabIndex={0}
+            aria-label={`Batteria: SOC ${fmtPct(flow.soc)}, ${fmtAbsKw(flow.batt)}`}
+            onClick={() => setSelectedNode("battery")}
+            onKeyDown={onNodeKey("battery")}
+          >
+            <rect x="108" y="248" width="172" height="70" rx="14" fill="transparent" />
+            <circle cx="144" cy="282" r="34" fill="transparent" />
+            <circle cx="144" cy="282" r="30" fill="none" stroke="var(--border-subtle)" strokeWidth="4" />
+            {flow.soc != null && (
+              <circle
+                cx="144"
+                cy="282"
+                r="30"
+                fill="none"
+                stroke={flow.battColor}
+                strokeWidth="4"
+                strokeLinecap="round"
+                strokeDasharray={`${((socClamped / 100) * 2 * Math.PI * 30).toFixed(1)} ${(2 * Math.PI * 30).toFixed(1)}`}
+                transform="rotate(-90 144 282)"
+              />
+            )}
+            <circle cx="144" cy="282" r="24" fill="var(--bg-surface-2)" />
+            <text x="144" y="287" textAnchor="middle" fill={flow.battColor} fontSize="14" fontWeight="800" className="mono">
+              {flow.soc != null ? `${Math.round(flow.soc)}%` : "N/D"}
+            </text>
+            <QualityMicroGlyph cx={172} cy={258} kind={flow.battQualityKind} />
+            <text x="192" y="278" fill={flow.battColor} fontSize="17" fontWeight="800" className="mono">
+              {battSplit.num} {battSplit.unit}
+            </text>
+            <text x="192" y="297" fill="var(--text-muted)" fontSize="12" fontWeight="600">
+              {shortBattState(flow.batt, flow.battCharge, flow.battDischarge)}
+            </text>
+          </g>
+        </svg>
+      </div>
+
+      {/* Node Detail Drawer (Desktop slide-over, Mobile full-screen overlay) */}
+      <EmeraldDetailDrawer
+        open={Boolean(activeSpec)}
+        title={activeSpec?.title ?? ""}
+        subtitle="Misure elettriche e provenienza campione"
+        accentColor={activeSpec?.accent}
+        onClose={() => setSelectedNode(null)}
+      >
+        {activeSpec && (
+          <div className="em-node-detail-list">
+            {activeSpec.rows.map(([k, v]) => (
+              <div key={k} className="em-node-detail-row">
+                <span className="em-node-detail-k">{k}</span>
+                <strong className="em-node-detail-v mono">{v}</strong>
+              </div>
+            ))}
+          </div>
+        )}
+      </EmeraldDetailDrawer>
     </div>
   );
 }

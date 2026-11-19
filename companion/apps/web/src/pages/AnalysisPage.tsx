@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { apiFetch } from "../lib/api";
 import { fmtKwh, fmtNum, fmtPct, strategyLabel, type TimeRange } from "../lib/format";
 import { ShadowBanner } from "../components/ShadowBanner";
+import { PageHeader } from "../components/shared/PageHeader";
 
 export function AnalysisPage() {
   const [range, setRange] = useState<TimeRange>("today");
@@ -19,12 +20,10 @@ export function AnalysisPage() {
 
   return (
     <>
-      <header className="topbar">
-        <div>
-          <h1 className="page-title">Analisi &amp; KPI Energetici</h1>
-          <p className="page-sub">Autoconsumo, autosufficienza, prestazioni EMS SHADOW e qualità dei dati</p>
-        </div>
-        <div className="topbar-right">
+      <PageHeader
+        title="Analisi & KPI Energetici"
+        subtitle="Autoconsumo, autosufficienza, prestazioni EMS SHADOW e qualità dei dati"
+        actions={
           <div className="seg-group">
             {(["today", "yesterday", "7d", "30d"] as TimeRange[]).map((r) => (
               <button key={r} type="button" className={`seg-btn ${range === r ? "active" : ""}`} onClick={() => setRange(r)}>
@@ -32,8 +31,8 @@ export function AnalysisPage() {
               </button>
             ))}
           </div>
-        </div>
-      </header>
+        }
+      />
 
       <ShadowBanner compact />
 

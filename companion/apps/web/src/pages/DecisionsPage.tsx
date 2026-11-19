@@ -7,6 +7,7 @@ import { apiFetch } from "../lib/api";
 import { fmtTime, fmtWatts, reasonLabel, strategyLabel, type TimeRange } from "../lib/format";
 import { EChart } from "../components/EChart";
 import { ShadowBanner } from "../components/ShadowBanner";
+import { PageHeader } from "../components/shared/PageHeader";
 import { useTheme } from "../theme/useTheme";
 
 const STRATEGY_COLORS: Record<string, { bg: string; fg: string }> = {
@@ -91,43 +92,43 @@ export function DecisionsPage() {
 
   return (
     <>
-      <header className="topbar">
-        <div>
-          <h1 className="page-title">Decisioni EMS &amp; Audit SHADOW</h1>
-          <p className="page-sub">Timeline strategie, vincoli Safety, eventi e ispezione per sequence ID</p>
-        </div>
-        <div className="topbar-right">
-          <select
-            aria-label="Filtra strategia"
-            className="input-field"
-            style={{ width: "auto" }}
-            value={strategyFilter}
-            onChange={(e) => setStrategyFilter(e.target.value)}
-          >
-            <option value="">Tutte le strategie</option>
-            <option value="SELF_USE">Self Use</option>
-            <option value="CHARGE_FIRST">Charge First</option>
-            <option value="TARGET_SOC">Target SOC</option>
-            <option value="MAINTENANCE">Maintenance</option>
-            <option value="NATIVE_INVERTER">Native Inverter</option>
-            <option value="SAFE_MODE">Safe Mode</option>
-          </select>
-          <button
-            type="button"
-            className={`btn ${safetyOnly ? "primary" : ""}`}
-            onClick={() => setSafetyOnly((v) => !v)}
-          >
-            Solo Safety
-          </button>
-          <div className="seg-group">
-            {(["today", "yesterday", "7d"] as TimeRange[]).map((r) => (
-              <button key={r} type="button" className={`seg-btn ${range === r ? "active" : ""}`} onClick={() => setRange(r)}>
-                {r === "today" ? "Oggi" : r === "yesterday" ? "Ieri" : "7g"}
-              </button>
-            ))}
-          </div>
-        </div>
-      </header>
+      <PageHeader
+        title="Decisioni EMS & Audit SHADOW"
+        subtitle="Timeline strategie, vincoli Safety, eventi e ispezione per sequence ID"
+        actions={
+          <>
+            <select
+              aria-label="Filtra strategia"
+              className="input-field"
+              style={{ width: "auto" }}
+              value={strategyFilter}
+              onChange={(e) => setStrategyFilter(e.target.value)}
+            >
+              <option value="">Tutte le strategie</option>
+              <option value="SELF_USE">Self Use</option>
+              <option value="CHARGE_FIRST">Charge First</option>
+              <option value="TARGET_SOC">Target SOC</option>
+              <option value="MAINTENANCE">Maintenance</option>
+              <option value="NATIVE_INVERTER">Native Inverter</option>
+              <option value="SAFE_MODE">Safe Mode</option>
+            </select>
+            <button
+              type="button"
+              className={`btn ${safetyOnly ? "primary" : ""}`}
+              onClick={() => setSafetyOnly((v) => !v)}
+            >
+              Solo Safety
+            </button>
+            <div className="seg-group">
+              {(["today", "yesterday", "7d"] as TimeRange[]).map((r) => (
+                <button key={r} type="button" className={`seg-btn ${range === r ? "active" : ""}`} onClick={() => setRange(r)}>
+                  {r === "today" ? "Oggi" : r === "yesterday" ? "Ieri" : "7g"}
+                </button>
+              ))}
+            </div>
+          </>
+        }
+      />
 
       <ShadowBanner compact />
 
@@ -218,7 +219,7 @@ export function DecisionsPage() {
             <span className="card-sub">{events.length} eventi</span>
           </div>
           <div className="table-wrap" style={{ maxHeight: 380 }}>
-            <table className="data-table">
+            <table className="data-table resp-cards">
               <thead>
                 <tr>
                   <th>Ora</th>
@@ -229,15 +230,15 @@ export function DecisionsPage() {
               <tbody>
                 {events.map((ev) => (
                   <tr key={ev.id}>
-                    <td>{new Date(ev.occurred_at).toLocaleTimeString("it-IT", { timeZone: "Europe/Rome" })}</td>
-                    <td>
+                    <td data-label="Ora">{new Date(ev.occurred_at).toLocaleTimeString("it-IT", { timeZone: "Europe/Rome" })}</td>
+                    <td data-label="Tipo">
                       <span className={`badge ${ev.severity === "warning" ? "safety" : "simulated"}`}>
                         {ev.event_type}
                       </span>
                     </td>
-                    <td>
+                    <td data-label="Dettaglio">
                       <strong>{ev.title}</strong>
-                      {ev.detail && <div style={{ fontSize: 11, color: "var(--text-muted)" }}>{ev.detail}</div>}
+                      {ev.detail && <div style={{ fontSize: 12, color: "var(--text-muted)" }}>{ev.detail}</div>}
                     </td>
                   </tr>
                 ))}

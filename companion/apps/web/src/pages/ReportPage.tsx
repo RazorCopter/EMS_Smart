@@ -4,6 +4,7 @@ import { Download } from "lucide-react";
 import { apiFetch, rangeQuery } from "../lib/api";
 import { fmtKwh, fmtPct, strategyLabel, type TimeRange } from "../lib/format";
 import { ShadowBanner } from "../components/ShadowBanner";
+import { PageHeader } from "../components/shared/PageHeader";
 
 export function ReportPage() {
   const [range, setRange] = useState<TimeRange>("today");
@@ -24,30 +25,30 @@ export function ReportPage() {
 
   return (
     <>
-      <header className="topbar">
-        <div>
-          <h1 className="page-title">Report &amp; Esportazioni</h1>
-          <p className="page-sub">Riepilogo energetico, KPI, strategie, confronto SEM/ESP e qualità sistema</p>
-        </div>
-        <div className="topbar-right">
-          <div className="seg-group">
-            {(["today", "7d", "30d", "custom"] as TimeRange[]).map((r) => (
-              <button key={r} type="button" className={`seg-btn ${range === r ? "active" : ""}`} onClick={() => setRange(r)}>
-                {r === "today" ? "Giornaliero" : r === "7d" ? "Settimanale" : r === "30d" ? "Mensile" : "Personalizzato"}
-              </button>
-            ))}
-          </div>
-          <a className="btn primary" href={`/api/v1/export?format=pdf&scope=report&${qs}`}>
-            <Download size={14} /> PDF
-          </a>
-          <a className="btn" href={`/api/v1/export?format=csv&scope=report&${qs}`}>
-            <Download size={14} /> CSV
-          </a>
-          <a className="btn" href={`/api/v1/export?format=json&scope=report&${qs}`}>
-            <Download size={14} /> JSON
-          </a>
-        </div>
-      </header>
+      <PageHeader
+        title="Report & Esportazioni"
+        subtitle="Riepilogo energetico, KPI, strategie, confronto SEM/ESP e qualità sistema"
+        actions={
+          <>
+            <div className="seg-group">
+              {(["today", "7d", "30d", "custom"] as TimeRange[]).map((r) => (
+                <button key={r} type="button" className={`seg-btn ${range === r ? "active" : ""}`} onClick={() => setRange(r)}>
+                  {r === "today" ? "Giornaliero" : r === "7d" ? "Settimanale" : r === "30d" ? "Mensile" : "Personalizzato"}
+                </button>
+              ))}
+            </div>
+            <a className="btn primary" href={`/api/v1/export?format=pdf&scope=report&${qs}`}>
+              <Download size={14} /> PDF
+            </a>
+            <a className="btn" href={`/api/v1/export?format=csv&scope=report&${qs}`}>
+              <Download size={14} /> CSV
+            </a>
+            <a className="btn" href={`/api/v1/export?format=json&scope=report&${qs}`}>
+              <Download size={14} /> JSON
+            </a>
+          </>
+        }
+      />
 
       {range === "custom" && (
         <section className="card" style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>

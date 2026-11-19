@@ -4,6 +4,7 @@ import type { EChartsOption } from "echarts";
 import { apiFetch } from "../lib/api";
 import { fmtKwh, fmtNum, fmtPct, fmtTime, fmtWatts, type TimeRange } from "../lib/format";
 import { EChart } from "../components/EChart";
+import { PageHeader } from "../components/shared/PageHeader";
 import { useTheme } from "../theme/useTheme";
 
 function ProvBadge({ provenance }: { provenance: string }) {
@@ -66,15 +67,10 @@ export function BatteryPage() {
 
   return (
     <>
-      <header className="topbar">
-        <div>
-          <h1 className="page-title">Batteria &amp; Stato Accumulo</h1>
-          <p className="page-sub">
-            Capacità {specs.capacity_wh?.value ? `${(specs.capacity_wh.value / 1000).toFixed(2)} kWh` : "10,24 kWh"} ·{" "}
-            Tensione nominale {specs.nominal_v?.value ?? 51.2} V · Provenienza esplicita su ogni grandezza
-          </p>
-        </div>
-        <div className="topbar-right">
+      <PageHeader
+        title="Batteria & Stato Accumulo"
+        subtitle={`Capacità ${specs.capacity_wh?.value ? `${(specs.capacity_wh.value / 1000).toFixed(2)} kWh` : "10,24 kWh"} · Tensione nominale ${specs.nominal_v?.value ?? 51.2} V · Provenienza esplicita su ogni grandezza`}
+        actions={
           <div className="seg-group">
             {(["today", "yesterday", "7d", "30d"] as TimeRange[]).map((r) => (
               <button key={r} type="button" className={`seg-btn ${range === r ? "active" : ""}`} onClick={() => setRange(r)}>
@@ -82,8 +78,8 @@ export function BatteryPage() {
               </button>
             ))}
           </div>
-        </div>
-      </header>
+        }
+      />
 
       <section className="grid-4">
         <article className="kpi-card">

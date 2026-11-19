@@ -1,42 +1,43 @@
-# Visual Review & Multi-Theme Refactor Plan (`Mission 8`)
+# Visual Review, Template Split & Correspondence Checklist (`Mission 8 — Correzione Template Distinto`)
 
 - **Baseline monorepo commit**: `513a353` (`offline-full-product-completion`)
 - **Baseline standalone repo (`RazorCopter/dashboard_ems` `main`)**: `4a9e9e0c1ed48e7f85afe727ebcd3cabe79a3688`
-- **Default primo deploy**: `classic` + `dark` (Classic + Scuro invariato)
+- **Default primo deploy**: `classic` + `dark` (`Classic + Scuro` invariato)
 
-## 1. Differenze Classic vs Emerald Control
+---
 
-| Aspetto | Classic (Congelato) | Emerald Control |
+## 1. Architettura a Template Distinti (Zero Duplicazione Dati)
+
+- **Shared ViewModel & State**:
+  - `src/viewmodels/dashboardViewModel.ts` produce `DashboardViewModels` (`energyFlow`, `decision`, `kpis`, `coverage`, `system`, `liveChart`, `eventsTop3`, `telemetry`) da `/api/v1/live` e `/api/v1/history`.
+  - Tutte le formule KPI, formatter (`src/lib/format.ts`), TanStack Query, autenticazione, export, `ThemeProvider` e WebSocket `ws/live` sono condivisi tra entrambi i template.
+- **Classic (`data-ui-template="classic"`) — Baseline Congelata**:
+  - `ClassicAppShell` (`src/components/classic/ClassicAppShell.tsx`)
+  - `ClassicDashboardLayout` (`src/components/classic/ClassicDashboardLayout.tsx`)
+  - `ClassicEnergyMonitor` (`src/components/classic/ClassicEnergyMonitor.tsx`)
+- **Emerald Control (`data-ui-template="emerald"`) — Template Strutturalmente Distinto**:
+  - `EmeraldAppShell` (`src/components/emerald/EmeraldAppShell.tsx`): sidebar `240px` raggruppata (`Monitoraggio`, `Analisi`, `Sistema`), header mobile dedicato con accesso a `Stato impianto`.
+  - `EmeraldDashboardLayout` (`src/components/emerald/EmeraldDashboardLayout.tsx`): header contestuale alto con data/ora live, stato telemetria, strategia e badge SHADOW.
+  - `EmeraldEnergyMonitor` (`src/components/emerald/EmeraldEnergyMonitor.tsx`): anello radiale segmentato con 4 nodi circolari iconici (nessuna cornice rettangolare, zero testo tecnico sul canvas), anello SOC concentrico sulla batteria, layout mobile semplificato (3 nodi circolari in alto + Batteria in basso), dettaglio elettrico in drawer (full-screen su mobile).
+  - `EmeraldDecisionCard` (`src/components/emerald/EmeraldDecisionCard.tsx`): gerarchia fedele al mockup (`Strategia attiva`, `Setpoint simulato`, confronto `Richiesta iniziale` / `Safety`, `Motivazione` umana, strip `SHADOW`).
+  - `EmeraldKpiSection` (`src/components/emerald/EmeraldKpiSection.tsx`): Row 2 con 3 pannelli (`Autoconsumo`, `Autosufficienza` con barre spesse; `Accumulo` con **batteria grafica a 10 segmenti**) e Row 3 con 4 card con **sparkline SVG continue** (`<polyline>` + `<polygon>`).
+  - `EmeraldSystemPanel` (`src/components/emerald/EmeraldSystemPanel.tsx`) & `EmeraldChrome` (`src/components/emerald/EmeraldChrome.tsx`).
+
+---
+
+## 2. Checklist Corrispondenza Mockup & Requisiti Correzione Missione 8
+
+| Requisito | Verifica Implementata | Esito |
 |---|---|---|
-| **Palette Dark** | Slate-teal `#091011` / `#111d1f` | Deep forest-emerald `#071110` / `#0C1917` / `#11211E` |
-| **Palette Light** | `#f1f5f4` / `#ffffff` | Neutro caldo `#F4F7F5` / `#FAFCFB` con testo `#0D1F1B` (AA) |
-| **Accent & Focus** | `#2dd4bf` | `#34D6A0` (hover `#57E4B7`, focus ring nitido) |
-| **Energy Monitor** | Schema rettangolare a blocchi | Hub radiale/semicircolare SVG con archi curvi, particelle proporzionali e gauge SOC circolare/barra |
-| **Card & Bordi** | Raggio `14–16px`, ombra morbida | Bordi `1px` Linear-style `#28423D`, gerarchia netta, zero shadow pesanti |
-| **KPI & Decision Card** | Griglia esistente congelata | Maggiore respiro verticale (o compatta su scelta utente), gauge semicircolari netti, ribbon Decisione EMS con envelope |
-| **Densità** | Fissa | Selezionabile (`Comoda` / `Compatta`) |
-
-## 2. Elementi Condivisi (Zero Duplicazione)
-
-- **Backend / Data**: REST API (`api.ts`), WebSocket live stream (`useQuery` + `qc.setQueryData`), formule KPI, calcoli `coverage`, `format.ts`, `auth`, router React.
-- **Pagine**: tutte le 8 route (`/`, `/storico`, `/decisioni`, `/analisi`, `/confronto-sem`, `/batteria`, `/report`, `/impostazioni`) restano un unico albero React guidato dai design token di `ThemeProvider`.
-- **Grafici**: tutte le istanze usano `EChart.tsx` + `useChartPalette()` sincronizzato al tema attivo senza ricreare l'istanza.
-
-## 3. Gerarchia, Spaziature & Densità
-
-1. Priorità visiva assoluta a **Energy Monitor + Decisione EMS** (`~62% / 38%` su desktop).
-2. Subito sotto: **KPI Primari** (`Autoconsumo`, `Autosufficienza`, `Batteria`) e **KPI Giornalieri Compatti** (`FV`, `Casa`, `Rete`, `Batteria`) con sparkline reali orarie.
-3. Strip diagnostica di **Copertura telemetrica** (distinguendo `Periodo precedente non monitorato` da `GAP` reali).
-4. **Trend live 6h**, **Ultimi 3 eventi significativi raggruppati** e **Stato sistema + Diagnostica risorse**.
-
-## 4. Strategia Responsive & Accessibilità
-
-- Breakpoint coerenti a `1180px` (stack hero verticalmente, KPI 2x2) e `768px` (bottom nav 5 item + drawer mobile, tabelle convertite in card, Energy Monitor verticale touch-friendly con nodi >= 44px, DetailDrawer full-screen).
-- Skip link (`Salta al contenuto principale`), aria-expanded su tutti i popover e tooltip, testo minimo >= 12px in Emerald Control, `reduced_motion` sia da OS sia da impostazione utente.
-
-## 5. Rischi Mitigati & Alternative Scartate
-
-- **Scartata duplicazione pagine** (`DashboardClassic.tsx` / `DashboardEmerald.tsx`): avrebbe raddoppiato manutenzione KPI e introdotto rischio di regressione su SHADOW. Scelto invece un singolo albero controllato da `data-style`, `data-theme`, `data-density`, `data-motion` + lazy-load della sola vista SVG `EmeraldEnergyMonitor`.
-- **Rischio FOUC / Flash bianco**: mitigato con sincronizzazione immediata prima del mount React (`themeStorage.ts`) basata sull'ultima preferenza in `localStorage`.
-- **Rischio crash variante Emerald**: mitigato con `ThemeErrorBoundary` dedicata che non sovrascrive la preferenza persistita senza consenso e consente ripristino immediato a `Classic`.
-- **Rischio reset ECharts su cambio tema**: mitigato aggiornando `setOption(..., { notMerge: false })` anziché smontare l'istanza in `useEffect`.
+| Classic invariato + default al primo deploy (`classic` + `dark`) | `classic_local_1440.png` vs `classic_baseline/` + test default | Conforme |
+| Distinzione strutturale anche in scala di grigi | `emerald_local_grayscale_1440.png` vs `classic_local_1440.png` | Conforme |
+| `data-ui-template="classic"` / `"emerald"` | Verificato su Shell e Dashboard + test Vitest dedicati | Conforme |
+| AppShell Emerald: Sidebar ~240px, gruppi, connessioni, SHADOW | `EmeraldAppShell` (`240px`, 3 gruppi, ESP32/MQTT/HA + SHADOW) | Conforme |
+| Header contestuale Emerald grande con ora/telemetria/SHADOW | `EmeraldPageHeader` su Dashboard e tutte le 7 sotto-pagine | Conforme |
+| Row 1 `65% / 35%`: Monitor radiale a nodi circolari + Decision Card gerarchica | `em-row-hero` (`1.85fr / 1fr`), no box nodi, no `.kv-row` su Decision | Conforme |
+| Row 2: 3 pannelli ad alto impatto (`Autoconsumo`, `Autosufficienza`, `Accumulo` segmentato) | `em-kpi-row-hero` + `SegmentedBatteryGraphic` 10 celle | Conforme |
+| Row 3: 4 card energetiche con sparkline SVG continue (`polyline`+`polygon`) | `ContinuousSparkline` senza barre rettangolari | Conforme |
+| Row 4 `75% / 25%`: Grafico `280px` a sinistra + `Stato impianto` autonomo a destra | `em-row-bottom` (`3fr / 1fr`) + `EmeraldSystemPanel` (ESP32, MQTT, HA, Controllo reale, SEM, Modalità ESP, AUX, NTP + risorse) | Conforme |
+| Mobile Emerald (`390x844`): monitor 3 nodi su + Batteria giù, `Impianto` in drawer, detail full-screen, KPI 2/riga | `emerald_local_390_mobile.png`, `emerald_local_390_node_detail.png` | Conforme (`overflow=False`) |
+| Font minimo leggibile (`>= 12px`) & `0` errori console/JS | Verificato programmaticamente via Playwright (`smallestFontPx=12`, `errors=0`) | Conforme |
+| Dark + Light + Sistema indipendenti dallo stile senza ricarica o reset WS | `emerald_local_light_1440.png`, ECharts in-place `setOption`, test live | Conforme |

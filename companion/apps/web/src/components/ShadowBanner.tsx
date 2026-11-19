@@ -12,7 +12,7 @@ export function ShadowBanner({ compact = false, extra }: Props) {
         <ShieldAlert size={18} color="var(--shadow-blue)" aria-hidden="true" />
         <div>
           <strong>SHADOW – Decisioni simulate</strong>
-          <div style={{ fontSize: compact ? 11 : 12, color: "var(--text-secondary)" }}>
+          <div className="shadow-banner-sub" style={{ fontSize: compact ? 11 : 12, color: "var(--text-secondary)" }}>
             Nessun comando applicato all&apos;inverter · Scritture Modbus: 0
             {extra ? ` · ${extra}` : ""}
           </div>

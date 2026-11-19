@@ -7,6 +7,7 @@ import { apiFetch, rangeQuery } from "../lib/api";
 import { fmtNum, fmtWatts, strategyLabel, type TimeRange } from "../lib/format";
 import { EChart } from "../components/EChart";
 import { ShadowBanner } from "../components/ShadowBanner";
+import { PageHeader } from "../components/shared/PageHeader";
 import { useTheme } from "../theme/useTheme";
 
 const RANGES: Array<{ id: TimeRange; label: string }> = [
@@ -138,14 +139,10 @@ export function HistoryPage() {
 
   return (
     <>
-      <header className="topbar">
-        <div>
-          <h1 className="page-title">Storico Energetico</h1>
-          <p className="page-sub">
-            Aggregazione: {data?.bucket ?? "auto"} · Bucket mancanti: {data?.missing_buckets ?? 0} (mai sostituiti con 0)
-          </p>
-        </div>
-        <div className="topbar-right">
+      <PageHeader
+        title="Storico Energetico"
+        subtitle={`Aggregazione: ${data?.bucket ?? "auto"} · Bucket mancanti: ${data?.missing_buckets ?? 0} (mai sostituiti con 0)`}
+        actions={
           <div className="seg-group" role="group" aria-label="Intervallo temporale">
             {RANGES.map((r) => (
               <button
@@ -158,8 +155,8 @@ export function HistoryPage() {
               </button>
             ))}
           </div>
-        </div>
-      </header>
+        }
+      />
 
       {range === "custom" && (
         <section className="card" style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "end" }}>

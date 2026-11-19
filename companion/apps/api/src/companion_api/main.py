@@ -57,6 +57,7 @@ from .queries import (
     query_analytics_report,
     query_battery_summary,
     query_comparison_summary,
+    query_coverage_summary,
     query_decisions_and_intervals,
     query_energy_kpi,
     query_history,
@@ -565,8 +566,13 @@ async def kpi(
     cfg: ApiSettings = request.app.state.settings
     s, e, _ = resolve_window(range, tz_name=cfg.companion_timezone, start_iso=start, end_iso=end)
     energy = await query_energy_kpi(db, cfg.device_id, s, e, battery_capacity_wh=cfg.battery_capacity_wh)
+    coverage = None
+    if range == "today":
+        coverage = await query_coverage_summary(db, cfg.device_id, s, datetime.now(timezone.utc), energy)
+        if coverage.get("coverage_since_first_sample_pct") is not None:
+            energy["data_availability_pct"] = coverage["coverage_since_first_sample_pct"]
     report = await query_analytics_report(db, cfg.device_id, s, e, tz_name=cfg.companion_timezone, battery_capacity_wh=cfg.battery_capacity_wh)
-    return {"period": {"start": s.isoformat(), "end": e.isoformat()}, "energy": energy, "analytics": report}
+    return {"period": {"start": s.isoformat(), "end": e.isoformat()}, "energy": energy, "coverage": coverage, "analytics": report}
 
 
 @app.get("/api/v1/comparison")

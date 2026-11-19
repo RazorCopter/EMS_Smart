@@ -4,6 +4,7 @@ import { apiFetch, type AuthUser } from "../lib/api";
 import { fmtTime } from "../lib/format";
 import { HelpTip } from "../components/HelpTip";
 import { ShadowBanner } from "../components/ShadowBanner";
+import { PageHeader } from "../components/shared/PageHeader";
 import { ThemeSettingsCard } from "../components/shared/ThemeControls";
 import { useTheme } from "../theme/useTheme";
 
@@ -76,15 +77,11 @@ export function SettingsPage({ user }: Props) {
 
   return (
     <>
-      <header className="topbar">
-        <div>
-          <h1 className="page-title">Impostazioni Companion</h1>
-          <p className="page-sub">
-            Ruolo attivo: <strong>{user.role}</strong> · Nessun segreto o password viene esposto dalle API
-          </p>
-        </div>
-        <span className="chip shadow">Controllo inverter disabilitato per design</span>
-      </header>
+      <PageHeader
+        title="Impostazioni Companion"
+        subtitle={`Ruolo attivo: ${user.role} · Nessun segreto o password viene esposto dalle API`}
+        badges={<span className="chip shadow">Controllo inverter disabilitato per design</span>}
+      />
 
       <ShadowBanner compact extra="Nessun ruolo può abilitare la modalità LIVE sull'ESP32" />
 

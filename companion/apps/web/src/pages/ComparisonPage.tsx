@@ -4,6 +4,7 @@ import type { EChartsOption } from "echarts";
 import { apiFetch } from "../lib/api";
 import { fmtPct, fmtWatts, strategyLabel, type TimeRange } from "../lib/format";
 import { EChart } from "../components/EChart";
+import { PageHeader } from "../components/shared/PageHeader";
 import { useTheme } from "../theme/useTheme";
 
 export function ComparisonPage() {
@@ -53,33 +54,33 @@ export function ComparisonPage() {
 
   return (
     <>
-      <header className="topbar">
-        <div>
-          <h1 className="page-title">Confronto SEM / ESP32 SHADOW</h1>
-          <p className="page-sub">Qualificazione comportamento simulato ESP32 rispetto al controllore reale Home Assistant SEM</p>
-        </div>
-        <div className="topbar-right">
-          <label className="chip" style={{ gap: 8 }}>
-            Soglia (W)
-            <input
-              type="number"
-              min={10}
-              max={2000}
-              step={10}
-              value={thresholdW}
-              onChange={(e) => setThresholdW(Number(e.target.value) || 100)}
-              style={{ width: 68, background: "transparent", border: 0, textAlign: "right", fontWeight: 700 }}
-            />
-          </label>
-          <div className="seg-group">
-            {(["today", "yesterday", "7d", "30d"] as TimeRange[]).map((r) => (
-              <button key={r} type="button" className={`seg-btn ${range === r ? "active" : ""}`} onClick={() => setRange(r)}>
-                {r === "today" ? "Oggi" : r === "yesterday" ? "Ieri" : r}
-              </button>
-            ))}
-          </div>
-        </div>
-      </header>
+      <PageHeader
+        title="Confronto SEM / ESP32 SHADOW"
+        subtitle="Qualificazione comportamento simulato ESP32 rispetto al controllore reale Home Assistant SEM"
+        actions={
+          <>
+            <label className="chip" style={{ gap: 8 }}>
+              Soglia (W)
+              <input
+                type="number"
+                min={10}
+                max={2000}
+                step={10}
+                value={thresholdW}
+                onChange={(e) => setThresholdW(Number(e.target.value) || 100)}
+                style={{ width: 68, background: "transparent", border: 0, textAlign: "right", fontWeight: 700 }}
+              />
+            </label>
+            <div className="seg-group">
+              {(["today", "yesterday", "7d", "30d"] as TimeRange[]).map((r) => (
+                <button key={r} type="button" className={`seg-btn ${range === r ? "active" : ""}`} onClick={() => setRange(r)}>
+                  {r === "today" ? "Oggi" : r === "yesterday" ? "Ieri" : r}
+                </button>
+              ))}
+            </div>
+          </>
+        }
+      />
 
       <div
         className="shadow-banner"

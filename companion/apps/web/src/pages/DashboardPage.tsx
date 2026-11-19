@@ -106,26 +106,37 @@ function SemiGauge({ value, color, label }: { value: number | null | undefined; 
   );
 }
 
-function FormulaTip({ id, title, formula }: { id: string; title: string; formula: string }) {
+function HelpTip({
+  id,
+  title,
+  text,
+  align = "left",
+}: {
+  id: string;
+  title: string;
+  text: string;
+  align?: "left" | "right";
+}) {
   const [open, setOpen] = useState(false);
   return (
-    <span className="tip-wrap">
+    <span className={`tip-wrap ${open ? "is-open" : ""}`} onMouseLeave={() => setOpen(false)}>
       <button
         type="button"
         className="tip-btn"
-        aria-label={`Mostra formula ${title}`}
+        aria-label={`Spiegazione: ${title}`}
         aria-expanded={open}
         aria-controls={id}
         onClick={() => setOpen((v) => !v)}
+        onKeyDown={(e) => {
+          if (e.key === "Escape") setOpen(false);
+        }}
         onBlur={() => setOpen(false)}
       >
-        <Info size={14} aria-hidden="true" />
+        <Info size={13} aria-hidden="true" />
       </button>
-      {open && (
-        <span id={id} role="tooltip" className="tip-bubble">
-          <strong>Formula {title}:</strong> {formula}
-        </span>
-      )}
+      <span id={id} role="tooltip" className={`tip-bubble align-${align}`}>
+        <strong>{title}:</strong> {text}
+      </span>
     </span>
   );
 }
@@ -393,11 +404,27 @@ export function DashboardPage() {
             <ShadowBanner compact />
 
             <div className="kv-row" style={{ marginTop: 10 }}>
-              <span className="kv-label">Strategia locale</span>
+              <span className="kv-label label-with-tip">
+                Strategia locale
+                <HelpTip
+                  id="tip-strat-loc"
+                  title="Strategia locale"
+                  text="Strategia di base configurata nella memoria dell'ESP32. Con modello predittivo attivo, può passare automaticamente a Charge First o carica dolce."
+                  align="left"
+                />
+              </span>
               <span className="kv-val">{strategyLabel(dec?.configured_strategy)}</span>
             </div>
             <div className="kv-row">
-              <span className="kv-label">Strategia effettiva</span>
+              <span className="kv-label label-with-tip">
+                Strategia effettiva
+                <HelpTip
+                  id="tip-strat-eff"
+                  title="Strategia effettiva"
+                  text="Modalità che guida le decisioni ora: Charge First accumula tutto il sole fino al 100% bloccando la scarica; Target SOC modula gli ampere per un orario obiettivo; Self Use bilancia casa e rete."
+                  align="left"
+                />
+              </span>
               <span className="kv-val">{strategyLabel(dec?.strategy)}</span>
             </div>
 
@@ -409,17 +436,41 @@ export function DashboardPage() {
 
             <div className="pipeline-3" aria-label="Pipeline setpoint SHADOW">
               <div className="pipe-box">
-                <span className="pipe-lbl">Candidato</span>
+                <span className="pipe-lbl label-with-tip">
+                  Candidato
+                  <HelpTip
+                    id="tip-cand"
+                    title="Candidato"
+                    text="Potenza ideale richiesta dalla strategia prima dei limiti di surplus o sicurezza (es. +2560 W = 50 A massimi di carica; segno - = richiesta scarica)."
+                    align="left"
+                  />
+                </span>
                 <strong className="pipe-val">{fmtWatts(dec?.candidate_w, "W")}</strong>
               </div>
               <div className="pipe-box">
-                <span className="pipe-lbl">Safety-limited</span>
+                <span className="pipe-lbl label-with-tip">
+                  Safety-limited
+                  <HelpTip
+                    id="tip-lim"
+                    title="Safety-limited"
+                    text="Valore massimo ammesso in questo secondo dall'inviluppo di sicurezza e dal surplus FV reale (in solo surplus non supera mai l'energia solare eccedente)."
+                    align="left"
+                  />
+                </span>
                 <strong className="pipe-val" style={{ color: "var(--safety-amber)" }}>
                   {fmtWatts(dec?.limited_w, "W")}
                 </strong>
               </div>
               <div className="pipe-box">
-                <span className="pipe-lbl">Simulato</span>
+                <span className="pipe-lbl label-with-tip">
+                  Simulato
+                  <HelpTip
+                    id="tip-sim"
+                    title="Setpoint simulato"
+                    text="Valore finale filtrato con deadband (±20 W) e rampa graduale. In SHADOW è solo calcolato per analisi: nessun comando raggiunge l'inverter."
+                    align="right"
+                  />
+                </span>
                 <strong className="pipe-val" style={{ color: "var(--accent-teal)" }}>
                   {fmtWatts(dec?.simulated_w, "W")}
                 </strong>
@@ -427,7 +478,15 @@ export function DashboardPage() {
             </div>
 
             <div className="kv-row">
-              <span className="kv-label">Limiti Safety attivi</span>
+              <span className="kv-label label-with-tip">
+                Limiti Safety attivi
+                <HelpTip
+                  id="tip-bounds"
+                  title="Limiti Safety (Min / Max)"
+                  text="Intervallo [Min / Max] in Watt consentito ora: Min = 0 W blocca la scarica della batteria; Max è il tetto istantaneo di carica sicuro da FV o rete."
+                  align="left"
+                />
+              </span>
               <span className="kv-val">
                 {dec?.safety_min_w != null && dec?.safety_max_w != null
                   ? `${Math.round(dec.safety_min_w)} / ${Math.round(dec.safety_max_w)} W`
@@ -435,7 +494,15 @@ export function DashboardPage() {
               </span>
             </div>
             <div className="kv-row">
-              <span className="kv-label">Ultima decisione {dec ? `(#${dec.seq})` : ""}</span>
+              <span className="kv-label label-with-tip">
+                Ultima decisione {dec ? `(#${dec.seq})` : ""}
+                <HelpTip
+                  id="tip-seq"
+                  title="Ultima decisione (#seq)"
+                  text="Numero progressivo a 1 Hz dell'ultimo ciclo valutato dall'ESP32 e orario esatto di acquisizione sincronizzato NTP."
+                  align="left"
+                />
+              </span>
               <span className="kv-val">{dec ? fmtTime(dec.source_timestamp, live.timezone) : "Non disponibile"}</span>
             </div>
           </div>
@@ -452,10 +519,11 @@ export function DashboardPage() {
           <div className="kpi-hero-copy">
             <div className="kpi-head-row">
               <span className="kpi-title-lbl">Autoconsumo</span>
-              <FormulaTip
+              <HelpTip
                 id="tip-autoconsumo"
                 title="Autoconsumo"
-                formula={kpi.formulas?.self_consumption ?? "FV consumato localmente / Produzione FV"}
+                text={`${kpi.formulas?.self_consumption ?? "FV autoconsumato / Produzione FV"}. Indica quanta parte dell'energia solare prodotta oggi hai utilizzato subito in casa o accumulato in batteria senza immetterla in rete.`}
+                align="left"
               />
             </div>
             <div className="kpi-hero-val" style={{ color: pvNotCalculable ? "var(--missing-grey)" : "var(--pv-color)" }}>
@@ -478,10 +546,11 @@ export function DashboardPage() {
           <div className="kpi-hero-copy">
             <div className="kpi-head-row">
               <span className="kpi-title-lbl">Autosufficienza</span>
-              <FormulaTip
+              <HelpTip
                 id="tip-autosuff"
                 title="Autosufficienza"
-                formula={kpi.formulas?.self_sufficiency ?? "(Consumo totale - Importazione rete) / Consumo totale"}
+                text={`${kpi.formulas?.self_sufficiency ?? "(Consumo totale - Importazione rete) / Consumo totale"}. Indica quanta parte del consumo di casa di oggi è stata coperta da fotovoltaico e batteria senza comprare energia dalla rete.`}
+                align="left"
               />
             </div>
             <div className="kpi-hero-val" style={{ color: loadNotCalculable ? "var(--missing-grey)" : "var(--accent-teal)" }}>
@@ -503,7 +572,15 @@ export function DashboardPage() {
         <article className="kpi-hero-card batt-summary">
           <div style={{ width: "100%" }}>
             <div className="kpi-head-row">
-              <span className="kpi-title-lbl">Batteria</span>
+              <span className="kpi-title-lbl label-with-tip">
+                Batteria
+                <HelpTip
+                  id="tip-batt-hero"
+                  title="Bilancio Batteria"
+                  text="SOC = stato di carica % dal BMS. +C / -D = kWh caricati e scaricati oggi. Throughput = somma energia transitata (C+D); 1 ciclo equivalente = 2 × capacità utile (10,24 kWh)."
+                  align="right"
+                />
+              </span>
               <span className="batt-soc-tag">
                 SOC {socPct != null ? fmtPct(socPct) : "Non disponibile"}
               </span>
@@ -531,7 +608,15 @@ export function DashboardPage() {
       <section className="kpi-compact-grid" aria-label="Totali energetici giornalieri">
         <article className="kpi-card">
           <div className="kpi-compact-head">
-            <span>Produzione FV oggi</span>
+            <span className="label-with-tip">
+              Produzione FV oggi
+              <HelpTip
+                id="tip-kpi-pv"
+                title="Produzione FV"
+                text="Energia solare totale generata dai pannelli da mezzanotte (integrata dai campioni FC04 senza interpolare eventuali gap)."
+                align="left"
+              />
+            </span>
             <span className="badge measured">Misurato</span>
           </div>
           <div className="kpi-val-lg" style={{ color: "var(--pv-color)" }}>
@@ -544,7 +629,15 @@ export function DashboardPage() {
 
         <article className="kpi-card">
           <div className="kpi-compact-head">
-            <span>Consumo casa oggi</span>
+            <span className="label-with-tip">
+              Consumo casa oggi
+              <HelpTip
+                id="tip-kpi-load"
+                title="Consumo casa"
+                text="Energia assorbita dalle utenze domestiche oggi, derivata istante per istante dal bilancio AC dell'inverter (FV + Rete − Batteria)."
+                align="left"
+              />
+            </span>
             <span className="badge derived">Derivato</span>
           </div>
           <div className="kpi-val-lg" style={{ color: "var(--home-color)" }}>
@@ -557,7 +650,15 @@ export function DashboardPage() {
 
         <article className="kpi-card">
           <div className="kpi-compact-head">
-            <span>Importazione / Esportazione</span>
+            <span className="label-with-tip">
+              Import. / Esport.
+              <HelpTip
+                id="tip-kpi-grid"
+                title="Scambio rete"
+                text="imp = kWh prelevati dalla rete elettrica (quando casa supera FV/batteria); esp = kWh immessi in rete (eccedenza solare non accumulata)."
+                align="left"
+              />
+            </span>
             <span className="badge measured">Misurato</span>
           </div>
           <div className="kpi-val-lg" style={{ color: "var(--grid-color)" }}>
@@ -572,7 +673,15 @@ export function DashboardPage() {
 
         <article className="kpi-card">
           <div className="kpi-compact-head">
-            <span>Carica / Scarica batteria</span>
+            <span className="label-with-tip">
+              Carica / Scarica
+              <HelpTip
+                id="tip-kpi-batt"
+                title="Carica / Scarica batteria"
+                text="Energia totale entrata (+) ed uscita (-) dai morsetti della batteria dall'inizio della giornata."
+                align="right"
+              />
+            </span>
             <span className="badge measured">Misurato</span>
           </div>
           <div className="kpi-val-lg" style={{ color: "var(--battery-color)" }}>
@@ -592,24 +701,40 @@ export function DashboardPage() {
       <section className="coverage-strip" aria-label="Copertura e qualità acquisizione dati">
         <div className="coverage-main">
           <span className={`dot ${covPct != null && covPct >= 95 ? "online" : covPct == null ? "" : "degraded"}`} aria-hidden="true" />
-          <strong>Copertura dal primo campione: {covPct != null ? fmtPct(covPct) : "Non disponibile"}</strong>
+          <strong className="label-with-tip">
+            Copertura dal primo campione: {covPct != null ? fmtPct(covPct) : "Non disponibile"}
+            <HelpTip
+              id="tip-coverage"
+              title="Copertura telemetrica"
+              text="Percentuale di secondi con dati validi dall'orario di primo avvio del Companion. Le ore precedenti all'installazione sono escluse dal calcolo (Non monitorato)."
+              align="left"
+            />
+          </strong>
           <span className="coverage-sep">·</span>
           <span>{formatStartedAtLabel(cov?.first_sample_at, Boolean(cov?.monitoring_started_today), live.timezone)}</span>
         </div>
         <div className="coverage-badges">
           {cov?.monitoring_started_today && (
-            <span className="chip" title="Periodo di oggi precedente all'installazione del Companion">
+            <span className="chip" title="Finestra odierna precedente alla prima accensione del Companion: non viene contata come errore o buco di raccolta">
               Periodo precedente non monitorato ({fmtDurationCompact(cov.unmonitored_pre_install_seconds)})
             </span>
           )}
-          <span className={`chip ${(cov?.gap_seconds ?? 0) > 0 ? "warn" : ""}`}>
+          <span
+            className={`chip ${(cov?.gap_seconds ?? 0) > 0 ? "warn" : ""}`}
+            title="Secondi senza campioni validi oltre la soglia di 60 s dopo l'inizio del monitoraggio"
+          >
             Gap dopo avvio: {fmtDurationCompact(cov?.gap_seconds ?? 0)}
           </span>
-          <span className={`chip ${(cov?.invalid_samples ?? 0) > 0 ? "warn" : ""}`}>
+          <span
+            className={`chip ${(cov?.invalid_samples ?? 0) > 0 ? "warn" : ""}`}
+            title="Campioni ricevuti con stato telemetry_valid=false o grandezze essenziali assenti (mai sostituiti con zero)"
+          >
             Invalidi: {cov?.invalid_samples ?? 0}
           </span>
           {(cov?.unavailable_seconds ?? 0) > 0 && (
-            <span className="chip err">Unavailable: {fmtDurationCompact(cov?.unavailable_seconds)}</span>
+            <span className="chip err" title="Tempo recente con sorgente ESP32/MQTT non raggiungibile">
+              Unavailable: {fmtDurationCompact(cov?.unavailable_seconds)}
+            </span>
           )}
           {(cov?.legacy_stride_gaps_excluded ?? 0) > 0 && (
             <span className="chip" title="Eventi DECISION_GAP precedenti al fix dello stride MQTT (esclusi dai KPI correnti senza eliminare lo storico)">

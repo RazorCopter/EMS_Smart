@@ -556,33 +556,57 @@
   border-radius: 999px;
 }
 
+.label-with-tip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
 .tip-wrap { position: relative; display: inline-flex; align-items: center; }
 .tip-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 24px;
-  height: 24px;
+  width: 21px;
+  height: 21px;
   border-radius: 999px;
   border: 1px solid var(--border-subtle);
   background: var(--bg-inset);
   color: var(--text-secondary);
   cursor: pointer;
+  flex: none;
+  padding: 0;
+}
+.tip-btn:hover, .tip-wrap.is-open .tip-btn {
+  border-color: var(--accent-teal);
+  color: var(--accent-teal);
 }
 .tip-bubble {
+  display: none;
   position: absolute;
-  top: 28px;
-  left: 0;
-  z-index: 30;
-  width: min(260px, 72vw);
-  padding: 8px 10px;
-  border-radius: 8px;
+  top: calc(100% + 6px);
+  z-index: 45;
+  width: min(275px, 76vw);
+  padding: 9px 11px;
+  border-radius: 10px;
   background: var(--bg-elevated);
   border: 1px solid var(--border-strong);
   box-shadow: var(--shadow-md);
   font-size: 11.5px;
+  font-weight: 450;
   color: var(--text-primary);
-  line-height: 1.4;
+  line-height: 1.45;
+  text-align: left;
+  white-space: normal;
+  pointer-events: none;
+}
+.tip-bubble.align-left { left: 0; }
+.tip-bubble.align-right { right: 0; left: auto; }
+.tip-wrap:hover .tip-bubble,
+.tip-wrap:focus-within .tip-bubble,
+.tip-wrap.is-open .tip-bubble {
+  display: block;
+  pointer-events: auto;
 }
 
 .kpi-compact-grid {

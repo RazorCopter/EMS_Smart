@@ -15,6 +15,7 @@
 #include <driver/gpio.h>
 #include <mutex>
 #include <atomic>
+#include <memory>
 #include <sstream>
 #include <cstring>
 
@@ -147,6 +148,19 @@ void discovery() {
    {"sensor","aux_auto_off_ms","AUX1 auto-off","system/manual",0},{"sensor","last_aux_origin","Last AUX1 origin","system/manual",0},
    {"sensor","deadline_minute","Target SOC deadline","config/state",0},{"number","target_deadline_s","Relative target deadline","config/state",604800},
    {"number","charge_first_s","Charge First duration limit","config/state",604800},
+   {"switch","predictive","Predictive EMS","config/state",1},
+   {"switch","auto_season","Auto seasonal SOC","config/state",1},
+   {"number","summer_soc_min","Summer min SOC","config/state",99},
+   {"number","winter_soc_min","Winter min SOC","config/state",99},
+   {"number","low_sun_kwh","Low sun threshold","config/state",100},
+   {"number","weekday_load_w","Weekday average load","config/state",20000},
+   {"number","weekend_load_w","Weekend average load","config/state",20000},
+   {"sensor","recommended_charge_a","Recommended charge current","ems/state",0},
+   {"sensor","effective_soc_min","Effective min SOC","ems/state",0},
+   {"sensor","predictive_phase","Predictive phase","ems/state",0},
+   {"sensor","season","EMS season","ems/state",0},
+   {"binary_sensor","fog_active","Fog protection active","ems/state",0},
+   {"binary_sensor","low_sun_mode","Low sun mode","ems/state",0},
    {"button","target_soc","Start Target SOC","config/state",0},{"button","maintenance","Start Maintenance","config/state",0},
    {"button","cancel_override","Cancel override","config/state",0},{"button","cancel_session","Cancel session","config/state",0},
  };
@@ -165,9 +179,9 @@ void discovery() {
        d["options"].add("SHADOW"); d["options"].add("LIVE");
      } else for(auto name:{"SELF_USE","CHARGE_FIRST","NATIVE_INVERTER","SAFE_MODE","TARGET_SOC","MAINTENANCE"}) d["options"].add(name);
    } else if(component=="switch") {
-     d["value_template"]=key=="aux1"?"{{ value_json.aux1 }}":"{{ 'ON' if value_json.grid_charge else 'OFF' }}";
+     d["value_template"]=key=="aux1"?"{{ value_json.aux1 }}":"{{ 'ON' if value_json."+key+" else 'OFF' }}";
    } else if(component!="button") d["value_template"]="{{ value_json."+key+" }}";
-   if(component=="number" || component=="select" || key=="grid_charge")d["entity_category"]="config";
+   if(component=="number" || component=="select" || (component=="switch" && key!="aux1"))d["entity_category"]="config";
    if(std::string(e.path)=="diagnostics")d["entity_category"]="diagnostic";
    if(key=="time_valid")d["value_template"]="{{ 'ON' if value_json.time_source == 'NTP' else 'OFF' }}";
    if(key=="timestamp")d["device_class"]="timestamp";
@@ -179,11 +193,12 @@ void discovery() {
    if(key=="deadline_minute")d["value_template"]="{{ '%02d:%02d' | format(value_json.deadline_minute // 60, value_json.deadline_minute % 60) }}";
    if(key=="target_deadline_s" || key=="charge_first_s")d["unit_of_measurement"]="s";
    if(key=="capacity_wh") d["unit_of_measurement"]="Wh";
+   if(key=="low_sun_kwh") d["unit_of_measurement"]="kWh";
    if(key=="nominal_mv") {d["unit_of_measurement"]="V";d["value_template"]="{{ value_json.nominal_mv / 1000 }}";}
-   if(key=="candidate_w" || key=="limited_w" || key=="simulated_w" || key=="charge_w" || key=="discharge_w") d["unit_of_measurement"]="W";
-   if(key=="charge_a" || key=="discharge_a") d["unit_of_measurement"]="A";
+   if(key=="candidate_w" || key=="limited_w" || key=="simulated_w" || key=="charge_w" || key=="discharge_w" || key=="weekday_load_w" || key=="weekend_load_w") d["unit_of_measurement"]="W";
+   if(key=="charge_a" || key=="discharge_a" || key=="recommended_charge_a") d["unit_of_measurement"]="A";
    if(key=="voltage_min" || key=="voltage_max") d["unit_of_measurement"]="V";
-   if(key.rfind("soc_",0)==0) d["unit_of_measurement"]="%";
+   if(key.rfind("soc_",0)==0 || key=="summer_soc_min" || key=="winter_soc_min" || key=="effective_soc_min") d["unit_of_measurement"]="%";
    if(component=="number") {d["min"]=(key=="soc_max" || key=="soc_target" || key=="target_deadline_s" || key=="charge_first_s")?1:0;d["max"]=key=="soc_min"?99:e.max;d["step"]=1;}
    const auto envelope="{\"schema\":1,\"message_id\":\""+id+"-{{ (now().timestamp()*1000000)|int }}\",\"timestamp\":{{ now().timestamp()|int }},\"ttl\":30,";
    if(component=="button") {
@@ -384,6 +399,7 @@ void brokerTask(void*) {
        doc["cpu_mhz"]=res.cpuMhz;
        doc["task_count"]=res.taskCount;
        doc["min_task_stack_free_b"]=res.minTaskStackFreeB;
+       doc["min_task_stack_name"]=res.minTaskStackName;
        doc["nvs_used_entries"]=res.nvsUsedEntries;
        doc["nvs_free_entries"]=res.nvsFreeEntries;
        doc["nvs_total_entries"]=res.nvsTotalEntries;
@@ -416,14 +432,16 @@ esp_err_t getDecision(httpd_req_t* r) {
 esp_err_t getDecisions(httpd_req_t* r) {
  if(!authorized(r))return ESP_OK;
  httpd_resp_set_type(r,"application/x-ndjson");
+ std::unique_ptr<char[]> line(new char[recordSize+1]);
+ if(!line) return httpd_resp_send_err(r,HTTPD_500_INTERNAL_SERVER_ERROR,"OOM");
  uint32_t end;
  {const std::lock_guard guard(stateLock);end=cursor;}
  if(history) for(uint32_t i=end>records?end-records:0;i<end;++i) {
-   char line[recordSize+1];
    {const std::lock_guard guard(stateLock);
     if(cursor-i>records) continue;
-    memcpy(line,history+(i%records)*recordSize,recordSize);}
-   if(line[0] && (httpd_resp_sendstr_chunk(r,line)!=ESP_OK || httpd_resp_sendstr_chunk(r,"\n")!=ESP_OK)) return ESP_FAIL;
+    memcpy(line.get(),history+(i%records)*recordSize,recordSize);}
+   line[recordSize]='\0';
+   if(line[0] && (httpd_resp_sendstr_chunk(r,line.get())!=ESP_OK || httpd_resp_sendstr_chunk(r,"\n")!=ESP_OK)) return ESP_FAIL;
  }
  return httpd_resp_send_chunk(r,nullptr,0);
 }
@@ -533,7 +551,7 @@ esp_err_t getSystem(httpd_req_t* r) {
 esp_err_t reboot(httpd_req_t* r) {
  if(!authorized(r))return ESP_OK;
  auto result=jsonResponse(r,"{\"restart\":true}");
- xTaskCreate([](void*){vTaskDelay(pdMS_TO_TICKS(300));ESP.restart();},"v51_restart",2048,nullptr,1,nullptr);
+ xTaskCreate([](void*){vTaskDelay(pdMS_TO_TICKS(300));ESP.restart();},"v51_restart",3072,nullptr,1,nullptr);
  return result;
 }
 }
@@ -562,6 +580,6 @@ void registerM4(httpd_handle_t server,Authorize auth,Preferences& storage) {
    {"/api/v1/mqtt/test",HTTP_POST,testBroker,nullptr},{"/api/v1/system/wifi-test",HTTP_POST,testWifi,nullptr},
  };
  for(auto& route:routes) if(httpd_register_uri_handler(server,&route)!=ESP_OK) recordLog("M4 route registration failed");
- xTaskCreate(brokerTask,"v51_mqtt",8192,nullptr,1,nullptr);
+ xTaskCreate(brokerTask,"v51_mqtt",10240,nullptr,1,nullptr);
 }
 }

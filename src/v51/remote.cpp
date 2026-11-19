@@ -27,6 +27,7 @@
 #include <atomic>
 #include <cmath>
 #include <cstring>
+#include <memory>
 #include <mutex>
 
 #include "ota_public_key.h"
@@ -180,13 +181,14 @@ esp_err_t health(httpd_req_t* request) {
         strcpy(cpu1Pct, "null");
     }
 
-    char response[1280]{};
-    snprintf(response, sizeof(response),
+    std::unique_ptr<char[]> response(new char[1408]);
+    if (!response) return httpd_resp_send_err(request, HTTPD_500_INTERNAL_SERVER_ERROR, "OOM");
+    snprintf(response.get(), 1408,
              "{\"firmware\":\"%s\",\"mode\":\"SHADOW\",\"uptime_ms\":%lu,\"reset_reason\":%d,"
              "\"heap\":%u,\"heap_total\":%u,\"min_heap\":%u,\"heap_max_alloc\":%u,\"heap_used_pct\":%.1f,"
              "\"psram\":%u,\"psram_free\":%u,\"psram_min\":%u,\"psram_used_pct\":%.1f,"
              "\"cpu_pct\":%s,\"cpu0_pct\":%s,\"cpu1_pct\":%s,\"cpu_mhz\":%u,"
-             "\"task_count\":%u,\"min_task_stack_free_b\":%u,"
+             "\"task_count\":%u,\"min_task_stack_free_b\":%u,\"min_task_stack_name\":\"%s\","
              "\"nvs_used_entries\":%u,\"nvs_free_entries\":%u,\"nvs_total_entries\":%u,\"nvs_used_pct\":%.1f,"
              "\"flash_size\":%u,\"sketch_size\":%u,\"sketch_free\":%u,"
              "\"sta_connected\":%s,\"ip\":\"%s\","
@@ -196,14 +198,14 @@ esp_err_t health(httpd_req_t* request) {
              res.heapFree, res.heapTotal, res.heapMin, res.heapMaxAlloc, res.heapUsedPct,
              res.psramTotal, res.psramFree, res.psramMin, res.psramUsedPct,
              cpuPct, cpu0Pct, cpu1Pct, res.cpuMhz,
-             res.taskCount, res.minTaskStackFreeB,
+             res.taskCount, res.minTaskStackFreeB, res.minTaskStackName,
              res.nvsUsedEntries, res.nvsFreeEntries, res.nvsTotalEntries, res.nvsUsedPct,
              res.flashSize, res.sketchSize, res.sketchFree,
              sta ? "true" : "false",
              staIp.c_str(), rssi, running ? running->label : "unknown", imageState(bootState.load()), auxOn()?"ON":"OFF");
     httpd_resp_set_type(request, "application/json");
     httpd_resp_set_hdr(request, "Cache-Control", "no-store");
-    const auto result = httpd_resp_sendstr(request, response);
+    const auto result = httpd_resp_sendstr(request, response.get());
     if (sta && result == ESP_OK) sawHealth.store(true);
     return result;
 }
@@ -216,21 +218,22 @@ esp_err_t logResponse(httpd_req_t* request) {
         end = sequence;
     }
     const uint32_t begin = end >= logs.size() ? end - logs.size() + 1 : 1;
+    std::unique_ptr<LogEntry> entry(new LogEntry());
+    std::unique_ptr<char[]> row(new char[940]);
+    if (!entry || !row) return httpd_resp_send_err(request, HTTPD_500_INTERNAL_SERVER_ERROR, "OOM");
     httpd_resp_set_type(request, "text/plain; charset=utf-8");
     httpd_resp_set_hdr(request, "Cache-Control", "no-store");
     for (uint32_t id = begin; id <= end; ++id) {
-        LogEntry entry;
         {
             const std::lock_guard lock(logMutex);
-            entry = logs[(id - 1) % logs.size()];
+            *entry = logs[(id - 1) % logs.size()];
         }
-        if (entry.sequence != id) continue;
-        char row[940];
+        if (entry->sequence != id) continue;
         std::ostringstream timing;
-        appendClock(timing,entry.clock);
-        snprintf(row, sizeof(row), "%lu %lu %s {%s}\n", static_cast<unsigned long>(id),
-                 static_cast<unsigned long>(entry.clock.uptime), entry.message, timing.str().c_str()+1);
-        if (httpd_resp_sendstr_chunk(request, row) != ESP_OK) return ESP_FAIL;
+        appendClock(timing,entry->clock);
+        snprintf(row.get(), 940, "%lu %lu %s {%s}\n", static_cast<unsigned long>(id),
+                 static_cast<unsigned long>(entry->clock.uptime), entry->message, timing.str().c_str()+1);
+        if (httpd_resp_sendstr_chunk(request, row.get()) != ESP_OK) return ESP_FAIL;
     }
     return httpd_resp_send_chunk(request, nullptr, 0);
 }
@@ -632,7 +635,10 @@ SystemResources sampleSystemResources() {
     bool found1 = false;
     for (UBaseType_t i = 0; i < count; ++i) {
         const uint32_t freeStack = static_cast<uint32_t>(tasks[i].usStackHighWaterMark) * sizeof(StackType_t);
-        if (freeStack < minStack) minStack = freeStack;
+        if (freeStack < minStack) {
+            minStack = freeStack;
+            snprintf(out.minTaskStackName, sizeof(out.minTaskStackName), "%s", tasks[i].pcTaskName);
+        }
         if (strcmp(tasks[i].pcTaskName, "IDLE0") == 0) {
             idle0 = tasks[i].ulRunTimeCounter;
             found0 = true;

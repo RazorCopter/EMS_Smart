@@ -192,4 +192,118 @@ int main() {
     dLoop = loopMgr.tick(sample(20, 600, t), pred, 1, t, &winterDay, std::nullopt, &rainy);
     assert(dLoop.strategy == Strategy::ChargeFirst);
     assert(dLoop.lower == 0);
+
+    // === Regression tests for Audit v5.1-console-7 ===
+    // R1: Sunny day 15:15 (between deadlineMinute-anticipationMin and deadlineMinute, SOC=95%) stays in GentleCharge RECOVERY (not ChargeFirst)
+    StrategyManager winMgr;
+    tm sunnyWin = summerDay;
+    sunnyWin.tm_hour = 14; sunnyWin.tm_min = 0;
+    PredictiveInputs lateSunny = sunny;
+    lateSunny.remainingForecastKwh = 3.0;
+    auto dR1 = winMgr.tick(sample(85, -1200, 10000), pred, 1, 10000, &sunnyWin, std::nullopt, &lateSunny);
+    assert(dR1.strategy == Strategy::Target);
+    sunnyWin.tm_hour = 15; sunnyWin.tm_min = 15;
+    lateSunny.remainingForecastKwh = 0.2;
+    dR1 = winMgr.tick(sample(95, -400, 14000), pred, 1, 14000, &sunnyWin, std::nullopt, &lateSunny);
+    assert(dR1.strategy == Strategy::Target && std::string_view(dR1.state) == "RECOVERY");
+
+    // R2: Sunny day 15:30 transitions to SelfUse allowing discharge (lower < 0)
+    sunnyWin.tm_hour = 15; sunnyWin.tm_min = 30;
+    auto dR2 = winMgr.tick(sample(95, 500, 18000), pred, 1, 18000, &sunnyWin, std::nullopt, &lateSunny);
+    assert(dR2.strategy == Strategy::SelfUse && dR2.lower.has_value() && *dR2.lower < 0);
+
+    // R3: Next sunny morning (day+1, 09:00, SOC=55%) resumes GentleCharge automatically
+    sunnyWin.tm_yday += 1; sunnyWin.tm_mday += 1; sunnyWin.tm_hour = 9; sunnyWin.tm_min = 0;
+    auto dR3 = winMgr.tick(sample(55, -1800, 22000), pred, 1, 22000, &sunnyWin, std::nullopt, &sunny);
+    assert(dR3.strategy == Strategy::Target);
+
+    // R4: Winter sunny morning (Nov 19, SOC=25%, today=16 kWh, tomorrow=15 kWh) enters GentleCharge (< 50A)
+    StrategyManager winSunnyMgr;
+    PredictiveInputs winSunny = sunny;
+    winSunny.todayTotalKwh = 16.0;
+    winSunny.tomorrowTotalKwh = 15.0;
+    winSunny.remainingForecastKwh = 15.0;
+    auto eWin25 = sample(25, -2400, 30000);
+    eWin25.batteryVoltage = {52.0, 30000, Quality::Valid};
+    auto dR4 = winSunnyMgr.tick(eWin25, pred, 1, 30000, &winterDay, std::nullopt, &winSunny);
+    assert(dR4.winterSeason && !dR4.lowSunMode && dR4.strategy == Strategy::Target && dR4.recommendedChargeA > 0 && dR4.recommendedChargeA < 50);
+
+    // R5: Winter sunny today + rainy tomorrow (< lowSunKwh) enters CaptureChargeFirst
+    StrategyManager winMixMgr;
+    PredictiveInputs winMix = winSunny;
+    winMix.tomorrowTotalKwh = 3.0;
+    auto dR5 = winMixMgr.tick(eWin25, pred, 1, 30000, &winterDay, std::nullopt, &winMix);
+    assert(dR5.winterSeason && dR5.lowSunMode && dR5.strategy == Strategy::ChargeFirst);
+
+    // R6: resumeSoc=25 with floor=20 honors 10%/15% in summer and 20%/25% in winter
+    Policy predRes = pred;
+    predRes.floor = 20;
+    predRes.resumeSoc = 25;
+    predRes.hysteresis = 2;
+    predRes.predictive = 0;
+    StrategyManager resMgr;
+    assert(resMgr.tick(sample(20, 400, 1000), predRes, 1, 1000).finalWatts == 0);
+    assert(resMgr.tick(sample(25, 400, 2000), predRes, 1, 2000).finalWatts == 0);
+    assert(resMgr.tick(sample(26, 400, 3000), predRes, 1, 3000).finalWatts == -400);
+    predRes.predictive = 1;
+    StrategyManager sumResMgr;
+    tm sumEvening = summerDay; sumEvening.tm_hour = 17; sumEvening.tm_min = 0;
+    sumResMgr.tick(sample(30, 400, 1000), predRes, 1, 1000, &sumEvening, std::nullopt, &sunny);
+    auto dR6s = sumResMgr.tick(sample(14, 400, 2000), predRes, 1, 2000, &sumEvening, std::nullopt, &sunny);
+    assert(dR6s.effectiveFloor == 10 && dR6s.strategy == Strategy::SelfUse && *dR6s.lower < 0);
+    tm winEvening = winterDay; winEvening.tm_hour = 17; winEvening.tm_min = 0;
+    sumResMgr.tick(sample(30, 400, 3000), predRes, 2, 3000, &winEvening, std::nullopt, &winSunny);
+    auto dR6w = sumResMgr.tick(sample(20, 400, 4000), predRes, 2, 4000, &winEvening, std::nullopt, &winSunny);
+    assert(dR6w.effectiveFloor == 20 && *dR6w.lower == 0);
+
+    // R7: fogSticky_ clears on midnight rollover AND after 1h of expired weather
+    StrategyManager fogMgr;
+    PredictiveInputs clearWeather{};
+    clearWeather.forecastValid = true; clearWeather.todayTotalKwh = 15.0; clearWeather.tomorrowTotalKwh = 15.0; clearWeather.remainingForecastKwh = 14.0;
+    clearWeather.weatherValid = true; clearWeather.fog = true;
+    auto dFog = fogMgr.tick(sample(35, -1800, 10000), pred, 1, 10000, &winterDay, std::nullopt, &clearWeather);
+    assert(dFog.fogActive && dFog.strategy == Strategy::ChargeFirst);
+    clearWeather.weatherValid = false;
+    dFog = fogMgr.tick(sample(35, -1800, 10000 + 3600000), pred, 1, 10000 + 3600000, &winterDay, std::nullopt, &clearWeather);
+    assert(!dFog.fogActive && dFog.strategy == Strategy::Target);
+    // Rollover test
+    clearWeather.weatherValid = true; clearWeather.fog = true;
+    dFog = fogMgr.tick(sample(35, -1800, 20000), pred, 2, 20000, &winterDay, std::nullopt, &clearWeather);
+    assert(dFog.fogActive);
+    tm nextWinterDay = winterDay; nextWinterDay.tm_yday += 1; nextWinterDay.tm_mday += 1;
+    clearWeather.fog = false; clearWeather.spreadC = 2.0; clearWeather.radiationWm2 = 150.0;
+    dFog = fogMgr.tick(sample(35, -1800, 25000), pred, 2, 25000, &nextWinterDay, std::nullopt, &clearWeather);
+    assert(!dFog.fogActive);
+
+    // R8: Stale telemetry during FullHold resets fullHoldAccumMs_
+    StrategyManager holdMgr;
+    uint32_t th = 10000;
+    holdMgr.tick(sample(100, -200, th), pred, 1, th, &winterDay, std::nullopt, &rainy);
+    th += 4000;
+    holdMgr.tick(sample(100, -200, th), pred, 1, th, &winterDay, std::nullopt, &rainy);
+    th += 20000; // stale telemetry gap (> staleMs)
+    auto eStale = sample(100, -200, 10000);
+    auto dStale = holdMgr.tick(eStale, pred, 1, th, &winterDay, std::nullopt, &rainy);
+    assert(dStale.strategy == Strategy::Safe);
+    // Resume 295s more of valid 100% hold: must NOT complete early from prior partial hold
+    for (int i = 0; i < 73; ++i) {
+        th += 4000;
+        auto dHold = holdMgr.tick(sample(100, -200, th), pred, 1, th, &winterDay, std::nullopt, &rainy);
+        assert(dHold.strategy == Strategy::ChargeFirst);
+    }
+
+    // R9: exportPredictiveState / restorePredictiveState preserves SelfUse discharge cycle across reboot on rainy day
+    StrategyManager bootMgr1;
+    uint32_t tb = 50000;
+    bootMgr1.tick(sample(100, -200, tb), pred, 1, tb, &winterDay, std::nullopt, &rainy);
+    for (int i = 0; i < 76; ++i) {
+        tb += 4000;
+        bootMgr1.tick(sample(100, 500, tb), pred, 1, tb, &winterDay, std::nullopt, &rainy);
+    }
+    const auto savedSt = bootMgr1.exportPredictiveState();
+    assert(savedSt.discharging == 1);
+    StrategyManager bootMgr2;
+    bootMgr2.restorePredictiveState(savedSt);
+    auto dReboot = bootMgr2.tick(sample(50, 500, 1000), pred, 1, 1000, &winterDay, std::nullopt, &rainy);
+    assert(dReboot.strategy == Strategy::SelfUse && dReboot.finalWatts == -500);
 }

@@ -3,6 +3,7 @@
 #include "energy_state.h"
 #include <algorithm>
 #include <cmath>
+#include <cstdint>
 #include <ctime>
 #include <string_view>
 
@@ -133,27 +134,65 @@ inline std::optional<int> dailySeconds(time_t now,const tm& local,int minute) {
     return int(std::clamp(difftime(deadline,now),0.0,172800.0));
 }
 
+struct PredictiveCycleState {
+    uint8_t magic = 0xA5;
+    uint8_t phase = 0;       // static_cast<uint8_t>(CyclePhase)
+    uint8_t discharging = 0; // 0 or 1
+    uint8_t reserved = 0;
+    int32_t cycleDay = -1;
+};
+
 class StrategyManager {
 public:
     enum class CyclePhase { SelfUse, GentleCharge, CaptureChargeFirst, FullHold };
+
+    void restorePredictiveState(const PredictiveCycleState& st) {
+        if (st.magic == 0xA5 && st.phase <= 3) {
+            cyclePhase_ = static_cast<CyclePhase>(st.phase);
+            dischargingCycle_ = st.discharging != 0;
+            cycleDay_ = st.cycleDay;
+            predInit_ = true;
+        }
+    }
+
+    PredictiveCycleState exportPredictiveState() const {
+        PredictiveCycleState st;
+        st.magic = 0xA5;
+        st.phase = static_cast<uint8_t>(cyclePhase_);
+        st.discharging = dischargingCycle_ ? 1 : 0;
+        st.reserved = 0;
+        st.cycleDay = cycleDay_;
+        return st;
+    }
 
     Decision tick(const EnergyState& e, const Policy& p, uint32_t revision, uint32_t now,
                   const tm* local=nullptr, std::optional<int> dailyRemaining={},
                   const PredictiveInputs* pred=nullptr) {
         if (revision_ != revision) {
-            revision_=revision;
-            start_=now;
-            day_=-1;
+            const uint32_t prevRevision = revision_;
+            revision_ = revision;
+            start_ = now;
+            day_ = -1;
             holdSince_.reset();
             priorW_.reset();
-            done_=false;
-            nearTarget_=false;
-            exit_="UNCHANGED";
-            predInit_=false;
-            fullHoldAccumMs_=0;
-            fullHoldLastTick_=now;
-            dischargingCycle_=false;
-            fogSticky_=false;
+            done_ = false;
+            nearTarget_ = false;
+            exit_ = "UNCHANGED";
+            fullHoldAccumMs_ = 0;
+            fullHoldLastTick_ = now;
+            const bool initialRestore = (prevRevision == 0) && predInit_ &&
+                                        p.predictive == 1 && (p.strategy == 0 || p.strategy == 1);
+            if (!initialRestore && (!hasLastPolicy_ || p.predictive != lastPredictive_ || p.strategy != lastStrategy_)) {
+                predInit_ = false;
+                dischargingCycle_ = false;
+                cycleDay_ = -1;
+                fogSticky_ = false;
+                fogDay_ = -1;
+                fogLastWeatherMs_ = now;
+            }
+            hasLastPolicy_ = true;
+            lastPredictive_ = p.predictive;
+            lastStrategy_ = p.strategy;
         }
         Decision d;
         d.configured=static_cast<Strategy>(p.strategy);
@@ -174,6 +213,7 @@ public:
                 finish("MAINTENANCE_FAULT_ABORT");
         }
         if (!healthy) {
+            fullHoldAccumMs_ = 0;
             const auto stale=[&](const Sample& sample){
                 return sample.status==Quality::Valid && now-sample.stamp>uint32_t(p.staleMs);
             };
@@ -277,17 +317,34 @@ private:
         d.winterSeason = isWinter;
         d.seasonName = isWinter ? "WINTER" : "SUMMER";
 
-        const int resumeThreshold = std::max(effectiveFloor + p.hysteresis, std::min(effectiveFloor + p.hysteresis, p.resumeSoc));
+        const int resumeDelta = std::max(p.hysteresis, std::max(0, p.resumeSoc - p.floor));
+        const int resumeThreshold = std::min(
+            p.ceiling - 1,
+            p.autoSeason ? (effectiveFloor + resumeDelta)
+                         : std::max(effectiveFloor + p.hysteresis, p.resumeSoc));
         if (soc <= effectiveFloor) reserve_ = true;
         else if (soc > resumeThreshold) reserve_ = false;
 
-        // 2. Fog / weather / ratio correction
+        const int currentDay = local ? (local->tm_year * 366 + local->tm_yday) : -1;
+
+        // 2. Fog / weather / ratio correction (midnight rollover + 1h stale decay)
+        if (local && fogDay_ >= 0 && currentDay != fogDay_) {
+            fogSticky_ = false;
+            fogDay_ = currentDay;
+        }
         if (ha.weatherValid) {
             d.usedWeather = true;
+            fogLastWeatherMs_ = now;
+            fogDay_ = currentDay;
             if (ha.fog) fogSticky_ = true;
             else if (ha.spreadC <= 1.5 && ha.radiationWm2 < 100.0 && (!local || local->tm_hour < 12)) fogSticky_ = true;
             else if (!fogSticky_) fogSticky_ = false;
-            else if (ha.spreadC >= 2.5 && ha.radiationWm2 >= 180.0 && (!ha.ratioValid || ha.ratio >= 0.75)) fogSticky_ = false;
+            else if ((!ha.fog && ha.radiationWm2 >= 250.0) ||
+                     (ha.spreadC >= 2.5 && ha.radiationWm2 >= 180.0 && (!ha.ratioValid || ha.ratio >= 0.75))) {
+                fogSticky_ = false;
+            }
+        } else if (fogSticky_ && uint32_t(now - fogLastWeatherMs_) >= 3600u * 1000u) {
+            fogSticky_ = false;
         }
         const bool fogActive = fogSticky_;
         d.fogActive = fogActive;
@@ -307,9 +364,11 @@ private:
             d.usedLoadProfile = true;
         }
 
-        // 4. Target deadline window (default 15:30 - 20 min = 15:10)
+        // 4. Target deadline window (default 15:30 - 20 min = 15:10, keeping 15:10-15:30 as anticipation recovery)
         const int localMin = local ? (local->tm_hour * 60 + local->tm_min) : 12 * 60;
         const int effTargetMin = std::max(0, p.deadlineMinute - p.anticipationMin);
+        const bool pastDeadline = local && localMin >= p.deadlineMinute;
+        const bool inAnticipationWindow = local && localMin >= effTargetMin && localMin < p.deadlineMinute;
         const double remainingHours = local && localMin < effTargetMin ? (effTargetMin - localMin) / 60.0 : 0.0;
 
         double expectedPvKwh = 0.0;
@@ -317,14 +376,17 @@ private:
             d.usedForecast = true;
             expectedPvKwh = ha.remainingForecastKwh * factor;
         }
-        const double expectedSurplusKwh = std::max(0.0, expectedPvKwh - loadKw * remainingHours);
+        const double forecastWindowHours = local && !pastDeadline
+            ? std::max(0.0, (p.deadlineMinute - localMin) / 60.0)
+            : 0.0;
+        const double expectedSurplusKwh = std::max(0.0, expectedPvKwh - loadKw * forecastWindowHours);
         const double deficitFullKwh = std::max(0.0, (double(p.target) - soc) * p.capacityWh / 100000.0);
         const double requiredInputKwh = deficitFullKwh * (100.0 / p.efficiencyPct) * (p.safetyMarginPct / 100.0);
 
-        const bool tomorrowFavorable = ha.forecastValid && ha.tomorrowTotalKwh >= 7.0 && soc >= 40.0;
-        const bool poorSolar = !ha.forecastValid || fogActive ||
-            expectedSurplusKwh < requiredInputKwh ||
-            (ha.todayTotalKwh > 0.0 && ha.todayTotalKwh < double(p.lowSunKwh));
+        const bool tomorrowFavorable = ha.forecastValid && ha.tomorrowTotalKwh >= double(p.lowSunKwh);
+        const bool todayLowTotal = (ha.todayTotalKwh > 0.0 && ha.todayTotalKwh < double(p.lowSunKwh));
+        const bool forecastDeficit = !pastDeadline && (expectedSurplusKwh < requiredInputKwh);
+        const bool poorSolar = !ha.forecastValid || fogActive || todayLowTotal || forecastDeficit;
         const bool lowSunMode = isWinter ? (poorSolar || !tomorrowFavorable) : (poorSolar && !tomorrowFavorable);
         d.lowSunMode = lowSunMode;
 
@@ -342,7 +404,7 @@ private:
                 fullHoldLastTick_ = now;
             } else if (lowSunMode || soc <= effectiveFloor) {
                 cyclePhase_ = CyclePhase::CaptureChargeFirst;
-            } else if (remainingHours > 0.0) {
+            } else if (remainingHours > 0.0 || inAnticipationWindow) {
                 cyclePhase_ = CyclePhase::GentleCharge;
             } else {
                 cyclePhase_ = CyclePhase::SelfUse;
@@ -351,6 +413,7 @@ private:
 
         if (soc <= effectiveFloor) {
             dischargingCycle_ = false;
+            cycleDay_ = -1;
         }
 
         bool justCompleted5MinHold = false;
@@ -370,6 +433,7 @@ private:
                 if (fullHoldAccumMs_ >= uint32_t(p.fullHoldSec) * 1000u) {
                     fullHoldAccumMs_ = 0;
                     dischargingCycle_ = true;
+                    cycleDay_ = currentDay;
                     cyclePhase_ = CyclePhase::SelfUse;
                     d.transition = "CALIBRATION_COMPLETE_SELF_USE";
                     justCompleted5MinHold = true;
@@ -382,7 +446,8 @@ private:
                 cyclePhase_ = CyclePhase::FullHold;
                 fullHoldAccumMs_ = 0;
                 d.transition = "FULL_HOLD_STARTED";
-            } else if (!lowSunMode && soc >= 45.0 && remainingHours > 1.5 && ha.forecastValid && expectedSurplusKwh >= requiredInputKwh * 1.15) {
+            } else if (!lowSunMode && soc > effectiveFloor + p.hysteresis && remainingHours > 1.0 &&
+                       ha.forecastValid && expectedSurplusKwh >= requiredInputKwh * 1.15) {
                 cyclePhase_ = CyclePhase::GentleCharge;
                 d.transition = "SWITCH_GENTLE_TARGET";
             }
@@ -393,20 +458,22 @@ private:
                 cyclePhase_ = CyclePhase::FullHold;
                 fullHoldAccumMs_ = 0;
                 d.transition = "FULL_HOLD_STARTED";
-            } else if (lowSunMode) {
-                cyclePhase_ = CyclePhase::CaptureChargeFirst;
-                d.transition = "CYCLE_CHARGE_FIRST";
-            } else if (local && localMin >= p.deadlineMinute) {
-                // Target deadline passed: fall back to SelfUse until next cycle
+            } else if (pastDeadline) {
+                dischargingCycle_ = true;
+                cycleDay_ = currentDay;
                 cyclePhase_ = CyclePhase::SelfUse;
                 d.transition = "DEADLINE_REACHED_SELF_USE";
+            } else if (lowSunMode && !inAnticipationWindow) {
+                cyclePhase_ = CyclePhase::CaptureChargeFirst;
+                d.transition = "CYCLE_CHARGE_FIRST";
             }
             break;
 
         case CyclePhase::SelfUse:
             if (soc <= effectiveFloor) {
                 dischargingCycle_ = false;
-                if (lowSunMode || isWinter || fogActive || !ha.forecastValid || remainingHours <= 0.0) {
+                cycleDay_ = -1;
+                if (lowSunMode || !ha.forecastValid || remainingHours <= 0.0) {
                     cyclePhase_ = CyclePhase::CaptureChargeFirst;
                     d.transition = "CYCLE_CHARGE_FIRST";
                 } else {
@@ -414,13 +481,19 @@ private:
                     d.transition = "CYCLE_GENTLE_TARGET";
                 }
             } else if (!dischargingCycle_) {
-                if (lowSunMode) {
+                if (lowSunMode && !inAnticipationWindow) {
                     cyclePhase_ = CyclePhase::CaptureChargeFirst;
                     d.transition = "CYCLE_CHARGE_FIRST";
-                } else if (soc < double(p.target) && remainingHours > 0.0) {
+                } else if (soc < double(p.target) && (remainingHours > 0.0 || inAnticipationWindow)) {
                     cyclePhase_ = CyclePhase::GentleCharge;
                     d.transition = "CYCLE_GENTLE_TARGET";
                 }
+            } else if (!lowSunMode && ha.forecastValid && remainingHours > 0.0 &&
+                       soc < double(p.target - p.hysteresis) && local && cycleDay_ >= 0 && currentDay > cycleDay_) {
+                dischargingCycle_ = false;
+                cycleDay_ = -1;
+                cyclePhase_ = CyclePhase::GentleCharge;
+                d.transition = "CYCLE_GENTLE_TARGET";
             }
             break;
         }
@@ -447,7 +520,8 @@ private:
             const int rawGentleW = int(std::ceil(requiredInputKwh * 1000.0 / effHours));
             const int minGentleW = std::min(cap, std::max(200, int(std::lround(refVolt * 4.0))));
             const int gentleW = std::clamp(rawGentleW, minGentleW, cap);
-            const bool inRecovery = (local && localMin < p.deadlineMinute && (p.deadlineMinute - localMin) <= 60) ||
+            const bool inRecovery = inAnticipationWindow ||
+                                    (local && localMin < p.deadlineMinute && (p.deadlineMinute - localMin) <= 60) ||
                                     rawGentleW >= int(cap * 0.9);
             const int targetCapW = inRecovery ? cap : gentleW;
             const bool permitGrid = p.gridCharge;
@@ -525,8 +599,9 @@ private:
     const char* state_="SAFE", *exit_="UNCHANGED";
     bool done_=false, nearTarget_=false, reserve_=true;
     // Predictive state
-    bool predInit_=false, dischargingCycle_=false, fogSticky_=false;
+    bool predInit_=false, dischargingCycle_=false, fogSticky_=false, hasLastPolicy_=false;
+    int lastPredictive_=0, lastStrategy_=0, cycleDay_=-1, fogDay_=-1;
     CyclePhase cyclePhase_=CyclePhase::SelfUse;
-    uint32_t fullHoldAccumMs_=0, fullHoldLastTick_=0;
+    uint32_t fullHoldAccumMs_=0, fullHoldLastTick_=0, fogLastWeatherMs_=0;
 };
 }

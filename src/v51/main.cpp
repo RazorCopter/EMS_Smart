@@ -4,6 +4,8 @@
 #include <driver/gpio.h>
 #include <esp_task_wdt.h>
 
+SET_LOOP_TASK_STACK_SIZE(12288);
+
 #include "boards/waveshare_esp32_s3_relay_1ch.h"
 #include "clock_service.h"
 #include "remote.h"

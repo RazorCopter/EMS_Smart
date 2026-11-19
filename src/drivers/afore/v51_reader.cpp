@@ -79,8 +79,16 @@ void update(EnergyState& state, Block block, const uint16_t* words, uint32_t sta
 
     const auto inverter = state.inverter.usable(stamp);
     const auto grid = state.grid.usable(stamp);
-    if (inverter && grid && state.inverter.stamp == state.grid.stamp && *inverter + *grid >= 0) {
-        state.load = {*inverter + *grid, state.grid.stamp, Quality::Valid};
+    if (inverter && grid && state.inverter.stamp == state.grid.stamp) {
+        const double derived = *inverter + *grid;
+        if (derived >= 0.0) {
+            state.load = {derived, state.grid.stamp, Quality::Valid};
+        } else if (derived >= -30.0) {
+            // Absorb minor CT measurement skew near 0 W load
+            state.load = {0.0, state.grid.stamp, Quality::Valid};
+        } else {
+            state.load = {};
+        }
     } else {
         state.load = {};
     }

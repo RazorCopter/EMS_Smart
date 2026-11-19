@@ -67,6 +67,9 @@ automation:
         seconds: "/30"
       - trigger: homeassistant
         event: start
+      - trigger: mqtt
+        topic: afore/afore-ems/v1/availability
+        payload: "online"
     actions:
       - action: script.afore_esp_publish_input
         data:
@@ -85,6 +88,9 @@ automation:
         minutes: "/5"
       - trigger: homeassistant
         event: start
+      - trigger: mqtt
+        topic: afore/afore-ems/v1/availability
+        payload: "online"
       - trigger: state
         entity_id:
           - sensor.solcast_pv_forecast_previsione_per_oggi

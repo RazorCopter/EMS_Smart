@@ -43,6 +43,9 @@ std::optional<Policy> overridePolicy;
 uint32_t leaseStart=0, leaseDuration=0;
 Preferences* storage=nullptr;
 bool (*checkAuth)(httpd_req_t*)=nullptr;
+PredictiveCycleState savedCycleState{};
+bool hasSavedCycleState=false;
+bool cycleStateRestored=false;
 
 template<typename T> void number(std::ostream& out,std::optional<T> value) {
     if (value) out<<*value;
@@ -156,16 +159,16 @@ bool applyPolicy(const std::string& form,uint32_t leaseMs,int cancel) {
     if (cancel) {
         if (cancel==3) {
             Policy previous;
-            if (!storage || storage->getBytesLength("ems-v3-prev")!=sizeof(previous) ||
-                storage->getBytes("ems-v3-prev",&previous,sizeof(previous))!=sizeof(previous) ||
-                !previous.valid() || storage->putBytes("ems-policy-v3",&previous,sizeof(previous))!=sizeof(previous))
+            if (!storage || storage->getBytesLength("ems-v4-prev")!=sizeof(previous) ||
+                storage->getBytes("ems-v4-prev",&previous,sizeof(previous))!=sizeof(previous) ||
+                !previous.valid() || storage->putBytes("ems-policy-v4",&previous,sizeof(previous))!=sizeof(previous))
                 return false;
             current=previous;
         }
         if (cancel==2 && (current.strategy==1 || current.strategy>=4)) {
             Policy next=current;
             next.strategy=current.strategy==1 ? 0 : current.fallback;
-            if (!storage || storage->putBytes("ems-policy-v3",&next,sizeof(next))!=sizeof(next))
+            if (!storage || storage->putBytes("ems-policy-v4",&next,sizeof(next))!=sizeof(next))
                 return false;
             current=next;
         }
@@ -209,8 +212,8 @@ bool applyPolicy(const std::string& form,uint32_t leaseMs,int cancel) {
         leaseStart=millis();
         leaseDuration=leaseMs;
     } else {
-        if (!storage || storage->putBytes("ems-v3-prev",&current,sizeof(current))!=sizeof(current) ||
-            storage->putBytes("ems-policy-v3",&next,sizeof(next))!=sizeof(next))
+        if (!storage || storage->putBytes("ems-v4-prev",&current,sizeof(current))!=sizeof(current) ||
+            storage->putBytes("ems-policy-v4",&next,sizeof(next))!=sizeof(next))
             return false;
         current=next;
         overridePolicy.reset();
@@ -220,19 +223,46 @@ bool applyPolicy(const std::string& form,uint32_t leaseMs,int cancel) {
 }
 void loadPolicy(Preferences& preferences) {
     storage=&preferences;
+    PredictiveCycleState cycleSaved{};
+    if (preferences.getBytesLength("ems-pred-st") == sizeof(cycleSaved) &&
+        preferences.getBytes("ems-pred-st", &cycleSaved, sizeof(cycleSaved)) == sizeof(cycleSaved) &&
+        cycleSaved.magic == 0xA5 && cycleSaved.phase <= 3) {
+        savedCycleState = cycleSaved;
+        hasSavedCycleState = true;
+    }
+
+    auto unlockPowerCaps = [](Policy& p) {
+        const int chgCapW = p.chargeA > 0 ? int(p.chargeA * (p.nominalMv / 1000.0)) : 2600;
+        const int disCapW = p.dischargeA > 0 ? int(p.dischargeA * (p.nominalMv / 1000.0)) : 2600;
+        if (p.charge <= 1000 && chgCapW > 1000) p.charge = chgCapW;
+        if (p.chargeFirstW <= 1000 && chgCapW > 1000) p.chargeFirstW = chgCapW;
+        if (p.targetW <= 1000 && chgCapW > 1000) p.targetW = chgCapW;
+        if (p.discharge <= 1000 && disCapW > 1000) p.discharge = disCapW;
+        if (p.chargeFirstSec < 43200) p.chargeFirstSec = 43200;
+    };
+
     constexpr size_t v2Size = offsetof(Policy, predictive);
     Policy saved;
+    if (preferences.getBytesLength("ems-policy-v4") == sizeof(saved) &&
+        preferences.getBytes("ems-policy-v4", &saved, sizeof(saved)) == sizeof(saved) && saved.valid()) {
+        current = saved;
+        return;
+    }
+    if (preferences.getBytesLength("ems-v4-prev") == sizeof(saved) &&
+        preferences.getBytes("ems-v4-prev", &saved, sizeof(saved)) == sizeof(saved) && saved.valid()) {
+        current = saved;
+        return;
+    }
     if (preferences.getBytesLength("ems-policy-v3") == sizeof(saved) &&
         preferences.getBytes("ems-policy-v3", &saved, sizeof(saved)) == sizeof(saved) && saved.valid()) {
-        current = saved;
-        return;
+        unlockPowerCaps(saved);
+        if (saved.valid()) {
+            current = saved;
+            preferences.putBytes("ems-policy-v4", &current, sizeof(current));
+            return;
+        }
     }
-    if (preferences.getBytesLength("ems-v3-prev") == sizeof(saved) &&
-        preferences.getBytes("ems-v3-prev", &saved, sizeof(saved)) == sizeof(saved) && saved.valid()) {
-        current = saved;
-        return;
-    }
-    // Migrate v2 policy into predictive-capable v3 preserving all user parameters
+    // Migrate v2 policy into predictive-capable v4 preserving all user parameters
     Policy migrated;
     if (preferences.getBytesLength("ems-policy-v2") == v2Size &&
         preferences.getBytes("ems-policy-v2", &migrated, v2Size) == v2Size && migrated.valid()) {
@@ -246,25 +276,16 @@ void loadPolicy(Preferences& preferences) {
         migrated.lowSunKwh = 8;
         migrated.anticipationMin = 20;
         migrated.safetyMarginPct = 115;
-        // Unlock watt ceiling up to chargeA * nominalV when legacy default was stuck at 1000W
-        const int ampCapW = migrated.chargeA > 0 ? int(migrated.chargeA * (migrated.nominalMv / 1000.0)) : 2600;
-        if (migrated.charge <= 1000 && ampCapW > 1000) migrated.charge = ampCapW;
-        if (migrated.chargeFirstW <= 1000 && ampCapW > 1000) migrated.chargeFirstW = ampCapW;
-        if (migrated.targetW <= 1000 && ampCapW > 1000) migrated.targetW = ampCapW;
-        if (migrated.chargeFirstSec < 43200) migrated.chargeFirstSec = 43200;
+        unlockPowerCaps(migrated);
         if (migrated.valid()) {
             current = migrated;
-            preferences.putBytes("ems-policy-v3", &current, sizeof(current));
+            preferences.putBytes("ems-policy-v4", &current, sizeof(current));
             return;
         }
     }
     // Fresh board fallback
     current.predictive = 1;
-    const int ampCapW = current.chargeA > 0 ? int(current.chargeA * (current.nominalMv / 1000.0)) : 2600;
-    current.charge = std::max(current.charge, ampCapW);
-    current.chargeFirstW = std::max(current.chargeFirstW, ampCapW);
-    current.targetW = std::max(current.targetW, ampCapW);
-    current.chargeFirstSec = 43200;
+    unlockPowerCaps(current);
 }
 void tickEms(const EnergyState& state,uint32_t now,uint32_t seq) {
     static StrategyManager manager;
@@ -279,19 +300,33 @@ void tickEms(const EnergyState& state,uint32_t now,uint32_t seq) {
         p=overridePolicy.value_or(current);
         version=revision;
     }
+    if (hasSavedCycleState && !cycleStateRestored && p.predictive == 1 && (p.strategy == 0 || p.strategy == 1)) {
+        manager.restorePredictiveState(savedCycleState);
+        cycleStateRestored = true;
+    }
     const auto wall=clockStamp().utc;
     tm local{};
     const auto* calendar=wall ? localtime_r(&wall,&local) : nullptr;
     std::optional<int> dailyRem = calendar && p.daily ? dailySeconds(wall, local, p.deadlineMinute) : std::nullopt;
     PredictiveInputs pred{};
     if (p.predictive && wall) {
-        const int effMin = std::max(0, p.deadlineMinute - p.anticipationMin);
-        const int remS = dailySeconds(wall, local, effMin).value_or(0);
+        const int remS = dailySeconds(wall, local, p.deadlineMinute).value_or(0);
         pred = readPredictiveInputs(wall, wall + remS);
     }
     const auto result=manager.tick(state,p,version,now,calendar,
         calendar && p.strategy==4 && p.daily ? dailyRem : std::nullopt,
         p.predictive ? &pred : nullptr);
+    if (p.predictive == 1 && (p.strategy == 0 || p.strategy == 1)) {
+        const auto curSt = manager.exportPredictiveState();
+        if (!hasSavedCycleState || curSt.phase != savedCycleState.phase ||
+            curSt.discharging != savedCycleState.discharging || curSt.cycleDay != savedCycleState.cycleDay) {
+            const std::lock_guard guard(lock);
+            if (storage && storage->putBytes("ems-pred-st", &curSt, sizeof(curSt)) == sizeof(curSt)) {
+                savedCycleState = curSt;
+                hasSavedCycleState = true;
+            }
+        }
+    }
     setHaUsage({result.usedForecast, result.usedRatio, result.usedWeather, result.usedLoadProfile});
     auto line=audit(state,p,result,now,seq,"MEASURED");
     line.pop_back();

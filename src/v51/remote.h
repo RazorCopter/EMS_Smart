@@ -12,6 +12,7 @@ struct SystemResources {
     uint32_t cpuMhz = 0;
     uint32_t taskCount = 0;
     uint32_t minTaskStackFreeB = 0;
+    char minTaskStackName[16]{};
     uint32_t heapTotal = 0;
     uint32_t heapFree = 0;
     uint32_t heapMin = 0;

@@ -54,6 +54,10 @@ community register maps, primarily
 [8none1/growatt_sph_nodered](https://github.com/8none1/growatt_sph_nodered), pending
 verification against real hardware. Sources per register are annotated in the profile.
 
+The Afore External EMS frame codec and offline actuator use the manufacturer's
+*External EMS Control* protocol specification (En_240312), section 2.2, as their
+register and framing reference. The implementation uses the shared Modbus codec.
+
 ## Libraries compiled into the firmware
 
 | Library | License (as published upstream) |

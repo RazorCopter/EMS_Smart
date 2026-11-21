@@ -4,10 +4,14 @@
 #include "remote.h"
 #include "m4.h"
 #include "m5.h"
+#include "live_trial.h"
+#include "transport/v51_read_only.h"
 #include <array>
 #include <Arduino.h>
 #include <cstring>
+#include <memory>
 #include <mutex>
+#include <new>
 #include <sstream>
 #include <charconv>
 
@@ -17,6 +21,15 @@ struct Field { const char* name; int Policy::* member; };
 constexpr Field fields[]={
     {"charge_a",&Policy::chargeA},{"discharge_a",&Policy::dischargeA},
     {"voltage_min",&Policy::minVolt},{"voltage_max",&Policy::maxVolt},{"soc_resume",&Policy::resumeSoc},
+    {"damping_w",&Policy::dampingW},{"damping_pct",&Policy::dampingPct},
+    {"trainer_settle_ms", &Policy::trainerSettleMs},
+    {"trainer_abs_w", &Policy::trainerAbsW},
+    {"trainer_pct", &Policy::trainerPct},
+    {"trainer_timeout_ms", &Policy::trainerTimeoutMs},
+    {"trainer_gap_ms", &Policy::trainerGapMs},
+    {"trainer_s", &Policy::trainerSec},
+    {"trainer_charge_w", &Policy::trainerChargeW},
+    {"trainer_discharge_w", &Policy::trainerDischargeW},
     {"grid_target_w",&Policy::gridTarget},{"export_limit_w",&Policy::exportLimit},
     {"strategy",&Policy::strategy},{"fallback",&Policy::fallback},{"soc_min",&Policy::floor},
     {"soc_max",&Policy::ceiling},{"soc_target",&Policy::target},{"charge_w",&Policy::charge},
@@ -80,7 +93,8 @@ std::string audit(const EnergyState& e,const Policy& p,const Decision& d,
     out<<",\"season\":\""<<d.seasonName<<"\",\"predictive_phase\":\""<<d.phase<<"\"";
     out<<",\"fog_active\":"<<(d.fogActive ? "true":"false")<<",\"low_sun_mode\":"<<(d.lowSunMode ? "true":"false");
     out<<",\"reason\":\""<<d.reason<<"\",\"disposition\":\""<<d.disposition
-       <<"\",\"executed\":false,\"applied\":null,\"aux1\":\""<<(auxOn()?"ON":"OFF")<<"\",\"modbus_write_count\":0}";
+       <<"\",\"executed\":false,\"applied\":null,\"aux1\":\""<<(auxOn()?"ON":"OFF")
+       <<"\",\"modbus_write_count\":"<<(strcmp(provenance,"MEASURED")==0?modbusWriteCount():0)<<"}";
     return out.str();
 }
 
@@ -141,7 +155,292 @@ esp_err_t replay(httpd_req_t* r) {
     }
     return httpd_resp_send_chunk(r,nullptr,0);
 }
+const char* cyclePhaseLabel(uint8_t phase) {
+    switch (phase) {
+    case 0: return "SELF_USE";
+    case 1: return "GENTLE_TARGET_CHARGE";
+    case 2: return "CAPTURE_CHARGE_FIRST";
+    case 3: return "FULL_HOLD_5M";
+    default: return "UNKNOWN";
+    }
 }
+esp_err_t replayM9b(httpd_req_t* r) {
+    if (!checkAuth(r)) return ESP_OK;
+    struct ReplayCtx {
+        StrategyManager mgr;
+        StrategyManager mgr2;
+        Policy p;
+        Policy p2;
+        EnergyState e;
+        PredictiveInputs pred;
+        tm cal{};
+    };
+    std::unique_ptr<ReplayCtx> ctx(new (std::nothrow) ReplayCtx());
+    if (!ctx) return httpd_resp_send_err(r, HTTPD_500_INTERNAL_SERVER_ERROR, "OOM");
+    httpd_resp_set_type(r, "application/x-ndjson");
+    httpd_resp_set_hdr(r, "Cache-Control", "no-store");
+
+    auto basePredPolicy = []() {
+        Policy p;
+        p.predictive = 1;
+        p.autoSeason = 1;
+        p.summerFloor = 10;
+        p.winterFloor = 20;
+        p.fullHoldSec = 300;
+        p.weekdayLoadW = 600;
+        p.weekendLoadW = 900;
+        p.lowSunKwh = 8;
+        p.anticipationMin = 20;
+        p.safetyMarginPct = 115;
+        p.charge = 2560;
+        p.discharge = 2560;
+        p.chargeFirstW = 2560;
+        p.targetW = 2560;
+        p.chargeA = 50;
+        p.dischargeA = 50;
+        p.nominalMv = 51200;
+        p.ramp = 20000;
+        return p;
+    };
+    auto makeState = [](double soc, double gridW, uint32_t stampMs, double pvW = 0.0, double loadW = 0.0) {
+        EnergyState e;
+        e.goodReads = 1;
+        e.soc = {soc, stampMs, Quality::Valid};
+        e.grid = {gridW, stampMs, Quality::Valid};
+        e.battery = {0.0, stampMs, Quality::Valid};
+        e.batteryVoltage = {52.0, stampMs, Quality::Valid};
+        e.pv = {pvW > 0.0 ? pvW : (gridW < 0 ? -gridW + 300.0 : 0.0), stampMs, Quality::Valid};
+        e.load = {loadW > 0.0 ? loadW : (gridW >= 0 ? gridW : 300.0), stampMs, Quality::Valid};
+        return e;
+    };
+    auto makeDay = [](int monZeroBased, int mday, int yday, int wday, int hour, int min) {
+        tm t{};
+        t.tm_year = 2026 - 1900;
+        t.tm_mon = monZeroBased;
+        t.tm_mday = mday;
+        t.tm_yday = yday;
+        t.tm_wday = wday;
+        t.tm_hour = hour;
+        t.tm_min = min;
+        t.tm_isdst = -1;
+        return t;
+    };
+    uint32_t seqId = 1;
+    auto emit = [&](const char* scenario, const char* step, const char* initialPhase,
+                    StrategyManager& m, const EnergyState& e, const Policy& p, uint32_t rev,
+                    uint32_t nowMs, const tm* cal, const PredictiveInputs* pi) -> bool {
+        const Decision d = m.tick(e, p, rev, nowMs, cal, std::nullopt, pi);
+        const auto baseJson = audit(e, p, d, nowMs, seqId++, "REPLAY_M9B");
+        std::ostringstream out;
+        out << "{\"scenario\":\"" << scenario << "\",\"step\":\"" << step
+            << "\",\"initial_phase\":\"" << initialPhase << "\",\"input\":{\"soc\":"
+            << e.soc.value.value_or(0.0) << ",\"grid_w\":" << e.grid.value.value_or(0.0)
+            << ",\"predictive\":" << p.predictive << ",\"strategy\":\""
+            << strategyName(static_cast<Strategy>(p.strategy)) << "\",\"grid_charge\":"
+            << p.gridCharge << ",\"surplus_only\":" << p.surplusOnly;
+        if (cal) {
+            out << ",\"time\":\"" << (cal->tm_mon + 1) << "/" << cal->tm_mday << " ";
+            if (cal->tm_hour < 10) out << "0";
+            out << cal->tm_hour << ":";
+            if (cal->tm_min < 10) out << "0";
+            out << cal->tm_min << "\"";
+        }
+        if (pi) {
+            out << ",\"today_kwh\":" << pi->todayTotalKwh << ",\"tomorrow_kwh\":" << pi->tomorrowTotalKwh
+                << ",\"rem_kwh\":" << pi->remainingForecastKwh << ",\"fog\":"
+                << (pi->fog ? "true" : "false") << ",\"weather_valid\":"
+                << (pi->weatherValid ? "true" : "false");
+        }
+        out << "}," << baseJson.substr(1) << "\n";
+        const auto line = out.str();
+        return httpd_resp_sendstr_chunk(r, line.c_str()) == ESP_OK;
+    };
+
+    // 1. Summer 15:15, SOC 95%
+    ctx->mgr = StrategyManager{};
+    ctx->p = basePredPolicy();
+    ctx->cal = makeDay(6, 15, 195, 3, 14, 0);
+    ctx->pred = PredictiveInputs{};
+    ctx->pred.forecastValid = true;
+    ctx->pred.todayTotalKwh = 18.0;
+    ctx->pred.tomorrowTotalKwh = 16.0;
+    ctx->pred.remainingForecastKwh = 3.0;
+    ctx->pred.loadProfileValid = true;
+    ctx->pred.loadTodayKw = 0.6;
+    ctx->e = makeState(85, -1200, 10000);
+    if (!emit("summer_1515_soc95", "init_1400_soc85", "INIT", ctx->mgr, ctx->e, ctx->p, 1, 10000, &ctx->cal, &ctx->pred)) return ESP_FAIL;
+    ctx->cal.tm_hour = 15; ctx->cal.tm_min = 15;
+    ctx->pred.remainingForecastKwh = 0.2;
+    ctx->e = makeState(95, -400, 14000);
+    if (!emit("summer_1515_soc95", "at_1515_soc95", cyclePhaseLabel(ctx->mgr.exportPredictiveState().phase), ctx->mgr, ctx->e, ctx->p, 1, 14000, &ctx->cal, &ctx->pred)) return ESP_FAIL;
+
+    // 2. Winter SOC 35%, today and tomorrow favorable
+    ctx->mgr = StrategyManager{};
+    ctx->p = basePredPolicy();
+    ctx->cal = makeDay(10, 19, 322, 4, 10, 0);
+    ctx->pred = PredictiveInputs{};
+    ctx->pred.forecastValid = true;
+    ctx->pred.todayTotalKwh = 16.0;
+    ctx->pred.tomorrowTotalKwh = 15.0;
+    ctx->pred.remainingForecastKwh = 14.0;
+    ctx->e = makeState(35, -2000, 10000);
+    if (!emit("winter_soc35_favorable", "evaluate", "INIT", ctx->mgr, ctx->e, ctx->p, 1, 10000, &ctx->cal, &ctx->pred)) return ESP_FAIL;
+
+    // 3. Fog active then weather stale > 1h
+    ctx->mgr = StrategyManager{};
+    ctx->p = basePredPolicy();
+    ctx->cal = makeDay(10, 19, 322, 4, 10, 0);
+    ctx->pred = PredictiveInputs{};
+    ctx->pred.forecastValid = true;
+    ctx->pred.todayTotalKwh = 15.0;
+    ctx->pred.tomorrowTotalKwh = 15.0;
+    ctx->pred.remainingForecastKwh = 14.0;
+    ctx->pred.weatherValid = true;
+    ctx->pred.fog = true;
+    ctx->e = makeState(35, -1800, 10000);
+    if (!emit("fog_active_then_stale_1h", "fog_active", "INIT", ctx->mgr, ctx->e, ctx->p, 1, 10000, &ctx->cal, &ctx->pred)) return ESP_FAIL;
+    ctx->pred.weatherValid = false;
+    ctx->e = makeState(35, -1800, 10000 + 3600000u);
+    if (!emit("fog_active_then_stale_1h", "weather_stale_1h", cyclePhaseLabel(ctx->mgr.exportPredictiveState().phase), ctx->mgr, ctx->e, ctx->p, 1, 10000 + 3600000u, &ctx->cal, &ctx->pred)) return ESP_FAIL;
+
+    // 4. Day rollover (deadline -> SelfUse -> next morning GentleCharge)
+    ctx->mgr = StrategyManager{};
+    ctx->p = basePredPolicy();
+    ctx->cal = makeDay(6, 15, 195, 3, 15, 15);
+    ctx->pred = PredictiveInputs{};
+    ctx->pred.forecastValid = true;
+    ctx->pred.todayTotalKwh = 18.0;
+    ctx->pred.tomorrowTotalKwh = 16.0;
+    ctx->pred.remainingForecastKwh = 0.2;
+    ctx->e = makeState(95, -400, 10000);
+    ctx->mgr.tick(ctx->e, ctx->p, 1, 10000, &ctx->cal, std::nullopt, &ctx->pred);
+    ctx->cal.tm_hour = 15; ctx->cal.tm_min = 30;
+    ctx->pred.remainingForecastKwh = 0.0;
+    ctx->e = makeState(95, 500, 14000);
+    if (!emit("day_rollover", "day1_deadline_1530", cyclePhaseLabel(ctx->mgr.exportPredictiveState().phase), ctx->mgr, ctx->e, ctx->p, 1, 14000, &ctx->cal, &ctx->pred)) return ESP_FAIL;
+    ctx->cal.tm_mday += 1; ctx->cal.tm_yday += 1; ctx->cal.tm_wday = 4;
+    ctx->cal.tm_hour = 9; ctx->cal.tm_min = 0;
+    ctx->pred.remainingForecastKwh = 15.0;
+    ctx->e = makeState(55, -1800, 18000);
+    if (!emit("day_rollover", "day2_0900_soc55", cyclePhaseLabel(ctx->mgr.exportPredictiveState().phase), ctx->mgr, ctx->e, ctx->p, 1, 18000, &ctx->cal, &ctx->pred)) return ESP_FAIL;
+
+    // 5. Reboot during SelfUse of cycle
+    ctx->mgr = StrategyManager{};
+    ctx->p = basePredPolicy();
+    ctx->cal = makeDay(10, 19, 322, 4, 10, 0);
+    ctx->pred = PredictiveInputs{};
+    ctx->pred.forecastValid = true;
+    ctx->pred.todayTotalKwh = 4.77;
+    ctx->pred.tomorrowTotalKwh = 5.0;
+    ctx->pred.remainingForecastKwh = 2.5;
+    ctx->pred.weatherValid = true;
+    ctx->pred.fog = true;
+    uint32_t tb = 50000;
+    ctx->mgr.tick(makeState(100, -200, tb), ctx->p, 1, tb, &ctx->cal, std::nullopt, &ctx->pred);
+    for (int i = 0; i < 76; ++i) {
+        tb += 4000;
+        ctx->mgr.tick(makeState(100, 500, tb), ctx->p, 1, tb, &ctx->cal, std::nullopt, &ctx->pred);
+    }
+    const auto savedSelfUse = ctx->mgr.exportPredictiveState();
+    ctx->mgr2 = StrategyManager{};
+    ctx->mgr2.restorePredictiveState(savedSelfUse);
+    ctx->e = makeState(50, 500, 1000, 0.0, 500.0);
+    if (!emit("reboot_during_cycle_self_use", "post_reboot_soc50", cyclePhaseLabel(savedSelfUse.phase), ctx->mgr2, ctx->e, ctx->p, 1, 1000, &ctx->cal, &ctx->pred)) return ESP_FAIL;
+
+    // 6. Reboot during FullHold
+    ctx->mgr = StrategyManager{};
+    ctx->mgr.tick(makeState(100, -200, 10000), ctx->p, 1, 10000, &ctx->cal, std::nullopt, &ctx->pred);
+    ctx->mgr.tick(makeState(100, -200, 14000), ctx->p, 1, 14000, &ctx->cal, std::nullopt, &ctx->pred);
+    const auto savedHold = ctx->mgr.exportPredictiveState();
+    ctx->mgr2 = StrategyManager{};
+    ctx->mgr2.restorePredictiveState(savedHold);
+    ctx->e = makeState(100, -200, 1000);
+    if (!emit("reboot_during_full_hold", "post_reboot_soc100", cyclePhaseLabel(savedHold.phase), ctx->mgr2, ctx->e, ctx->p, 1, 1000, &ctx->cal, &ctx->pred)) return ESP_FAIL;
+
+    // 7. Stale telemetry during FullHold (resets hold timer, does not finish early)
+    ctx->mgr = StrategyManager{};
+    uint32_t th = 10000;
+    if (!emit("stale_telemetry_during_full_hold", "hold_start", "INIT", ctx->mgr, makeState(100, -200, th), ctx->p, 1, th, &ctx->cal, &ctx->pred)) return ESP_FAIL;
+    th += 4000; ctx->mgr.tick(makeState(100, -200, th), ctx->p, 1, th, &ctx->cal, std::nullopt, &ctx->pred);
+    th += 4000; ctx->mgr.tick(makeState(100, -200, th), ctx->p, 1, th, &ctx->cal, std::nullopt, &ctx->pred);
+    th += 20000;
+    if (!emit("stale_telemetry_during_full_hold", "stale_gap", cyclePhaseLabel(ctx->mgr.exportPredictiveState().phase), ctx->mgr, makeState(100, -200, 10000), ctx->p, 1, th, &ctx->cal, &ctx->pred)) return ESP_FAIL;
+    for (int i = 0; i < 74; ++i) {
+        th += 4000;
+        ctx->mgr.tick(makeState(100, -200, th), ctx->p, 1, th, &ctx->cal, std::nullopt, &ctx->pred);
+    }
+    if (!emit("stale_telemetry_during_full_hold", "resumed_297s_still_holding", cyclePhaseLabel(ctx->mgr.exportPredictiveState().phase), ctx->mgr, makeState(100, -200, th), ctx->p, 1, th, &ctx->cal, &ctx->pred)) return ESP_FAIL;
+    th += 4000;
+    if (!emit("stale_telemetry_during_full_hold", "completed_full_300s", cyclePhaseLabel(ctx->mgr.exportPredictiveState().phase), ctx->mgr, makeState(100, 500, th), ctx->p, 1, th, &ctx->cal, &ctx->pred)) return ESP_FAIL;
+
+    // 8. Secondary threshold modification without losing predictive phase
+    ctx->mgr = StrategyManager{};
+    ctx->mgr.restorePredictiveState(savedSelfUse);
+    ctx->e = makeState(60, 600, 400000, 0.0, 600.0);
+    if (!emit("secondary_threshold_change_keeps_phase", "before_edit", cyclePhaseLabel(savedSelfUse.phase), ctx->mgr, ctx->e, ctx->p, 1, 400000, &ctx->cal, &ctx->pred)) return ESP_FAIL;
+    ctx->p2 = ctx->p;
+    ctx->p2.lowSunKwh = 10;
+    ctx->p2.deadband = 30;
+    ctx->p2.anticipationMin = 25;
+    ctx->e = makeState(60, 600, 404000, 0.0, 600.0);
+    if (!emit("secondary_threshold_change_keeps_phase", "after_edit_rev2", cyclePhaseLabel(ctx->mgr.exportPredictiveState().phase), ctx->mgr, ctx->e, ctx->p2, 2, 404000, &ctx->cal, &ctx->pred)) return ESP_FAIL;
+
+    // 9. resumeSoc distinct from floor+hysteresis (manual + seasonal predictive)
+    ctx->mgr = StrategyManager{};
+    ctx->p = basePredPolicy();
+    ctx->p.predictive = 0; ctx->p.strategy = 0; ctx->p.floor = 20; ctx->p.hysteresis = 2; ctx->p.resumeSoc = 25;
+    if (!emit("resume_soc_distinct_from_floor_hyst", "manual_soc20_reserve", "MANUAL", ctx->mgr, makeState(20, 400, 1000, 0, 400), ctx->p, 1, 1000, nullptr, nullptr)) return ESP_FAIL;
+    if (!emit("resume_soc_distinct_from_floor_hyst", "manual_soc25_still_locked", "MANUAL", ctx->mgr, makeState(25, 400, 2000, 0, 400), ctx->p, 1, 2000, nullptr, nullptr)) return ESP_FAIL;
+    if (!emit("resume_soc_distinct_from_floor_hyst", "manual_soc26_unlocked", "MANUAL", ctx->mgr, makeState(26, 400, 3000, 0, 400), ctx->p, 1, 3000, nullptr, nullptr)) return ESP_FAIL;
+    ctx->mgr2 = StrategyManager{};
+    ctx->p2 = ctx->p; ctx->p2.predictive = 1;
+    ctx->cal = makeDay(6, 15, 195, 3, 17, 0);
+    ctx->pred = PredictiveInputs{}; ctx->pred.forecastValid = true; ctx->pred.todayTotalKwh = 18.0; ctx->pred.tomorrowTotalKwh = 16.0;
+    ctx->mgr2.tick(makeState(30, 400, 1000, 0, 400), ctx->p2, 1, 1000, &ctx->cal, std::nullopt, &ctx->pred);
+    if (!emit("resume_soc_distinct_from_floor_hyst", "pred_summer_soc14_allows_discharge", cyclePhaseLabel(ctx->mgr2.exportPredictiveState().phase), ctx->mgr2, makeState(14, 400, 2000, 0, 400), ctx->p2, 1, 2000, &ctx->cal, &ctx->pred)) return ESP_FAIL;
+    ctx->cal = makeDay(10, 19, 322, 4, 17, 0);
+    ctx->mgr2.tick(makeState(30, 400, 3000, 0, 400), ctx->p2, 2, 3000, &ctx->cal, std::nullopt, &ctx->pred);
+    if (!emit("resume_soc_distinct_from_floor_hyst", "pred_winter_soc20_blocked", cyclePhaseLabel(ctx->mgr2.exportPredictiveState().phase), ctx->mgr2, makeState(20, 400, 4000, 0, 400), ctx->p2, 2, 4000, &ctx->cal, &ctx->pred)) return ESP_FAIL;
+
+    // 10. Effective discharge_w = 2560 W
+    ctx->p = basePredPolicy();
+    ctx->p.predictive = 0; ctx->p.strategy = 0; ctx->p.discharge = 2560; ctx->p.dischargeA = 50;
+    ctx->mgr = StrategyManager{};
+    if (!emit("effective_discharge_2560w", "exact_2560w", "MANUAL", ctx->mgr, makeState(60, 2560, 1000, 0, 2560), ctx->p, 1, 1000, nullptr, nullptr)) return ESP_FAIL;
+    ctx->mgr2 = StrategyManager{};
+    if (!emit("effective_discharge_2560w", "capped_at_2560w", "MANUAL", ctx->mgr2, makeState(60, 3000, 1000, 0, 3000), ctx->p, 1, 1000, nullptr, nullptr)) return ESP_FAIL;
+
+    // 11-15. Decision disposition cases (M9B #2)
+    ctx->p = basePredPolicy();
+    ctx->p.predictive = 0; ctx->p.chargeA = 0;
+    ctx->p.strategy = 1; ctx->p.surplusOnly = 1; ctx->p.gridCharge = 0;
+    ctx->mgr = StrategyManager{};
+    if (!emit("disp_charge_first_no_surplus", "eval", "MANUAL", ctx->mgr, makeState(50, 500, 1000, 0, 500), ctx->p, 1, 1000, nullptr, nullptr)) return ESP_FAIL;
+
+    ctx->p.surplusOnly = 0; ctx->p.gridCharge = 0;
+    ctx->mgr = StrategyManager{};
+    if (!emit("disp_grid_charge_disabled", "eval", "MANUAL", ctx->mgr, makeState(50, 500, 1000, 0, 500), ctx->p, 1, 1000, nullptr, nullptr)) return ESP_FAIL;
+
+    ctx->p.strategy = 0; ctx->p.floor = 20; ctx->p.resumeSoc = 25; ctx->p.dischargeA = 0;
+    ctx->mgr = StrategyManager{};
+    if (!emit("disp_candidate_zero_safety", "eval", "MANUAL", ctx->mgr, makeState(15, 800, 1000, 0, 800), ctx->p, 1, 1000, nullptr, nullptr)) return ESP_FAIL;
+
+    ctx->p.strategy = 1; ctx->p.surplusOnly = 1; ctx->p.gridCharge = 0;
+    ctx->mgr = StrategyManager{};
+    if (!emit("disp_candidate_partial_surplus", "eval", "MANUAL", ctx->mgr, makeState(50, -1200, 1000, 1500, 300), ctx->p, 1, 1000, nullptr, nullptr)) return ESP_FAIL;
+
+    ctx->p.strategy = 1; ctx->p.surplusOnly = 0; ctx->p.gridCharge = 1;
+    ctx->mgr = StrategyManager{};
+    if (!emit("disp_candidate_applicable", "eval", "MANUAL", ctx->mgr, makeState(50, 500, 1000, 0, 500), ctx->p, 1, 1000, nullptr, nullptr)) return ESP_FAIL;
+
+    return httpd_resp_send_chunk(r, nullptr, 0);
+}
+}
+Policy savedPolicy() {
+    const std::lock_guard guard(lock);
+    return current;
+}
+
 PolicyStatus policyStatus() {
     const std::lock_guard guard(lock);
     return {revision,static_cast<Strategy>(overridePolicy.value_or(current).strategy)};
@@ -244,6 +543,14 @@ void loadPolicy(Preferences& preferences) {
 
     constexpr size_t v2Size = offsetof(Policy, predictive);
     Policy saved;
+    constexpr size_t previousSize = offsetof(Policy, dampingW);
+    for (const char* key : {"ems-policy-v4", "ems-v4-prev"}) {
+        if (preferences.getBytesLength(key) == previousSize) {
+            Policy previous;
+            if (preferences.getBytes(key, &previous, previousSize) == previousSize && previous.valid())
+                preferences.putBytes(key, &previous, sizeof(previous));
+        }
+    }
     if (preferences.getBytesLength("ems-policy-v4") == sizeof(saved) &&
         preferences.getBytes("ems-policy-v4", &saved, sizeof(saved)) == sizeof(saved) && saved.valid()) {
         current = saved;
@@ -288,7 +595,7 @@ void loadPolicy(Preferences& preferences) {
     current.predictive = 1;
     unlockPowerCaps(current);
 }
-void tickEms(const EnergyState& state,uint32_t now,uint32_t seq) {
+Decision tickEms(const EnergyState& state,uint32_t now,uint32_t seq) {
     static StrategyManager manager;
     Policy p;
     uint32_t version;
@@ -331,8 +638,10 @@ void tickEms(const EnergyState& state,uint32_t now,uint32_t seq) {
     setHaUsage({result.usedForecast, result.usedRatio, result.usedWeather, result.usedLoadProfile});
     auto line=audit(state,p,result,now,seq,"MEASURED");
     line.pop_back();
+    line+=liveTrialActive()?",\"live_trial_active\":true":",\"live_trial_active\":false";
     line+=",\"ha_inputs\":"+haSummary(false)+"}";
     recordDecision(state,now,line);
+    return result;
 }
 void registerEms(httpd_handle_t server,bool (*authorize)(httpd_req_t*)) {
     checkAuth=authorize;
@@ -340,6 +649,7 @@ void registerEms(httpd_handle_t server,bool (*authorize)(httpd_req_t*)) {
         {"/api/v1/ems/config",HTTP_GET,getPolicy,nullptr},
         {"/api/v1/ems/config",HTTP_POST,setPolicy,nullptr},
         {"/api/v1/ems/replay",HTTP_GET,replay,nullptr},
+        {"/api/v1/ems/replay/m9b",HTTP_GET,replayM9b,nullptr},
     };
     for (const auto& route:routes)
         if (httpd_register_uri_handler(server,&route)!=ESP_OK) recordLog("EMS REST route registration failed");

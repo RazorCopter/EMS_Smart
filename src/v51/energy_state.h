@@ -30,7 +30,7 @@ struct Sample {
 };
 
 struct EnergyState {
-    Sample batteryVoltage, batteryCurrent, pv1v, pv1a, pv1w, pv2v, pv2a, pv2w;
+    Sample batteryVoltage, batteryCurrent, batteryTemp, soh, pv1v, pv1a, pv1w, pv2v, pv2a, pv2w;
     Sample soc, pv, grid, battery, inverter, load, temperature, voltage, frequency;
     uint32_t goodReads = 0;
     uint32_t errors = 0;

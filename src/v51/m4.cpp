@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: MIT
 #include "m4.h"
+#include "live_trial.h"
+#include "transport/v51_read_only.h"
 #include "clock_service.h"
 #include "ems_runtime.h"
 #include "m5.h"
@@ -39,6 +41,9 @@ constexpr Channel channels[] = {
      &EnergyState::batteryVoltage},
     {"battery_a", "Battery current", "A", "current",
      &EnergyState::batteryCurrent},
+    {"battery_temp_c", "Battery temperature", "°C", "temperature",
+     &EnergyState::batteryTemp},
+    {"soh_pct", "Battery SOH", "%", "battery", &EnergyState::soh},
     {"pv_w", "PV total", "W", "power", &EnergyState::pv},
     {"pv1_v", "PV1 voltage", "V", "voltage", &EnergyState::pv1v},
     {"pv1_a", "PV1 current", "A", "current", &EnergyState::pv1a},
@@ -65,6 +70,8 @@ struct Broker {
 std::mutex stateLock, brokerLock, eventLock;
 ClockStamp linkedClock{}, publishedClock{}, commandClock{};
 std::atomic<bool> connected{false};
+std::atomic<bool> availabilityPublished{false};
+std::atomic<int> inputSubMsgId{-1};
 std::atomic<uint32_t> linkedAt{0}, publishedAt{0}, reconnectCount{0};
 std::atomic<bool> connectedOnce{false};
 std::atomic<int> lastError{0};
@@ -119,9 +126,9 @@ void telemetry(JsonDocument &d, const EnergyState &e, uint32_t now) {
   d["telemetry_valid"] = !e.readHalted && e.grid.usable(now).has_value() &&
                          e.soc.usable(now).has_value() &&
                          e.battery.usable(now).has_value();
-  d["shadow"] = true;
+  d["shadow"] = !liveTrialActive();
   d["aux1"] = auxOn() ? "ON" : "OFF";
-  d["modbus_write_count"] = 0;
+  d["modbus_write_count"] = modbusWriteCount();
   d["mqtt"] = connected.load();
   auto stamp = clockStamp();
 
@@ -369,22 +376,32 @@ void handleEvent(void *, esp_event_base_t, int32_t code, void *data) {
     if (connectedOnce.exchange(true))
       reconnectCount.fetch_add(1);
     connected = true;
+    availabilityPublished = false;
+    inputSubMsgId = -1;
     {
       const auto stamp = clockStamp();
       const std::lock_guard guard(eventLock);
       linkedClock = stamp;
       linkedAt = stamp.uptime;
     }
-    publish("availability", "online", true);
     const auto topic = std::string(active.base) + "/ems/command";
     esp_mqtt_client_subscribe(e->client, topic.c_str(), active.qos);
-    const auto inputs = std::string(active.base) + "/input/+";
     const auto solar = std::string(active.base) + "/forecast/solar";
-    esp_mqtt_client_subscribe(e->client, inputs.c_str(), active.qos);
     esp_mqtt_client_subscribe(e->client, solar.c_str(), active.qos);
-  } else if (code == MQTT_EVENT_DISCONNECTED)
+    const auto inputs = std::string(active.base) + "/input/+";
+    inputSubMsgId =
+        esp_mqtt_client_subscribe(e->client, inputs.c_str(), active.qos);
+  } else if (code == MQTT_EVENT_SUBSCRIBED) {
+    const int expected = inputSubMsgId.load();
+    if ((e->msg_id == expected || expected < 0) &&
+        !availabilityPublished.exchange(true)) {
+      publish("availability", "online", true);
+    }
+  } else if (code == MQTT_EVENT_DISCONNECTED) {
     connected = false;
-  else if (code == MQTT_EVENT_ERROR)
+    availabilityPublished = false;
+    inputSubMsgId = -1;
+  } else if (code == MQTT_EVENT_ERROR)
     lastError = e->error_handle ? e->error_handle->error_type : -1;
   else if (code == MQTT_EVENT_DATA && e->topic &&
            e->data_len == e->total_data_len && e->current_data_offset == 0 &&
@@ -541,6 +558,8 @@ void brokerTask(void *) {
         client = nullptr;
       }
       connected = false;
+      availabilityPublished = false;
+      inputSubMsgId = -1;
       active = desired;
       revision = next;
       seenConnection = 0;
@@ -565,6 +584,7 @@ void brokerTask(void *) {
       c.session.last_will.qos = 1;
       c.outbox.limit = 32768;
       c.buffer.size = 8192;
+      c.task.stack_size = 8192;
       client = esp_mqtt_client_init(&c);
       if (client) {
         esp_mqtt_client_register_event(client, MQTT_EVENT_ANY, handleEvent,
@@ -578,6 +598,10 @@ void brokerTask(void *) {
     }
     if (connected) {
       uint32_t now = millis();
+      if (!availabilityPublished.load() && (now - linkedAt) >= 2000) {
+        if (!availabilityPublished.exchange(true))
+          publish("availability", "online", true);
+      }
       if (seenConnection != linkedAt) {
         seenConnection = linkedAt;
         discovery();
@@ -613,7 +637,7 @@ void brokerTask(void *) {
         std::ostringstream config;
         appendPolicyJson(config);
         publish("config/state", config.str(), active.retain);
-        const auto res = sampleSystemResources();
+        const auto res = sampleSystemResourceSummary();
         JsonDocument doc;
         doc["rssi"] = WiFi.RSSI();
         doc["heap"] = res.heapFree;
@@ -638,6 +662,9 @@ void brokerTask(void *) {
         doc["task_count"] = res.taskCount;
         doc["min_task_stack_free_b"] = res.minTaskStackFreeB;
         doc["min_task_stack_name"] = res.minTaskStackName;
+        doc["min_application_stack_free_b"] = res.minApplicationStackFreeB;
+        doc["min_application_stack_name"] = res.minApplicationStackName;
+        doc["mqtt_reconnect_count"] = reconnectCount.load();
         doc["nvs_used_entries"] = res.nvsUsedEntries;
         doc["nvs_free_entries"] = res.nvsFreeEntries;
         doc["nvs_total_entries"] = res.nvsTotalEntries;
@@ -654,7 +681,7 @@ void brokerTask(void *) {
           doc["reads"] = snapshot.goodReads;
           doc["errors"] = snapshot.errors;
         }
-        doc["modbus_write_count"] = 0;
+        doc["modbus_write_count"] = modbusWriteCount();
         addClock(doc.as<JsonObject>(), clockStamp());
         publish("diagnostics", encode(doc), active.retain);
       }

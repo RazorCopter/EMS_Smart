@@ -1,9 +1,11 @@
 // SPDX-License-Identifier: MIT
 #include "m5.h"
 #include "clock_service.h"
+#include "live_trial.h"
 #include "network/rtc_time.h"
 #include "remote.h"
 #include <Arduino.h>
+#include <Preferences.h>
 #include <driver/gpio.h>
 #include <esp_timer.h>
 #include <array>
@@ -168,8 +170,23 @@ bool auxOn() {
 }
 ManualResult manualCommand(const char* action,JsonVariantConst payload,const char* origin,unsigned maximumSeconds) {
     const std::lock_guard guard(auxMutex);
+#ifdef V51_LIVE_TRIAL
+    if(strcmp(action,"live_trainer")==0) {
+        if((strcmp(origin,"WEB_UI")!=0 && strcmp(origin,"REST_API")!=0) ||
+           !payload["enabled"].is<bool>() || !payload["sample_s"].is<unsigned>())
+            return {false,"INVALID"};
+        const bool accepted = configureLiveTrainer(payload["enabled"].as<bool>(),payload["sample_s"].as<unsigned>());
+        return {accepted,accepted?"ACCEPTED":"LIVE_TRAINER_CONFIG_REFUSED"};
+    }
+#endif
     if(strcmp(action,"operating_mode")==0) {
         const char* mode=payload["mode"]|"";
+#ifdef V51_LIVE_TRIAL
+        if (strcmp(origin,"WEB_UI")==0 || strcmp(origin,"REST_API")==0) {
+            const bool accepted = requestLiveTrial(mode);
+            return {accepted,accepted?"LIVE_TRIAL_QUEUED":"LIVE_TRIAL_REFUSED"};
+        }
+#endif
         const bool shadow=strcmp(mode,"SHADOW")==0;
         const char* reason=shadow?"ACCEPTED":strcmp(mode,"LIVE")==0?"LIVE_NOT_QUALIFIED":"INVALID_MODE";
         event(origin,shadow?"SHADOW":strcmp(mode,"LIVE")==0?"LIVE":"INVALID_MODE",reason);
@@ -198,6 +215,10 @@ std::string manualState() {
     const std::lock_guard guard(auxMutex);
     JsonDocument d;
     d["operating_mode"]="SHADOW";d["live_lock"]="LIVE_NOT_QUALIFIED";
+    d["invert_live_sign"]=true;
+#ifdef V51_LIVE_TRIAL
+    appendLiveTrialStatus(d.as<JsonObject>());
+#endif
     d["aux1"]=commanded?"ON":"OFF";d["physical_feedback"]=nullptr;
     d["last_aux_origin"]=lastAuxOrigin;d["last_aux_action"]=lastAuxAction;d["last_aux_reason"]=lastAuxReason;
     d["aux_auto_off_ms"]=commanded && timed ? std::max<int32_t>(0,int32_t(until-millis())) : 0;

@@ -5,9 +5,10 @@
 #include <Preferences.h>
 
 namespace heliograph::v51 {
+Policy savedPolicy();
 struct PolicyStatus {uint32_t revision;Strategy configured;};
 PolicyStatus policyStatus();
 void loadPolicy(Preferences& preferences);
-void tickEms(const EnergyState& state,uint32_t now,uint32_t sequence);
+Decision tickEms(const EnergyState& state,uint32_t now,uint32_t sequence);
 void registerEms(httpd_handle_t server,bool (*authorize)(httpd_req_t*));
 }

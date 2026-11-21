@@ -162,7 +162,7 @@ automation:
           units: "{{ dict(temperature_c='°C', dew_point_c='°C', spread_c='°C', radiation_w_m2='W/m²', visibility='weather unit') }}"
           quality: observed
           content: >-
-            {% set t = states('sensor.sense_esterno_temperature') | float(none) %}
+            {% set t = states('sensor.temp_esterna') | float(none) %}
             {% set td = states('sensor.punto_di_rugiada') | float(none) %}
             {% set fog = states('binary_sensor.sem_nebbia') %}
             {{ dict(temperature_c=t, dew_point_c=td, fog=(fog=='on') if fog in ['on','off'] else none,

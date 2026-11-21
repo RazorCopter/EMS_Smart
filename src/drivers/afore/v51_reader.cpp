@@ -30,6 +30,8 @@ Sample* matchField(EnergyState& state, const char* id) {
     if (strcmp(id, "ac.frequency") == 0) return &state.frequency;
     if (strcmp(id, "battery.voltage") == 0) return &state.batteryVoltage;
     if (strcmp(id, "battery.current") == 0) return &state.batteryCurrent;
+    if (strcmp(id, "battery.temperature") == 0) return &state.batteryTemp;
+    if (strcmp(id, "battery.soh") == 0) return &state.soh;
     if (strcmp(id, "dc.mppt_1.voltage") == 0) return &state.pv1v;
     if (strcmp(id, "dc.mppt_1.current") == 0) return &state.pv1a;
     if (strcmp(id, "dc.mppt_1.power") == 0) return &state.pv1w;
@@ -65,7 +67,8 @@ void update(EnergyState& state, Block block, const uint16_t* words, uint32_t sta
         }
         const double value = raw * field.scale;
         const bool validSoc = std::isfinite(value) && std::abs(value) <= 30000 &&
-                              (sample != &state.soc || (value >= 0 && value <= 100)) &&
+                              ((sample != &state.soc && sample != &state.soh) || (value >= 0 && value <= 100)) &&
+                              (sample != &state.batteryTemp || (value >= -40 && value <= 100)) &&
                               (sample != &state.pv || value >= 0);
         if (state.goodReads <= kBlockCount) {
             char line[220];
@@ -95,6 +98,20 @@ void update(EnergyState& state, Block block, const uint16_t* words, uint32_t sta
 }
 }
 
+#ifdef V51_LIVE_TRIAL
+uint8_t AforeReader::unit() const { return kUnit; }
+
+bool AforeReader::readHolding(uint8_t unit, uint16_t address, uint16_t* words, uint16_t count) {
+    return ownsBus() && unit == kUnit &&
+           transport_.readHoldingRegisters(unit, address, count, words) ==
+               ReadOnlyModbusTransport::Result::Ok;
+}
+
+bool AforeReader::writeFrame(const uint8_t* frame, size_t size) {
+    return ownsBus() && size && frame[0] == kUnit && transport_.writeMultipleFrame(frame, size);
+}
+#endif
+
 void AforeReader::start(uint32_t now) {
     if (!started_) {
         started_ = true;
@@ -123,6 +140,16 @@ void AforeReader::tick(uint32_t now) {
     bool ok = result == ReadOnlyModbusTransport::Result::Ok;
     const auto stamp = millis();
     update(state_, block, words.data(), stamp, ok);
+    if (block.address == 2000 && block.count >= 4) {
+        if (!ok) {
+            state_.soh.status = Quality::ReadError;
+        } else {
+            const double sohVal = double(words[3]);
+            const bool validSoh = sohVal >= 0.0 && sohVal <= 100.0;
+            state_.soh = {validSoh ? std::optional<double>(sohVal) : std::nullopt, stamp,
+                          validSoh ? Quality::Valid : Quality::Invalid};
+        }
+    }
     if (ok && ((block.address == 2002 || block.address == 2000) &&
                (state_.soc.status != Quality::Valid ||
                 (block.address == 2000 && state_.battery.status != Quality::Valid)) ||

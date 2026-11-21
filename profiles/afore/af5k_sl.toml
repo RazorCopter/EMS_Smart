@@ -147,6 +147,15 @@ unit = "A"
 # Phase 0 through full charge/discharge cycle observation.
 # ------------------------------------------------------------------------------------------
 
+[[register]]                      # VERIFIED (A): Official docs v3.4 ('运行信息04', R162)
+measurement = "battery.temperature"
+display_name = "Battery Temperature"
+space = "input"
+address = 2001                    # 0x07D1
+type = "s16"
+scale = 0.1
+unit = "°C"
+
 [[register]]                      # VERIFIED (A, B, C): Official docs + Solarman + Roadmap
 measurement = "battery.soc"
 display_name = "Battery State of Charge"

@@ -41,7 +41,27 @@ struct Policy {
     int weekdayLoadW=600, weekendLoadW=900, winterStart=1025, winterEnd=228;
     int lowSunKwh=8, anticipationMin=20, safetyMarginPct=115;
 
+    int dampingW = 50, dampingPct = 50;
+
+    int trainerSettleMs = 3000;
+    int trainerAbsW = 60;
+    int trainerPct = 15;
+    int trainerTimeoutMs = 10000;
+    int trainerGapMs = 20000;
+    int trainerSec = 1800;
+    int trainerChargeW = 200;
+    int trainerDischargeW = 200;
+
     bool valid() const {
+        if (!(trainerSettleMs >= 500 && trainerSettleMs <= 10000 &&
+              trainerAbsW >= 1 && trainerAbsW <= 500 &&
+              trainerPct >= 1 && trainerPct <= 30 &&
+              trainerTimeoutMs >= 1000 && trainerTimeoutMs <= 20000 &&
+              trainerGapMs >= 2000 && trainerGapMs <= 30000 &&
+              trainerSec >= 10 && trainerSec <= 1800 &&
+              trainerChargeW >= 0 && trainerChargeW <= 20000 &&
+              trainerDischargeW >= 0 && trainerDischargeW <= 20000 && trainerSettleMs < trainerTimeoutMs && trainerTimeoutMs <= trainerGapMs)) return false;
+        if (dampingW < 0 || dampingW > 1000 || dampingPct < 1 || dampingPct > 100) return false;
         auto validMmDd = [](int mmdd) {
             const int m = mmdd / 100, d = mmdd % 100;
             return m >= 1 && m <= 12 && d >= 1 && d <= 31;
@@ -572,6 +592,12 @@ private:
         else if (!keepCustomReason && bounded != *d.candidate) d.safetyReason = "POWER_LIMIT";
 
         if (priorW_ && effective_ == d.strategy) {
+            if (d.strategy == Strategy::SelfUse ||
+                (d.strategy == Strategy::ChargeFirst && !d.gridPermitted && selected > *priorW_ &&
+                 std::string_view(state_) != "TAPER")) {
+                const int delta = selected - *priorW_;
+                selected = *priorW_ + (std::abs(delta) <= p.dampingW ? 0 : delta * p.dampingPct / 100);
+            }
             const int step = int(p.ramp * std::min(now - last_, uint32_t(4000)) / 1000);
             selected = std::abs(selected - *priorW_) < p.deadband ? *priorW_
                 : std::clamp(selected, *priorW_ - step, *priorW_ + step);

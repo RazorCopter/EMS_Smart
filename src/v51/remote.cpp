@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: MIT
 #include "remote.h"
+#include "live_trial.h"
+#include "transport/v51_read_only.h"
 #include "clock_service.h"
 #include "ems_runtime.h"
 #include "m4.h"
@@ -26,9 +28,11 @@
 #include <array>
 #include <atomic>
 #include <cmath>
+#include <cstdarg>
 #include <cstring>
 #include <memory>
 #include <mutex>
+#include <new>
 
 #include "ota_public_key.h"
 
@@ -58,7 +62,7 @@ bool applicationTask(const char *name) {
   return strcmp(name, "loopTask") == 0 || strcmp(name, "v51_mqtt") == 0 ||
          strcmp(name, "v51_restart") == 0 ||
          strcmp(name, "v51_wifi_test") == 0 || strcmp(name, "httpd") == 0 ||
-         strcmp(name, "tiT") == 0 || strcmp(name, "mqtt_task") == 0;
+         strcmp(name, "mqtt_task") == 0;
 }
 
 const char *taskRole(const char *name) {
@@ -70,8 +74,10 @@ const char *taskRole(const char *name) {
     return "restart";
   if (strcmp(name, "v51_wifi_test") == 0)
     return "wifi-test";
-  if (strcmp(name, "httpd") == 0 || strcmp(name, "tiT") == 0)
+  if (strcmp(name, "httpd") == 0)
     return "http-web";
+  if (strcmp(name, "tiT") == 0)
+    return "tcpip";
   return "system";
 }
 
@@ -87,7 +93,7 @@ uint32_t configuredStackBytes(const char *name) {
   if (strcmp(name, "httpd") == 0)
     return 10240;
   if (strcmp(name, "mqtt_task") == 0)
-    return 6144;
+    return 8192;
   return 0;
 }
 
@@ -214,35 +220,51 @@ const char *imageState(esp_ota_img_states_t state) {
   }
 }
 
+void appendf(char *buf, size_t cap, size_t &used, const char *fmt, ...) {
+  if (used + 1 >= cap)
+    return;
+  va_list args;
+  va_start(args, fmt);
+  const int written = vsnprintf(buf + used, cap - used, fmt, args);
+  va_end(args);
+  if (written < 0)
+    return;
+  const size_t n = static_cast<size_t>(written);
+  used = (n >= cap - used) ? (cap - 1) : (used + n);
+}
+
 esp_err_t health(httpd_req_t *request) {
   if (!authorized(request))
     return ESP_OK;
+  constexpr size_t kHealthBufCap = 6144;
+  std::unique_ptr<SystemResources> res(new (std::nothrow) SystemResources());
+  std::unique_ptr<char[]> response(new (std::nothrow) char[kHealthBufCap]);
+  if (!res || !response)
+    return httpd_resp_send_err(request, HTTPD_500_INTERNAL_SERVER_ERROR, "OOM");
+  sampleSystemResources(*res);
   const bool sta = WiFi.status() == WL_CONNECTED;
   const auto *running = esp_ota_get_running_partition();
   const auto staIp = sta ? WiFi.localIP().toString() : String();
-  const auto res = sampleSystemResources();
   char rssi[12]{};
   if (sta)
     snprintf(rssi, sizeof(rssi), "%d", WiFi.RSSI());
   else
     strcpy(rssi, "null");
   char cpuPct[12]{}, cpu0Pct[12]{}, cpu1Pct[12]{};
-  if (res.cpuValid) {
-    snprintf(cpuPct, sizeof(cpuPct), "%.1f", res.cpuPct);
-    snprintf(cpu0Pct, sizeof(cpu0Pct), "%.1f", res.cpu0Pct);
-    snprintf(cpu1Pct, sizeof(cpu1Pct), "%.1f", res.cpu1Pct);
+  if (res->cpuValid) {
+    snprintf(cpuPct, sizeof(cpuPct), "%.1f", res->cpuPct);
+    snprintf(cpu0Pct, sizeof(cpu0Pct), "%.1f", res->cpu0Pct);
+    snprintf(cpu1Pct, sizeof(cpu1Pct), "%.1f", res->cpu1Pct);
   } else {
     strcpy(cpuPct, "null");
     strcpy(cpu0Pct, "null");
     strcpy(cpu1Pct, "null");
   }
 
-  std::unique_ptr<char[]> response(new char[4096]);
-  if (!response)
-    return httpd_resp_send_err(request, HTTPD_500_INTERNAL_SERVER_ERROR, "OOM");
-  size_t used = snprintf(
-      response.get(), 4096,
-      "{\"firmware\":\"%s\",\"mode\":\"SHADOW\",\"uptime_ms\":%lu,\"reset_"
+  size_t used = 0;
+  appendf(
+      response.get(), kHealthBufCap, used,
+      "{\"firmware\":\"%s\",\"mode\":\"%s\",\"uptime_ms\":%lu,\"reset_"
       "reason\":%d,"
       "\"heap\":%u,\"heap_total\":%u,\"min_heap\":%u,\"heap_max_alloc\":%u,"
       "\"heap_used_pct\":%.1f,"
@@ -259,37 +281,35 @@ esp_err_t health(httpd_req_t *request) {
       "\"rssi_dbm\":%s,\"ota_slot\":\"%s\",\"ota_state\":\"%s\","
       "\"mqtt_connected\":%s,\"mqtt_reconnect_count\":%u,"
       "\"aux1\":\"%s\",\"executed\":false,\"applied\":null,\"modbus_write_"
-      "count\":0,\"tasks\":[",
-      V51_BUILD_ID, static_cast<unsigned long>(millis()),
-      int(esp_reset_reason()), res.heapFree, res.heapTotal, res.heapMin,
-      res.heapMaxAlloc, res.heapUsedPct, res.psramTotal, res.psramFree,
-      res.psramMin, res.psramUsedPct, cpuPct, cpu0Pct, cpu1Pct, res.cpuMhz,
-      res.taskCount, res.minTaskStackFreeB, res.minTaskStackName,
-      res.minApplicationStackFreeB, res.minApplicationStackName,
-      res.nvsUsedEntries, res.nvsFreeEntries, res.nvsTotalEntries,
-      res.nvsUsedPct, res.flashSize, res.sketchSize, res.sketchFree,
+      "count\":%u,\"tasks\":[",
+      V51_BUILD_ID, liveTrialActive() ? "LIVE" : "SHADOW", static_cast<unsigned long>(millis()),
+      int(esp_reset_reason()), res->heapFree, res->heapTotal, res->heapMin,
+      res->heapMaxAlloc, res->heapUsedPct, res->psramTotal, res->psramFree,
+      res->psramMin, res->psramUsedPct, cpuPct, cpu0Pct, cpu1Pct, res->cpuMhz,
+      res->taskCount, res->minTaskStackFreeB, res->minTaskStackName,
+      res->minApplicationStackFreeB, res->minApplicationStackName,
+      res->nvsUsedEntries, res->nvsFreeEntries, res->nvsTotalEntries,
+      res->nvsUsedPct, res->flashSize, res->sketchSize, res->sketchFree,
       sta ? "true" : "false", staIp.c_str(), rssi,
       running ? running->label : "unknown", imageState(bootState.load()),
       mqttConnected() ? "true" : "false", mqttReconnectCount(),
-      auxOn() ? "ON" : "OFF");
-  for (uint32_t i = 0; i < res.reportedTaskCount && used < 4000; ++i) {
-    const auto &task = res.tasks[i];
-    used +=
-        snprintf(response.get() + used, 4096 - used,
-                 "%s{\"name\":\"%s\",\"role\":\"%s\",\"classification\":\"%s\","
-                 "\"stack_allocated_b\":",
-                 i ? "," : "", task.name, task.role,
-                 task.application ? "application" : "system");
-    used += task.stackAllocatedKnown
-                ? snprintf(response.get() + used, 4096 - used, "%u",
-                           task.stackAllocatedB)
-                : snprintf(response.get() + used, 4096 - used, "null");
-    used +=
-        snprintf(response.get() + used, 4096 - used,
-                 ",\"stack_high_water_free_b\":%u}", task.stackHighWaterFreeB);
+      auxOn() ? "ON" : "OFF", modbusWriteCount());
+  for (uint32_t i = 0; i < res->reportedTaskCount && used + 128 < kHealthBufCap;
+       ++i) {
+    const auto &task = res->tasks[i];
+    appendf(response.get(), kHealthBufCap, used,
+            "%s{\"name\":\"%s\",\"role\":\"%s\",\"classification\":\"%s\","
+            "\"stack_allocated_b\":",
+            i ? "," : "", task.name, task.role,
+            task.application ? "application" : "system");
+    if (task.stackAllocatedKnown)
+      appendf(response.get(), kHealthBufCap, used, "%u", task.stackAllocatedB);
+    else
+      appendf(response.get(), kHealthBufCap, used, "null");
+    appendf(response.get(), kHealthBufCap, used,
+            ",\"stack_high_water_free_b\":%u}", task.stackHighWaterFreeB);
   }
-  if (used < 4094)
-    snprintf(response.get() + used, 4096 - used, "]}");
+  appendf(response.get(), kHealthBufCap, used, "]}");
   httpd_resp_set_type(request, "application/json");
   httpd_resp_set_hdr(request, "Cache-Control", "no-store");
   const auto result = httpd_resp_sendstr(request, response.get());
@@ -582,7 +602,7 @@ bool startHttp() {
   config.stack_size = 10240;
   config.recv_wait_timeout = 5;
   config.send_wait_timeout = 5;
-  config.max_uri_handlers = 28;
+  config.max_uri_handlers = 32;
   config.lru_purge_enable = true;
   if (httpd_start(&server, &config) != ESP_OK)
     return false;
@@ -663,7 +683,7 @@ void verifyBoot(uint32_t now, bool healthy) {
   if (now - bootStarted > 20000)
     ESP.restart();
 #else
-  const auto resources = sampleSystemResources();
+  const auto resources = sampleSystemResourceSummary();
   if (now - bootStarted >= kBootStableTime && healthy && server && online &&
       sawHealth.load() && mqttConnected() &&
       resources.minApplicationStackFreeB >= 1024) {
@@ -745,7 +765,7 @@ void tickRemote(bool healthy) {
   const uint32_t now = millis();
   if (now - lastResourceSample >= 5000) {
     lastResourceSample = now;
-    sampleSystemResources();
+    (void)sampleSystemResourceSummary();
   }
   if (server)
     manageWifi(now);
@@ -754,63 +774,67 @@ void tickRemote(bool healthy) {
   verifyBoot(now, healthy);
 }
 
-SystemResources sampleSystemResources() {
-  static std::mutex resMutex;
+namespace {
+std::mutex resMutex;
+const SystemResources &refreshSystemResourcesLocked() {
   static bool hasBaseline = false;
   static uint32_t lastSampleMs = 0;
   static uint32_t prevTotal = 0;
   static uint32_t prevIdle0 = 0;
   static uint32_t prevIdle1 = 0;
   static SystemResources cached{};
+  static TaskStatus_t tasks[kMaxReportedTasks]{};
 
-  const std::lock_guard lock(resMutex);
   const uint32_t nowMs = millis();
   if (hasBaseline && (nowMs - lastSampleMs) < 2000 && cached.heapTotal > 0) {
     return cached;
   }
 
-  SystemResources out = cached;
-  out.cpuMhz = ESP.getCpuFreqMHz();
-  out.heapTotal = ESP.getHeapSize();
-  out.heapFree = ESP.getFreeHeap();
-  out.heapMin = ESP.getMinFreeHeap();
-  out.heapMaxAlloc = ESP.getMaxAllocHeap();
-  out.heapUsedPct =
-      out.heapTotal
-          ? std::roundf(1000.0f * float(out.heapTotal - out.heapFree) /
-                        float(out.heapTotal)) /
+  cached.cpuMhz = ESP.getCpuFreqMHz();
+  cached.heapTotal = ESP.getHeapSize();
+  cached.heapFree = ESP.getFreeHeap();
+  cached.heapMin = ESP.getMinFreeHeap();
+  cached.heapMaxAlloc = ESP.getMaxAllocHeap();
+  cached.heapUsedPct =
+      cached.heapTotal
+          ? std::roundf(1000.0f * float(cached.heapTotal - cached.heapFree) /
+                        float(cached.heapTotal)) /
                 10.0f
           : 0.0f;
-  out.psramTotal = ESP.getPsramSize();
-  out.psramFree = ESP.getFreePsram();
-  out.psramMin = ESP.getMinFreePsram();
-  out.psramUsedPct =
-      out.psramTotal
-          ? std::roundf(1000.0f * float(out.psramTotal - out.psramFree) /
-                        float(out.psramTotal)) /
+  cached.psramTotal = ESP.getPsramSize();
+  cached.psramFree = ESP.getFreePsram();
+  cached.psramMin = ESP.getMinFreePsram();
+  cached.psramUsedPct =
+      cached.psramTotal
+          ? std::roundf(1000.0f * float(cached.psramTotal - cached.psramFree) /
+                        float(cached.psramTotal)) /
                 10.0f
           : 0.0f;
-  out.flashSize = ESP.getFlashChipSize();
-  out.sketchSize = ESP.getSketchSize();
-  out.sketchFree = ESP.getFreeSketchSpace();
+  cached.flashSize = ESP.getFlashChipSize();
+  cached.sketchSize = ESP.getSketchSize();
+  cached.sketchFree = ESP.getFreeSketchSpace();
 
   nvs_stats_t nvsStats{};
   if (nvs_get_stats(nullptr, &nvsStats) == ESP_OK) {
-    out.nvsUsedEntries = static_cast<uint32_t>(nvsStats.used_entries);
-    out.nvsFreeEntries = static_cast<uint32_t>(nvsStats.free_entries);
-    out.nvsTotalEntries = static_cast<uint32_t>(nvsStats.total_entries);
-    out.nvsUsedPct = out.nvsTotalEntries
-                         ? std::roundf(1000.0f * float(out.nvsUsedEntries) /
-                                       float(out.nvsTotalEntries)) /
-                               10.0f
-                         : 0.0f;
+    cached.nvsUsedEntries = static_cast<uint32_t>(nvsStats.used_entries);
+    cached.nvsFreeEntries = static_cast<uint32_t>(nvsStats.free_entries);
+    cached.nvsTotalEntries = static_cast<uint32_t>(nvsStats.total_entries);
+    cached.nvsUsedPct = cached.nvsTotalEntries
+                            ? std::roundf(1000.0f * float(cached.nvsUsedEntries) /
+                                          float(cached.nvsTotalEntries)) /
+                                  10.0f
+                            : 0.0f;
   }
 
-  TaskStatus_t tasks[24]{};
+  cached.reportedTaskCount = 0;
+  cached.tasks = {};
+  cached.minTaskStackName[0] = '\0';
+  cached.minApplicationStackName[0] = '\0';
+
   uint32_t totalRunTime = 0;
-  const UBaseType_t count = uxTaskGetSystemState(
-      tasks, sizeof(tasks) / sizeof(tasks[0]), &totalRunTime);
-  out.taskCount = static_cast<uint32_t>(count);
+  const UBaseType_t count =
+      uxTaskGetSystemState(tasks, kMaxReportedTasks, &totalRunTime);
+  cached.taskCount = static_cast<uint32_t>(count);
   uint32_t minStack = UINT32_MAX;
   uint32_t minApplicationStack = UINT32_MAX;
   uint32_t idle0 = 0;
@@ -821,22 +845,26 @@ SystemResources sampleSystemResources() {
     const uint32_t freeStack =
         static_cast<uint32_t>(tasks[i].usStackHighWaterMark) *
         sizeof(StackType_t);
-    auto &detail = out.tasks[out.reportedTaskCount++];
-    snprintf(detail.name, sizeof(detail.name), "%s", tasks[i].pcTaskName);
-    snprintf(detail.role, sizeof(detail.role), "%s",
-             taskRole(tasks[i].pcTaskName));
-    detail.stackHighWaterFreeB = freeStack;
-    detail.stackAllocatedB = configuredStackBytes(tasks[i].pcTaskName);
-    detail.stackAllocatedKnown = detail.stackAllocatedB != 0;
-    detail.application = applicationTask(tasks[i].pcTaskName);
-    if (detail.application && freeStack < minApplicationStack) {
+    const bool isApp = applicationTask(tasks[i].pcTaskName);
+    if (cached.reportedTaskCount < cached.tasks.size()) {
+      auto &detail = cached.tasks[cached.reportedTaskCount++];
+      snprintf(detail.name, sizeof(detail.name), "%s", tasks[i].pcTaskName);
+      snprintf(detail.role, sizeof(detail.role), "%s",
+               taskRole(tasks[i].pcTaskName));
+      detail.stackHighWaterFreeB = freeStack;
+      detail.stackAllocatedB = configuredStackBytes(tasks[i].pcTaskName);
+      detail.stackAllocatedKnown = detail.stackAllocatedB != 0;
+      detail.application = isApp;
+    }
+    if (isApp && freeStack < minApplicationStack) {
       minApplicationStack = freeStack;
-      snprintf(out.minApplicationStackName, sizeof(out.minApplicationStackName),
-               "%s", tasks[i].pcTaskName);
+      snprintf(cached.minApplicationStackName,
+               sizeof(cached.minApplicationStackName), "%s",
+               tasks[i].pcTaskName);
     }
     if (freeStack < minStack) {
       minStack = freeStack;
-      snprintf(out.minTaskStackName, sizeof(out.minTaskStackName), "%s",
+      snprintf(cached.minTaskStackName, sizeof(cached.minTaskStackName), "%s",
                tasks[i].pcTaskName);
     }
     if (strcmp(tasks[i].pcTaskName, "IDLE0") == 0) {
@@ -847,8 +875,8 @@ SystemResources sampleSystemResources() {
       found1 = true;
     }
   }
-  out.minTaskStackFreeB = (minStack == UINT32_MAX) ? 0 : minStack;
-  out.minApplicationStackFreeB =
+  cached.minTaskStackFreeB = (minStack == UINT32_MAX) ? 0 : minStack;
+  cached.minApplicationStackFreeB =
       (minApplicationStack == UINT32_MAX) ? 0 : minApplicationStack;
 
   if (hasBaseline && (nowMs - lastSampleMs) >= 500) {
@@ -863,18 +891,18 @@ SystemResources sampleSystemResources() {
       int cores = 0;
       float sum = 0.0f;
       if (found0) {
-        out.cpu0Pct = coreLoad(idle0, prevIdle0);
-        sum += out.cpu0Pct;
+        cached.cpu0Pct = coreLoad(idle0, prevIdle0);
+        sum += cached.cpu0Pct;
         ++cores;
       }
       if (found1) {
-        out.cpu1Pct = coreLoad(idle1, prevIdle1);
-        sum += out.cpu1Pct;
+        cached.cpu1Pct = coreLoad(idle1, prevIdle1);
+        sum += cached.cpu1Pct;
         ++cores;
       }
       if (cores > 0) {
-        out.cpuPct = std::roundf(10.0f * (sum / float(cores))) / 10.0f;
-        out.cpuValid = true;
+        cached.cpuPct = std::roundf(10.0f * (sum / float(cores))) / 10.0f;
+        cached.cpuValid = true;
       }
     }
   }
@@ -883,8 +911,48 @@ SystemResources sampleSystemResources() {
   prevIdle1 = idle1;
   lastSampleMs = nowMs;
   hasBaseline = true;
-  cached = out;
   return cached;
+}
+} // namespace
+
+void sampleSystemResources(SystemResources &out) {
+  const std::lock_guard lock(resMutex);
+  out = refreshSystemResourcesLocked();
+}
+
+SystemResourceSummary sampleSystemResourceSummary() {
+  const std::lock_guard lock(resMutex);
+  const auto &src = refreshSystemResourcesLocked();
+  SystemResourceSummary summary{};
+  summary.cpuValid = src.cpuValid;
+  summary.cpuPct = src.cpuPct;
+  summary.cpu0Pct = src.cpu0Pct;
+  summary.cpu1Pct = src.cpu1Pct;
+  summary.cpuMhz = src.cpuMhz;
+  summary.taskCount = src.taskCount;
+  summary.minTaskStackFreeB = src.minTaskStackFreeB;
+  memcpy(summary.minTaskStackName, src.minTaskStackName,
+         sizeof(summary.minTaskStackName));
+  summary.minApplicationStackFreeB = src.minApplicationStackFreeB;
+  memcpy(summary.minApplicationStackName, src.minApplicationStackName,
+         sizeof(summary.minApplicationStackName));
+  summary.heapTotal = src.heapTotal;
+  summary.heapFree = src.heapFree;
+  summary.heapMin = src.heapMin;
+  summary.heapMaxAlloc = src.heapMaxAlloc;
+  summary.heapUsedPct = src.heapUsedPct;
+  summary.psramTotal = src.psramTotal;
+  summary.psramFree = src.psramFree;
+  summary.psramMin = src.psramMin;
+  summary.psramUsedPct = src.psramUsedPct;
+  summary.nvsUsedEntries = src.nvsUsedEntries;
+  summary.nvsFreeEntries = src.nvsFreeEntries;
+  summary.nvsTotalEntries = src.nvsTotalEntries;
+  summary.nvsUsedPct = src.nvsUsedPct;
+  summary.flashSize = src.flashSize;
+  summary.sketchSize = src.sketchSize;
+  summary.sketchFree = src.sketchFree;
+  return summary;
 }
 
 void recordLog(const char *message) {

@@ -368,7 +368,7 @@ int main() {
   assert(resMgr.tick(sample(20, 400, 1000), predRes, 1, 1000).finalWatts == 0);
   assert(resMgr.tick(sample(25, 400, 2000), predRes, 1, 2000).finalWatts == 0);
   assert(resMgr.tick(sample(26, 400, 3000), predRes, 1, 3000).finalWatts ==
-         -400);
+         -200);
   predRes.predictive = 1;
   StrategyManager sumResMgr;
   tm sumEvening = summerDay;
@@ -461,4 +461,99 @@ int main() {
   auto dReboot = bootMgr2.tick(sample(50, 500, 1000), pred, 1, 1000, &winterDay,
                                std::nullopt, &rainy);
   assert(dReboot.strategy == Strategy::SelfUse && dReboot.finalWatts == -500);
+  assert(std::string_view(dReboot.disposition) == "APPLICABLE");
+
+  // R10: exportPredictiveState / restorePredictiveState preserves FullHold across reboot
+  StrategyManager holdBoot1;
+  holdBoot1.tick(sample(100, -200, 10000), pred, 1, 10000, &winterDay,
+                 std::nullopt, &rainy);
+  holdBoot1.tick(sample(100, -200, 14000), pred, 1, 14000, &winterDay,
+                 std::nullopt, &rainy);
+  const auto savedHold = holdBoot1.exportPredictiveState();
+  assert(savedHold.phase == static_cast<uint8_t>(StrategyManager::CyclePhase::FullHold));
+  StrategyManager holdBoot2;
+  holdBoot2.restorePredictiveState(savedHold);
+  auto dHoldReboot = holdBoot2.tick(sample(100, -200, 1000), pred, 1, 1000,
+                                    &winterDay, std::nullopt, &rainy);
+  assert(dHoldReboot.strategy == Strategy::ChargeFirst);
+  assert(std::string_view(dHoldReboot.phase) == "FULL_HOLD_5M");
+  assert(dHoldReboot.lower == 0);
+  assert(std::string_view(dHoldReboot.disposition) == "SAFETY_LIMIT");
+
+  // R11: Secondary threshold edits (same predictive=1 & strategy=0) preserve active phase
+  Policy predEdited = pred;
+  predEdited.lowSunKwh = 10;
+  predEdited.deadband = 30;
+  predEdited.anticipationMin = 25;
+  auto dSecEdit = bootMgr2.tick(sample(60, 600, 4000), predEdited, 2, 4000,
+                                &winterDay, std::nullopt, &rainy);
+  assert(dSecEdit.strategy == Strategy::SelfUse && dSecEdit.finalWatts == -600);
+  assert(std::string_view(dSecEdit.disposition) == "APPLICABLE");
+
+  // R12: Effective discharge_w = 2560W (exact & capped on 3000W load)
+  Policy disPol = pred;
+  disPol.predictive = 0;
+  disPol.strategy = 0;
+  disPol.discharge = 2560;
+  disPol.dischargeA = 50;
+  disPol.ramp = 20000;
+  StrategyManager disMgr1;
+  auto eDis2560 = sample(60, 2560, 1000);
+  eDis2560.batteryVoltage = {52.0, 1000, Quality::Valid};
+  auto dDisExact = disMgr1.tick(eDis2560, disPol, 1, 1000);
+  assert(dDisExact.candidate == -2560 && dDisExact.limited == -2560 &&
+         dDisExact.finalWatts == -2560);
+  assert(std::string_view(dDisExact.disposition) == "APPLICABLE");
+
+  StrategyManager disMgr2;
+  auto eDis3000 = sample(60, 3000, 1000);
+  eDis3000.batteryVoltage = {52.0, 1000, Quality::Valid};
+  auto dDisCap = disMgr2.tick(eDis3000, disPol, 1, 1000);
+  assert(dDisCap.candidate == -3000 && dDisCap.limited == -2560 &&
+         dDisCap.finalWatts == -2560 && dDisCap.lower == -2560);
+  assert(std::string_view(dDisCap.disposition) == "PARTIAL_POWER_LIMIT");
+
+  // Damping K=0.5 + +/-50W deadband in SelfUse and asymmetric ChargeFirst surplusOnly
+  Policy dampPol;
+  dampPol.strategy = 0;
+  dampPol.predictive = 0;
+  dampPol.ramp = 2000;
+  dampPol.deadband = 20;
+  StrategyManager dampSelf;
+  assert(dampSelf.tick(sample(50, -1000, 1000), dampPol, 1, 1000).finalWatts == 1000);
+  // Load step on: surplus drops to 600 -> d.upper clamps immediately to 600 (no grid charge)
+  EnergyState eLoad = sample(50, 400, 2000);
+  eLoad.battery = {1000.0, 2000, Quality::Valid};
+  assert(dampSelf.tick(eLoad, dampPol, 1, 2000).finalWatts == 600);
+  // Within +/-50W deadband (surplus=640 >= 600): holds 600
+  EnergyState eSmall = sample(50, -40, 3000);
+  eSmall.battery = {600.0, 3000, Quality::Valid};
+  assert(dampSelf.tick(eSmall, dampPol, 1, 3000).finalWatts == 600);
+  // Surplus rises to 1000: damped K=0.5 -> 600 + (1000-600)/2 = 800
+  EnergyState eRise = sample(50, -400, 4000);
+  eRise.battery = {600.0, 4000, Quality::Valid};
+  assert(dampSelf.tick(eRise, dampPol, 1, 4000).finalWatts == 800);
+
+  // ChargeFirst (ordinary) surplusOnly: immediate drop on load spike, damped rise on load drop
+  dampPol.strategy = 1;
+  dampPol.surplusOnly = 1;
+  dampPol.chargeFirstW = 2560;
+  dampPol.charge = 2560;
+  StrategyManager dampCf;
+  assert(dampCf.tick(sample(50, -1500, 1000), dampPol, 1, 1000).finalWatts == 1500);
+  // Surplus drops to 600: immediate drop to 600
+  assert(dampCf.tick(sample(50, -600, 2000), dampPol, 1, 2000).finalWatts == 600);
+  // Surplus jumps back to 1600: damped K=0.5 rise -> 600 + (1600-600)/2 = 1100
+  assert(dampCf.tick(sample(50, -1600, 3000), dampPol, 1, 3000).finalWatts == 1100);
+
+  // Ensure every checked Decision has an explicit non-placeholder disposition
+  for (const auto *disp :
+       {dSunny.disposition, dRainy.disposition, dNight.disposition,
+        dNoGrid.disposition, dPartial.disposition, dApplicable.disposition,
+        dSafety.disposition, dUnavailable.disposition, dReboot.disposition,
+        dHoldReboot.disposition, dSecEdit.disposition, dDisExact.disposition,
+        dDisCap.disposition}) {
+    const std::string_view sv(disp);
+    assert(!sv.empty() && sv != "NONE" && sv != "NOT_EVALUATED");
+  }
 }

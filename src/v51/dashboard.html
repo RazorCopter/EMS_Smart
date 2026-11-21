@@ -1,129 +1,307 @@
-<!doctype html><html lang="it"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Afore EMS</title><style>
-:root{color-scheme:dark;--bg:#0b1213;--panel:#111d1e;--line:#293a3b;--text:#f2f7f1;--muted:#a3b8b6;--green:#73e1b2;--sun:#f7ce77;--grid:#91bafa;--load:#d5a5ed}*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:15px system-ui,sans-serif}main,header{max-width:1140px;margin:auto;padding:26px 28px}header{display:flex;justify-content:space-between;gap:20px;align-items:center}header b{font-size:21px;letter-spacing:-.04em}.brand{display:flex;gap:12px;align-items:center}.mark{position:relative;flex:none;width:36px;height:36px;border:1px solid #42705f;border-radius:9px;background:linear-gradient(145deg,#214a3d,#102623)}
+<!doctype html><html lang="it"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Afore EMS · Console</title><style>
+:root{color-scheme:dark;--bg:#091112;--bg2:#0e191a;--panel:#111e20;--panel2:#152527;--line:#23383a;--line2:#314d50;--text:#f1f6f2;--muted:#93acab;--green:#34d399;--green-soft:rgba(52,211,153,.14);--sun:#fbbf24;--grid:#60a5fa;--load:#c084fc;--danger:#f87171}
+*{box-sizing:border-box}
+body{margin:0;background:radial-gradient(1200px 420px at 15% -10%,rgba(52,211,153,.09),transparent 60%),var(--bg);color:var(--text);font:14.5px/1.45 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;font-variant-numeric:tabular-nums;-webkit-font-smoothing:antialiased}
+main,header{max-width:1180px;margin:auto;padding:18px 24px}
+header{display:flex;justify-content:space-between;gap:14px;align-items:center;padding-top:18px;padding-bottom:12px;border-bottom:1px solid var(--line)}
+.brand{display:flex;gap:12px;align-items:center;min-width:0}
+.brandText b{display:block;font-size:18px;letter-spacing:-.03em;line-height:1.15}
+.brandText small{display:block;color:var(--muted);font-size:12px}
+.mark{position:relative;flex:none;width:38px;height:38px;border:1px solid rgba(52,211,153,.42);border-radius:10px;background:linear-gradient(145deg,#193f34,#0d211f);box-shadow:0 4px 16px rgba(0,0,0,.28)}
 .mark-sun{position:absolute;top:6px;right:6px;width:8px;height:8px;border-radius:50%;background:var(--sun)}
-.mark-panel{position:absolute;top:16px;left:7px;width:19px;height:11px;transform:skewX(-16deg);border:1px solid var(--green);border-radius:2px;background:linear-gradient(90deg,transparent calc(50% - .5px),var(--green) calc(50% - .5px),var(--green) calc(50% + .5px),transparent calc(50% + .5px)),linear-gradient(transparent calc(50% - .5px),var(--green) calc(50% - .5px),var(--green) calc(50% + .5px),transparent calc(50% + .5px))}
+.mark-panel{position:absolute;top:17px;left:7px;width:20px;height:11px;transform:skewX(-16deg);border:1px solid var(--green);border-radius:2px;background:linear-gradient(90deg,transparent calc(50% - .5px),var(--green) calc(50% - .5px),var(--green) calc(50% + .5px),transparent calc(50% + .5px)),linear-gradient(transparent calc(50% - .5px),var(--green) calc(50% - .5px),var(--green) calc(50% + .5px),transparent calc(50% + .5px))}
 .mark-panel::after{content:"";position:absolute;left:3px;right:3px;bottom:-4px;border-bottom:1px solid var(--green)}
-.badge{color:var(--green);border:1px solid #315946;border-radius:7px;padding:7px 10px;font-size:11px;font-weight:750;letter-spacing:.04em}nav{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:28px;border-bottom:1px solid var(--line);padding-bottom:12px}button,input,select{font:inherit}button{cursor:pointer;min-height:44px;padding:8px 13px;border:1px solid var(--line);border-radius:8px;background:#19292a;color:var(--text)}button[aria-selected=true],.primary{background:var(--green);color:#10251e;border-color:transparent;font-weight:750}h1{font-size:clamp(27px,4vw,42px);letter-spacing:-.06em;margin:0 0 7px}h2{font-size:17px;margin:0 0 12px}p{line-height:1.55}.sub,small{color:var(--muted)}.metrics{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:11px;margin:21px 0}.card,article{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px}.card .number{font-size:31px;font-weight:700;letter-spacing:-.055em;margin:10px 0 3px}.card:nth-child(1) .number{color:var(--sun)}.card:nth-child(2) .number{color:var(--grid)}.card:nth-child(3) .number{color:var(--green)}.card:nth-child(4) .number{color:var(--load)}.split{display:grid;gap:12px;grid-template-columns:1.1fr 1fr}.flow{display:grid;grid-template-columns:1fr auto 1fr;gap:12px;align-items:center;margin:22px 0}.flow span{padding:9px;background:#192a2a;border-radius:7px;text-align:center}.rows{display:grid;gap:0}.row{display:flex;justify-content:space-between;gap:12px;padding:8px 0;border-bottom:1px solid var(--line)}.row:last-child{border:0}.row strong{text-align:right}.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}label{display:grid;gap:6px;color:var(--muted)}input,select{width:100%;background:#0c1718;color:var(--text);padding:9px 10px;min-height:44px;border:1px solid #3b5353;border-radius:7px}input[type=checkbox]{width:22px;min-height:22px;accent-color:var(--green)}.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}a{color:var(--green)}.status{min-height:27px;color:var(--green);margin-top:12px}.status[data-error=true]{color:#ff9b9b}code{overflow-wrap:anywhere}.empty{color:var(--muted)}details{margin-top:12px}summary{cursor:pointer;padding:10px 0}.tag{font-size:11px;color:var(--muted)}[hidden]{display:none!important}@media(max-width:660px){header,main{padding:13px 14px}header{align-items:flex-start;flex-direction:column;gap:10px}.metrics{grid-template-columns:repeat(2,1fr)}.split{grid-template-columns:1fr}.card,article{padding:13px}.card .number{font-size:25px}.grid{grid-template-columns:1fr}nav{margin-bottom:16px}nav button{font-size:13px}.badge{line-height:1.4}}
-#powerFlow{width:100%;height:auto;display:block;margin-top:8px}.edges path{fill:none;stroke:#445655;stroke-width:2;stroke-linecap:round}.edges path.active{stroke-dasharray:4 8;animation:stream 1.15s linear infinite;marker-end:url(#arrow)}.edges path.reverse{marker-start:url(#arrow);marker-end:none;animation-direction:reverse}@keyframes stream{to{stroke-dashoffset:-24}}.nodes g{--node:#a4accc}.nodes .solar{--node:#f6cf6b}.nodes .house{--node:#90c9fb}.nodes .battery{--node:#7dd9ba}.nodes rect{fill:#142324;stroke:var(--node);stroke-width:1.4}.nodes text{text-anchor:middle;fill:var(--node);font-size:13px;font-weight:700}.nodes .idle{opacity:.4}@media(prefers-reduced-motion:reduce){.edges path.active{animation:none}}
-header{padding-top:17px;padding-bottom:10px}main{padding-top:8px}nav{margin-bottom:15px}h1{margin-bottom:13px}.grid,.metrics,.groups{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.groups{align-items:start}.groups article{min-width:0}.groups .grid{grid-template-columns:minmax(0,1fr)}.groups .formGroup{margin-top:0}.groups article h2{margin-bottom:8px}.fieldhead,.control{display:flex;align-items:center;gap:8px;min-width:0}.fieldhead{justify-content:space-between;min-height:31px}.fieldhead label{line-height:1.2}.fieldhelp{min-width:0}.fieldhelp input,.fieldhelp select{min-width:0}.fieldhelp input[type=checkbox]{margin:0 10px}.control{border:1px solid #3b5353;border-radius:7px;min-height:44px;background:#0c1718}.control:focus-within{outline:2px solid var(--green);outline-offset:2px}.control input,.control select{border:0;background:transparent;outline:0;min-height:42px}.control select option{background:#0c1718}.control .timeUnit{width:auto;max-width:7.3rem}.control small{padding-right:9px;white-space:nowrap}.control input[type=range]{width:42%;min-width:42%;padding:0 5px;accent-color:var(--green)}.help{padding:0;width:30px;min-height:30px;flex:none;border-radius:50%;font-weight:700}.error.duration{color:var(--muted)}.error{color:#ff9b9b;display:block;min-height:15px;font-size:11px;line-height:1.1;margin-top:3px}.formLayout{display:grid;grid-template-columns:minmax(0,1fr);gap:14px;align-items:start}.formLayout:has(.helpPanel:not([hidden])){grid-template-columns:minmax(0,1fr) minmax(220px,28%)}.helpPanel{background:#17292a;border-color:#426260}.helpPanel p{font-size:14px;margin:8px 0}.helpPanel button{margin-top:8px}.formGroup+.formGroup{margin-top:14px}.strategyTabs{display:flex;flex-wrap:wrap;gap:7px;margin:12px 0}.strategyTabs button{min-height:40px}.metrics{margin:0}.split{grid-template-columns:repeat(2,minmax(0,1fr))}.overviewStack{display:grid;gap:12px}.overviewStack article{min-width:0}.overviewDetails,.clockCard{margin-bottom:12px}.overviewDetails{margin-top:12px}.clockCard .actions{margin-top:9px}.clockCard details{margin-top:0}.overviewDetails details:first-child{margin-top:0}.overviewDetails .row{font-size:13px}.tag{font-size:13px}.fresh{color:var(--green);font-size:12px}.fresh[data-warn=true]{color:var(--sun)}#powerFlow{max-height:234px;margin:0 auto}#conversion{margin-top:8px}.powerComparison{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-top:10px}.powerComparison .row{font-size:13px}.powerComparison .row:last-child strong{color:var(--green)}.row strong{overflow-wrap:anywhere;min-width:0}.technical pre{white-space:pre-wrap;overflow-wrap:anywhere;font-size:12px}.sub{margin:0 0 10px}@media(max-width:760px){.formLayout:has(.helpPanel:not([hidden])),.grid,.split,.groups,.metrics{grid-template-columns:minmax(0,1fr)}.formLayout .helpPanel:not([hidden]){margin-top:8px;border-radius:14px 14px 8px 8px}.powerComparison{grid-template-columns:1fr}.grid>.helpPanel{margin:0 0 5px}.strategyTabs button{min-height:43px}#powerFlow{max-height:175px}.overviewStack{gap:8px}.overviewStack article{padding:11px}.overviewStack .row{padding:5px 0}}
-
-.inputTable{width:100%;border-collapse:collapse;font-size:14px;line-height:1.4}
-.inputTable th,.inputTable td{padding:10px 12px;text-align:left;vertical-align:top;border-bottom:1px solid var(--line)}
-.inputTable thead th{font-size:12px;color:var(--muted)}
-.inputTable tbody th{font-weight:650}
-.inputTable tbody tr:last-child>*{border-bottom:0}
-.inputTable time{font-variant-numeric:tabular-nums}
-.inputState{display:table;margin-top:4px;padding:2px 6px;border-radius:5px;color:var(--muted);background:#213335;font-size:11px;font-weight:600}
-.inputState[data-state=valid]{color:var(--green)}
-.inputState[data-state=stale]{color:var(--sun)}
-.inputTable small{display:block;margin-top:3px}
+.headRight{display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+.ledRow{display:flex;gap:6px;flex-wrap:wrap}
+.led{display:inline-flex;align-items:center;gap:5px;padding:4px 8px;border-radius:999px;background:var(--panel);border:1px solid var(--line);font-size:11px;font-weight:600;color:var(--muted)}
+.led i{width:7px;height:7px;border-radius:50%;background:#52686a;display:block}
+.led[data-on="1"]{color:var(--text);border-color:rgba(52,211,153,.35)}
+.led[data-on="1"] i{background:var(--green);box-shadow:0 0 8px rgba(52,211,153,.65)}
+.led[data-on="warn"]{color:var(--sun);border-color:rgba(251,191,36,.35)}
+.led[data-on="warn"] i{background:var(--sun)}
+.badge{color:var(--green);background:var(--green-soft);border:1px solid rgba(52,211,153,.38);border-radius:999px;padding:5px 11px;font-size:11px;font-weight:700;letter-spacing:.04em;white-space:nowrap}
+main{padding-top:14px;padding-bottom:56px}
+nav{display:flex;gap:8px;margin-bottom:18px;border-bottom:1px solid var(--line);padding-bottom:12px;overflow-x:auto;scrollbar-width:none}
+nav::-webkit-scrollbar{display:none}
+button,input,select{font:inherit}
+button{cursor:pointer;min-height:40px;padding:7px 14px;border:1px solid var(--line2);border-radius:9px;background:var(--panel2);color:var(--text);transition:background .15s,border-color .15s}
+button:hover{border-color:#4b7275}
+button[aria-selected=true],.primary{background:var(--green);color:#062016;border-color:transparent;font-weight:700}
+nav button{white-space:nowrap;flex:none}
+h1{font-size:clamp(24px,3.2vw,34px);letter-spacing:-.04em;margin:0 0 4px}
+h2{font-size:15.5px;letter-spacing:-.01em;margin:0 0 12px;display:flex;align-items:center;justify-content:space-between;gap:8px}
+p{line-height:1.5}
+.sub,small{color:var(--muted)}
+.sub{margin:0 0 14px;font-size:13px}
+.card,article{background:linear-gradient(180deg,rgba(255,255,255,.018),transparent 40%),var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px 18px;box-shadow:0 8px 24px rgba(0,0,0,.22)}
+.split{display:grid;gap:14px;grid-template-columns:1.08fr 1fr;align-items:start}
+.overviewStack{display:grid;gap:14px}
+.overviewStack article{min-width:0}
+.rows{display:grid;gap:0}
+.row{display:flex;justify-content:space-between;align-items:baseline;gap:12px;padding:7.5px 0;border-bottom:1px solid rgba(35,56,58,.8)}
+.row:last-child{border:0;padding-bottom:2px}
+.row span{color:var(--muted);font-size:13.5px}
+.row strong{text-align:right;overflow-wrap:anywhere;min-width:0;font-weight:600}
+.pillRow{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+.pill{display:inline-flex;align-items:center;gap:5px;padding:3px 9px;border-radius:999px;font-size:11.5px;font-weight:600;background:var(--panel2);border:1px solid var(--line2);color:var(--text)}
+.pill.ok{color:var(--green);border-color:rgba(52,211,153,.38);background:var(--green-soft)}
+.pill.warn{color:var(--sun);border-color:rgba(251,191,36,.38);background:rgba(251,191,36,.12)}
+.socWrap{margin-bottom:10px}
+.socHead{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin-bottom:6px}
+.socBig{font-size:32px;font-weight:750;letter-spacing:-.04em;color:var(--green);line-height:1}
+.socMeta{font-size:12.5px;color:var(--muted)}
+.barTrack{position:relative;height:9px;border-radius:999px;background:#091314;border:1px solid var(--line);overflow:hidden}
+.barFill{height:100%;border-radius:999px;background:linear-gradient(90deg,#10b981,#34d399);transition:width .35s ease}
+.barFill.warn{background:linear-gradient(90deg,#d97706,#fbbf24)}
+.barFill.danger{background:linear-gradient(90deg,#dc2626,#f87171)}
+.barFloor{position:absolute;top:0;bottom:0;width:2px;background:var(--sun);opacity:.9}
+.miniGrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 14px;margin-top:10px;padding-top:10px;border-top:1px solid var(--line)}
+.miniItem span{display:block;font-size:11.5px;color:var(--muted)}
+.miniItem strong{font-size:14px}
+.resGrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-bottom:12px}
+.resCard{padding:10px 12px;border-radius:10px;background:var(--bg2);border:1px solid var(--line)}
+.resHead{display:flex;justify-content:space-between;font-size:12px;color:var(--muted);margin-bottom:6px}
+.resHead strong{color:var(--text)}
+#powerFlow{width:100%;max-height:252px;height:auto;display:block;margin:6px auto 0}
+.edges path{fill:none;stroke:#374b4d;stroke-width:2;stroke-linecap:round}
+.edges path.active{stroke-dasharray:4 8;animation:stream 1.15s linear infinite;marker-end:url(#arrow)}
+.edges path.reverse{marker-start:url(#arrow);marker-end:none;animation-direction:reverse}
+@keyframes stream{to{stroke-dashoffset:-24}}
+.nodes g{--node:#94a3b8;transition:opacity .2s}
+.nodes .solar{--node:#fbbf24}
+.nodes .house{--node:#60a5fa}
+.nodes .battery{--node:#34d399}
+.nodes rect{fill:#0f1d1f;stroke:var(--node);stroke-width:1.5}
+.nodes text{text-anchor:middle;fill:var(--node);font-size:12.5px;font-weight:700}
+.nodes .subtxt{font-size:10px;font-weight:500;fill:var(--muted)}
+.nodes .idle{opacity:.72}
+@media(prefers-reduced-motion:reduce){.edges path.active{animation:none}}
+.grid,.groups{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.groups{align-items:start}
+.groups article{min-width:0}
+.groups .grid{grid-template-columns:minmax(0,1fr)}
+.groups .formGroup{margin-top:0}
+label{display:grid;gap:6px;color:var(--muted);font-size:13px}
+input,select{width:100%;background:#091314;color:var(--text);padding:9px 10px;min-height:42px;border:1px solid #334e50;border-radius:8px}
+input[type=checkbox]{width:22px;min-height:22px;accent-color:var(--green)}
+.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
+a{color:var(--green)}
+.status{min-height:24px;color:var(--green);margin-top:12px;font-size:13.5px}
+.status[data-error=true]{color:var(--danger)}
+#feedback:not(:empty){position:fixed;right:18px;bottom:18px;z-index:50;max-width:min(420px,calc(100vw - 36px));margin:0;padding:11px 16px;border-radius:10px;background:#102924;border:1px solid rgba(52,211,153,.45);box-shadow:0 12px 30px rgba(0,0,0,.45)}
+#feedback[data-error=true]:not(:empty){background:#2b1416;border-color:rgba(248,113,113,.5)}
+code{overflow-wrap:anywhere}
+details{margin-top:12px}
+summary{cursor:pointer;padding:8px 0;font-weight:600;color:var(--text)}
+.tag{font-size:12.5px;color:var(--muted)}
+[hidden]{display:none!important}
+.fieldhead,.control{display:flex;align-items:center;gap:8px;min-width:0}
+.fieldhead{justify-content:space-between;min-height:30px}
+.fieldhead label{line-height:1.2}
+.fieldhelp{min-width:0}
+.fieldhelp input,.fieldhelp select{min-width:0}
+.fieldhelp input[type=checkbox]{margin:0 10px}
+.control{border:1px solid #334e50;border-radius:8px;min-height:42px;background:#091314}
+.control:focus-within{outline:2px solid var(--green);outline-offset:2px}
+.control input,.control select{border:0;background:transparent;outline:0;min-height:40px}
+.control select option{background:#091314}
+.control .timeUnit{width:auto;max-width:7.3rem}
+.control small{padding-right:9px;white-space:nowrap}
+.control input[type=range]{width:42%;min-width:42%;padding:0 5px;accent-color:var(--green)}
+.help{padding:0;width:28px;min-height:28px;flex:none;border-radius:50%;font-weight:700}
+.error{color:var(--danger);display:block;min-height:15px;font-size:11px;line-height:1.1;margin-top:3px}
+.error.duration{color:var(--muted)}
+.formLayout{display:grid;grid-template-columns:minmax(0,1fr);gap:14px;align-items:start}
+.formLayout:has(.helpPanel:not([hidden])){grid-template-columns:minmax(0,1fr) minmax(220px,28%)}
+.helpPanel{background:#16292b;border-color:#3a5f62}
+.helpPanel p{font-size:13.5px;margin:8px 0}
+.formGroup+.formGroup{margin-top:14px}
+.strategyTabs{display:flex;flex-wrap:wrap;gap:7px;margin:12px 0}
+.overviewDetails,.clockCard{margin-bottom:14px;margin-top:14px}
+.clockCard{margin-top:0}
+.overviewDetails details:first-child{margin-top:0}
+.fresh{color:var(--green);font-size:12px;white-space:nowrap}
+.fresh[data-warn=true]{color:var(--sun)}
+.powerComparison{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-top:10px}
+.powerComparison .row:last-child strong{color:var(--green)}
+.technical pre{white-space:pre-wrap;overflow-wrap:anywhere;font-size:12px;background:var(--bg2);padding:10px;border-radius:8px;border:1px solid var(--line)}
+.inputTable,.taskTable{width:100%;border-collapse:collapse;font-size:13.5px;line-height:1.4}
+.inputTable th,.inputTable td,.taskTable th,.taskTable td{padding:9px 10px;text-align:left;vertical-align:top;border-bottom:1px solid var(--line)}
+.inputTable thead th,.taskTable thead th{font-size:11.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.03em}
+.inputTable tbody tr:last-child>*,.taskTable tbody tr:last-child>*{border-bottom:0}
+.inputState{display:inline-block;margin-left:6px;padding:2px 6px;border-radius:5px;color:var(--muted);background:#1f3234;font-size:11px;font-weight:600}
+.inputState[data-state=valid]{color:var(--green);background:var(--green-soft)}
+.inputState[data-state=stale]{color:var(--sun);background:rgba(251,191,36,.12)}
 .inputCellLabel{display:none}
-@media(max-width:800px){
+@media(max-width:760px){
+ header{align-items:flex-start;flex-direction:column;gap:10px;padding:14px}
+ main{padding:12px 14px 72px}
+ .headRight{width:100%;justify-content:space-between}
+ .badge{white-space:normal;line-height:1.35}
+ .formLayout:has(.helpPanel:not([hidden])),.grid,.split,.groups,.resGrid,.powerComparison{grid-template-columns:minmax(0,1fr)}
+ #powerFlow{max-height:190px}
  .inputTable,.inputTable tbody{display:block}
  .inputTable thead{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}
- .inputTable tbody tr{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 12px;margin:8px 0;padding:12px;border:1px solid var(--line);border-radius:8px}
+ .inputTable tbody tr{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 12px;margin:8px 0;padding:12px;border:1px solid var(--line);border-radius:10px}
  .inputTable tbody th,.inputTable td,.inputTable tbody tr:last-child>*{padding:0;border:0;min-width:0;overflow-wrap:anywhere}
  .inputTable tbody th,.inputTable tbody td:last-child{grid-column:1/-1}
- .inputTable tbody th{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px}
- .inputState{margin-top:0}
- .inputCellLabel{display:block;color:var(--muted);font-size:12px;margin-bottom:2px}
+ .inputCellLabel{display:block;color:var(--muted);font-size:11.5px;margin-bottom:2px}
 }
-</style></head><body><header><div class="brand"><span class="mark" aria-hidden="true"><span class="mark-sun"></span><span class="mark-panel"></span></span><b>Afore Autonomous EMS</b></div><span class="badge">SHADOW – DECISIONI SIMULATE – NESSUN COMANDO APPLICATO</span></header><main>
-<nav aria-label="Sezioni"><button data-pane="overview" aria-selected="true">Overview</button><button data-pane="strategies">Strategie EMS</button><button data-pane="limits">Batteria e limiti</button><button data-pane="mqtt">MQTT</button><button data-pane="system">Sistema</button></nav>
-<section id="overview"><h1>Flussi energetici</h1><div class="sub" id="live">Connessione al dispositivo…</div><div class="split"><article><h2>Flusso istantaneo</h2><svg id="powerFlow" viewBox="0 0 420 274" role="img" aria-label="Flusso energetico fra fotovoltaico, casa, batteria e rete">
-<defs><marker id="arrow" markerWidth="5" markerHeight="5" refX="4" refY="2.5" orient="auto-start-reverse"><path d="M0 0L5 2.5 0 5Z" fill="context-stroke"/></marker></defs>
-<g class="edges"><path id="edge-pv" d="M210 73V125"/><path id="edge-load" d="M232 137H302"/><path id="edge-battery" d="M210 202V150"/><path id="edge-grid" d="M120 137H189"/></g>
-<g class="nodes"><g id="node-pv" class="solar" transform="translate(158 10)"><rect width="104" height="62" rx="15"/><text x="52" y="23">FV</text><text id="flow-pv" x="52" y="45">—</text></g>
-<g id="node-load" class="house" transform="translate(306 106)"><rect width="104" height="62" rx="15"/><text x="52" y="23">Casa</text><text id="flow-load" x="52" y="45">—</text></g>
-<g id="node-grid" class="utility" transform="translate(14 106)"><rect width="104" height="62" rx="15"/><text x="52" y="23">Rete</text><text id="flow-grid" x="52" y="45">—</text></g>
-<g id="node-battery" class="battery" transform="translate(158 204)"><rect width="104" height="62" rx="15"/><text id="flow-soc" x="52" y="23">Batteria</text><text id="flow-battery" x="52" y="45">—</text></g></g>
-<circle cx="210" cy="137" r="15" fill="#223635" stroke="#a8b7b1"/><path d="M213 128l-7 10h5l-3 8 8-11h-5z" fill="#ddf5e7"/></svg><p class="tag" id="flowBadges"></p></article><div class="overviewStack"><article><h2>Batteria</h2><div class="rows" id="cards"></div></article><article><h2>Decisione EMS</h2><div class="rows" id="decision"></div></article></div></div><article class="overviewDetails"><details><summary>Dettagli telemetria</summary><div class="rows" id="signals"></div></details><details><summary>Previsioni e input Home Assistant</summary><div id="forecastRows"></div><details><summary>Provenienza, età e scadenze</summary><table class="inputTable" role="table" aria-label="Provenienza, età e scadenze degli input Home Assistant">
-<thead role="rowgroup"><tr role="row"><th scope="col" role="columnheader">Input</th><th scope="col" role="columnheader">Origine</th><th scope="col" role="columnheader">Tipo</th><th scope="col" role="columnheader">Aggiornato</th><th scope="col" role="columnheader">Età dato</th><th scope="col" role="columnheader">Scadenza</th></tr></thead>
-<tbody id="inputDetail" role="rowgroup"></tbody></table></details></details></article></section>
+</style></head><body>
+<header>
+ <div class="brand"><span class="mark" aria-hidden="true"><span class="mark-sun"></span><span class="mark-panel"></span></span><div class="brandText"><b>Afore Autonomous EMS</b><small id="fwBadge">Console locale ESP32-S3</small></div></div>
+<div class="headRight"><div class="ledRow" id="hdrLeds"><span class="led" id="ledFc04"><i></i>FC04</span><span class="led" id="ledMqtt"><i></i>MQTT</span><span class="led" id="ledHa"><i></i>HA</span><span class="led" id="ledNtp"><i></i>NTP</span></div><span class="badge" id="modeBadge">Connessione…</span></div>
+</header>
+<main>
+<nav aria-label="Sezioni"><button data-pane="overview" aria-selected="true">Overview</button><button data-pane="strategies">Strategie EMS</button><button data-pane="limits">Batteria e limiti</button><button data-pane="advanced">Avanzate</button><button data-pane="mqtt">MQTT</button><button data-pane="system">Sistema</button></nav>
+<section id="overview">
+ <h1>Flussi energetici</h1><div class="sub" id="live">Connessione al dispositivo…</div>
+ <div class="split">
+  <article><h2>Flusso istantaneo <span class="tag" id="flowBadges"></span></h2><svg id="powerFlow" viewBox="0 0 420 278" role="img" aria-label="Flusso energetico fra fotovoltaico, casa, batteria e rete">
+   <defs><marker id="arrow" markerWidth="5" markerHeight="5" refX="4" refY="2.5" orient="auto-start-reverse"><path d="M0 0L5 2.5 0 5Z" fill="context-stroke"/></marker></defs>
+   <g class="edges"><path id="edge-pv" d="M210 74V124"/><path id="edge-load" d="M232 138H302"/><path id="edge-battery" d="M210 202V152"/><path id="edge-grid" d="M120 138H189"/></g>
+   <g class="nodes">
+    <g id="node-pv" class="solar" transform="translate(154 8)"><rect width="112" height="66" rx="14"/><text x="56" y="21">FV</text><text id="flow-pv" x="56" y="40">—</text><text id="sub-pv" class="subtxt" x="56" y="56">Produzione</text></g>
+    <g id="node-load" class="house" transform="translate(302 105)"><rect width="112" height="66" rx="14"/><text x="56" y="21">Casa</text><text id="flow-load" x="56" y="40">—</text><text class="subtxt" x="56" y="56">Carico</text></g>
+    <g id="node-grid" class="utility" transform="translate(6 105)"><rect width="112" height="66" rx="14"/><text x="56" y="21">Rete</text><text id="flow-grid" x="56" y="40">—</text><text id="sub-grid" class="subtxt" x="56" y="56">Neutra</text></g>
+    <g id="node-battery" class="battery" transform="translate(154 204)"><rect width="112" height="66" rx="14"/><text id="flow-soc" x="56" y="21">Batteria</text><text id="flow-battery" x="56" y="40">—</text><text id="sub-battery" class="subtxt" x="56" y="56">Inattiva</text></g>
+   </g>
+   <circle cx="210" cy="138" r="15" fill="#1b3031" stroke="#8fb3ad"/><path d="M213 129l-7 10h5l-3 8 8-11h-5z" fill="#34d399"/>
+  </svg></article>
+  <div class="overviewStack">
+   <article><h2>Batteria</h2>
+    <div class="socWrap"><div class="socHead"><span class="socBig" id="socBig">—</span><span class="socMeta" id="socMeta">Stato —</span></div><div class="barTrack"><div class="barFill" id="socBar" style="width:0%"></div><div class="barFloor" id="socFloor" title="SOC minimo stagionale"></div></div></div>
+    <div class="rows" id="cards"></div>
+    <div class="miniGrid" id="battExtra"></div>
+   </article>
+   <article><h2>Decisione EMS <span class="pill" id="dispPill">—</span></h2><div class="rows" id="decision"></div><div class="pillRow" id="predPills"></div></article>
+  </div>
+ </div>
+ <article class="overviewDetails">
+  <details><summary>Dettagli telemetria FC04</summary><div class="rows" id="signals"></div></details>
+  <details><summary>Previsioni e input Home Assistant</summary><div class="rows" id="forecastRows"></div>
+   <details><summary>Provenienza, età e scadenze</summary><table class="inputTable" role="table" aria-label="Provenienza, età e scadenze degli input Home Assistant">
+    <thead><tr><th scope="col">Input</th><th scope="col">Origine</th><th scope="col">Tipo</th><th scope="col">Aggiornato</th><th scope="col">Età dato</th><th scope="col">Scadenza</th></tr></thead>
+    <tbody id="inputDetail"></tbody></table></details>
+  </details>
+ </article>
+</section>
 <section id="strategies" hidden><h1>Strategie EMS</h1><article><h2>Strategia attiva</h2><div id="strategyStatus" class="rows"></div></article><form id="strategyForm"><div class="strategyTabs" id="strategyTabs" role="group" aria-label="Strategia locale"></div><div class="formLayout"><div class="formBody"></div><article class="helpPanel" hidden></article></div><div class="actions"><button class="primary">Salva strategia</button></div></form></section>
 <section id="limits" hidden><h1>Batteria e limiti</h1><form id="limitsForm"><div class="formLayout"><div class="formBody groups"></div><article class="helpPanel" hidden></article></div><div class="actions"><button class="primary">Salva limiti</button></div></form></section>
-<section id="mqtt" hidden><h1>MQTT</h1><p class="sub" id="brokerStatus">Lettura dello stato broker…</p><article><h2>Attività broker</h2><div id="brokerInfo"></div><details class="technical"><summary>Dettagli tecnici</summary><pre id="brokerTech"></pre></details></article><article class="formGroup"><h2>Connessione</h2><form id="brokerForm"><div class="grid"></div><div class="actions"><button class="primary">Salva MQTT</button><button type="button" id="mqttTest">Test connessione</button></div></form></article></section>
+<section id="advanced" hidden><h1>Avanzate</h1><form id="advancedForm"><div class="formLayout"><div class="formBody groups"></div><article class="helpPanel" hidden></article></div><div class="actions"><button class="primary">Applica</button></div></form></section>
+<section id="mqtt" hidden><h1>MQTT</h1><p class="sub" id="brokerStatus">Lettura dello stato broker…</p><article><h2>Attività broker</h2><div id="brokerInfo" class="rows"></div><details class="technical"><summary>Dettagli tecnici</summary><pre id="brokerTech"></pre></details></article><article class="formGroup"><h2>Connessione</h2><form id="brokerForm"><div class="grid"></div><div class="actions"><button class="primary">Salva MQTT</button><button type="button" id="mqttTest">Test connessione</button></div></form></article></section>
 <section id="system" hidden><h1>Sistema</h1>
-<article id="clockCard" class="clockCard" hidden><h2>Data e ora</h2><div class="rows" id="clockStatus"></div><div class="actions"><button type="button" id="syncClock">Sincronizza ora</button></div>
-<details><summary>Impostazioni orarie</summary><form id="clockForm"><div class="grid">
-<label for="ntpEnabled">NTP abilitato<span class="control"><input id="ntpEnabled" name="enabled" type="checkbox"></span></label>
-<label for="clockZone">Timezone IANA<input id="clockZone" name="zone" type="text" maxlength="63" placeholder="Europe/Rome" spellcheck="false" required></label>
-<label for="ntpPrimary">Server NTP primario<input id="ntpPrimary" name="primary" type="text" maxlength="63" spellcheck="false" required></label>
-<label for="ntpFallback1">Server NTP fallback 1<input id="ntpFallback1" name="fallback1" type="text" maxlength="63" spellcheck="false" required></label>
-<label for="ntpFallback2">Server NTP fallback 2<input id="ntpFallback2" name="fallback2" type="text" maxlength="63" spellcheck="false" required></label>
-</div><div class="actions"><button class="primary">Salva data e ora</button></div></form></details></article><div class="split"><article><h2>Diagnostica</h2><div class="rows" id="device"></div></article><article><h2>Gestione dispositivo</h2><details><summary>Password amministratore</summary>
-<form id="adminPasswordForm" method="post" autocomplete="on">
-<p class="sub">Usa da 12 a 64 caratteri ASCII stampabili (lettere, numeri, simboli o spazi).</p>
-<input type="hidden" name="username" value="admin" autocomplete="username">
-<label>Password attuale<input name="current_password" type="password" autocomplete="current-password" required maxlength="64"></label>
-<label>Nuova password<input name="new_password" type="password" autocomplete="new-password" required minlength="12" maxlength="64"></label>
-<label>Conferma nuova password<input name="confirm_password" type="password" autocomplete="new-password" required minlength="12" maxlength="64"></label>
-<div class="actions"><button class="primary">Cambia password admin</button>
-<button id="adminSignIn" type="button" hidden>Accedi di nuovo</button></div>
-<p id="adminPasswordStatus" class="status" role="status" aria-live="polite"></p>
-</form></details><label>Modalità operativa<select id="opMode"><option>SHADOW</option><option>LIVE</option></select></label><p class="tag">🔒 Controllo reale non ancora qualificato</p>
-<label>Spegnimento automatico AUX1 (secondi, 0 = manuale)<input id="auxTtl" type="number" min="0" max="86400" value="0"></label><div class="actions"><button id="auxOn">Attiva AUX1</button><button id="auxOff">Spegni AUX1</button></div><p class="tag" id="auxStatus"></p><p><a href="/wifi">Configurazione Wi-Fi</a> · <a href="/api/v1/ems/decisions">Scarica audit decisioni</a></p><div class="actions"><button id="backup">Esporta configurazione</button></div><details><summary>Azioni avanzate</summary><div class="actions"><button id="restart">Riavvia</button><button id="rollbackPolicy">Ripristina EMS precedente</button><button id="rollbackBroker">Ripristina MQTT precedente</button></div><label>Ripristina configurazione EMS e MQTT<input id="restore" type="file" accept="application/json"></label><details><summary>Aggiornamento OTA firmato</summary><form id="otaForm"><label>Firmware applicativo<input name="image" type="file" accept=".bin" required></label><label>SHA-256 del firmware<input name="sha" required pattern="[A-Fa-f0-9]{64}"></label><label>Firma ECDSA DER in esadecimale<input name="signature" required pattern="[A-Fa-f0-9]+"></label><div class="actions"><button>Carica e riavvia</button></div></form></details></details></article></div></section>
-<div id="feedback" class="status" role="status" aria-live="polite"></div></main>
+ <article id="clockCard" class="clockCard" hidden><h2>Data e ora</h2><div class="rows" id="clockStatus"></div><div class="actions"><button type="button" id="syncClock">Sincronizza ora</button></div>
+  <details><summary>Impostazioni orarie</summary><form id="clockForm"><div class="grid">
+   <label for="ntpEnabled">NTP abilitato<span class="control"><input id="ntpEnabled" name="enabled" type="checkbox"></span></label>
+   <label for="clockZone">Timezone IANA<input id="clockZone" name="zone" type="text" maxlength="63" placeholder="Europe/Rome" spellcheck="false" required></label>
+   <label for="ntpPrimary">Server NTP primario<input name="primary" id="ntpPrimary" type="text" maxlength="63" spellcheck="false" required></label>
+   <label for="ntpFallback1">Server NTP fallback 1<input name="fallback1" id="ntpFallback1" type="text" maxlength="63" spellcheck="false" required></label>
+   <label for="ntpFallback2">Server NTP fallback 2<input name="fallback2" id="ntpFallback2" type="text" maxlength="63" spellcheck="false" required></label>
+  </div><div class="actions"><button class="primary">Salva data e ora</button></div></form></details>
+ </article>
+ <div class="split">
+  <article><h2>Diagnostica ESP32</h2><div class="resGrid" id="resBars"></div><div class="rows" id="device"></div><details><summary>Stack per task FreeRTOS</summary><table class="taskTable"><thead><tr><th>Task</th><th>Ruolo</th><th>Tipo</th><th>Free / Alloc</th></tr></thead><tbody id="taskRows"></tbody></table></details></article>
+  <article><h2>Gestione dispositivo</h2><details><summary>Password amministratore</summary>
+   <form id="adminPasswordForm" method="post" autocomplete="on"><p class="sub">Usa da 12 a 64 caratteri ASCII stampabili.</p><input type="hidden" name="username" value="admin" autocomplete="username">
+    <label>Password attuale<input name="current_password" type="password" autocomplete="current-password" required maxlength="64"></label>
+    <label>Nuova password<input name="new_password" type="password" autocomplete="new-password" required minlength="12" maxlength="64"></label>
+    <label>Conferma nuova password<input name="confirm_password" type="password" autocomplete="new-password" required minlength="12" maxlength="64"></label>
+    <div class="actions"><button class="primary">Cambia password admin</button><button id="adminSignIn" type="button" hidden>Accedi di nuovo</button></div>
+    <p id="adminPasswordStatus" class="status" role="status" aria-live="polite"></p>
+   </form></details>
+   <label>Modalità operativa<select id="opMode"><option>SHADOW</option><option>LIVE</option></select></label>
+   <p class="tag" id="liveTrialStatus">🔒 Controllo reale non ancora qualificato</p>
+   <button type="button" id="livePreflight" hidden>Leggi modalità nativa</button>
+   <div id="liveTrainerSettings" hidden>
+    <label><input id="liveTrainer" type="checkbox" checked> Trainer LIVE (5 min)</label>
+    <label>Campiona il log ogni (s)<input id="liveTrainerSample" type="number" min="1" max="30" step="1" value="2"></label>
+   </div>
+   <small id="liveSignHint">Anteprima del comando con la polarità Afore.</small>
+   <label>Spegnimento automatico AUX1 (secondi, 0 = manuale)<input id="auxTtl" type="number" min="0" max="86400" value="0"></label>
+   <div class="actions"><button id="auxOn">Attiva AUX1</button><button id="auxOff">Spegni AUX1</button></div><p class="tag" id="auxStatus"></p>
+   <p><a href="/wifi">Configurazione Wi-Fi</a> · <a href="/api/v1/ems/decisions">Scarica audit decisioni</a></p>
+   <div class="actions"><button id="backup">Esporta configurazione</button></div>
+   <details><summary>Azioni avanzate</summary>
+    <div class="actions"><button id="restart">Riavvia</button><button id="rollbackPolicy">Ripristina EMS precedente</button><button id="rollbackBroker">Ripristina MQTT precedente</button></div>
+    <label>Ripristina configurazione EMS e MQTT<input id="restore" type="file" accept="application/json"></label>
+    <details><summary>Aggiornamento OTA firmato</summary><form id="otaForm"><label>Firmware applicativo<input name="image" type="file" accept=".bin" required></label><label>SHA-256 del firmware<input name="sha" required pattern="[A-Fa-f0-9]{64}"></label><label>Firma ECDSA DER in esadecimale<input name="signature" required pattern="[A-Fa-f0-9]+"></label><div class="actions"><button>Carica e riavvia</button></div></form></details>
+   </details>
+  </article>
+ </div>
+</section>
+<div id="feedback" class="status" role="status" aria-live="polite"></div>
+</main>
 <script>
 const $=id=>document.getElementById(id), api='/api/v1/';
 const strategies=['Self Use','Charge First','Native Inverter','Safe Mode','Target SOC','Maintenance'];
 const strategyFields={strategy:'Strategia locale',fallback:'Strategia di ritorno',soc_target:'SOC target (%)',predictive:'Modello predittivo automatico',auto_season:'SOC minimo stagionale automatico',summer_soc_min:'SOC minimo estivo (%)',winter_soc_min:'SOC minimo autunno/inverno (%)',full_hold_s:'Tenuta 100% prima di Self Use (s)',weekday_load_w:'Carico medio feriale fallback (W)',weekend_load_w:'Carico medio weekend fallback (W)',low_sun_kwh:'Soglia poco sole (kWh)',daily_deadline:'Usa scadenza locale giornaliera',deadline_minute:'Scadenza locale (minuti da mezzanotte)',target_deadline_s:'Scadenza relativa Target SOC (s)',hold_s:'Durata Maintenance (s)',maintenance_soc:'SOC Maintenance (%)',soc_hysteresis:'Isteresi SOC (%)',maintenance_timeout_s:'Timeout Maintenance (s)',charge_first_s:'Timeout Charge First (s)',charge_first_w:'Massimo Charge First (W)',target_w:'Massimo Target SOC (W)',grid_charge:'Consenti carica da rete SHADOW',surplus_only:'Charge First solo surplus FV',stale_ms:'Timeout telemetria (ms)'};
 const limitFields={soc_min:'SOC minimo (%)',soc_max:'SOC massimo (%)',soc_resume:'SOC di riattivazione (%)',charge_a:'Corrente massima carica (A)',discharge_a:'Corrente massima scarica (A)',charge_w:'Potenza massima carica (W)',discharge_w:'Potenza massima scarica (W)',voltage_min:'Tensione minima batteria (V)',voltage_max:'Tensione massima batteria (V)',capacity_wh:'Capacità utile · HA/Solarman (Wh)',nominal_mv:'Tensione nominale · HA/Solarman (mV)',efficiency_pct:'Efficienza provvisoria (%)',deadband_w:'Deadband (W)',ramp_w_s:'Rampa (W/s)',export_limit_w:'Limite immissione (W, 0 disabilita)',grid_target_w:'Target scambio rete (W)'};
 const brokerFields={enabled:'MQTT abilitato',host:'Host o IP broker',port:'Porta',tls:'TLS',user:'Utente',password:'Password MQTT',device:'Identificativo dispositivo',base:'Topic base',prefix:'Prefisso Home Assistant Discovery',qos:'QoS',retain:'Mantieni stato sul broker',telemetry_s:'Intervallo telemetria (s)',diagnostics_s:'Intervallo diagnostica (s)',keepalive:'Keepalive (s)',timeout_ms:'Timeout connessione (ms)'};
-const signals={soc:['SOC','%'],soh:['Stato di salute batteria','%'],battery_w:['Potenza batteria','W'],battery_v:['Tensione batteria','V'],battery_a:['Corrente batteria','A'],battery_temp:['Temperatura batteria','°C'],pv_w:['Fotovoltaico totale','W'],pv1_v:['Tensione PV1','V'],pv1_a:['Corrente PV1','A'],pv1_w:['Potenza PV1','W'],pv2_v:['Tensione PV2','V'],pv2_a:['Corrente PV2','A'],pv2_w:['Potenza PV2','W'],grid_w:['Potenza rete','W'],grid_v:['Tensione rete','V'],grid_a:['Corrente rete','A'],hz:['Frequenza rete','Hz'],temp_c:['Dissipatore inverter','°C'],inverter_w:['Potenza AC inverter','W'],load_w:['Carico derivato','W'],running:['Stato operativo inverter','']};
+const signals={soc:['SOC batteria','%'],soh_pct:['Stato di salute batteria (SOH)','%'],battery_temp_c:['Temperatura batteria','°C'],battery_w:['Potenza batteria','W'],battery_v:['Tensione batteria','V'],battery_a:['Corrente batteria','A'],pv_w:['Fotovoltaico totale','W'],pv1_v:['Tensione PV1','V'],pv1_a:['Corrente PV1','A'],pv1_w:['Potenza PV1','W'],pv2_v:['Tensione PV2','V'],pv2_a:['Corrente PV2','A'],pv2_w:['Potenza PV2','W'],grid_w:['Potenza rete','W'],grid_v:['Tensione rete','V'],hz:['Frequenza rete','Hz'],temp_c:['Dissipatore inverter','°C'],inverter_w:['Potenza AC inverter','W'],load_w:['Carico derivato','W']};
 const check=new Set(['grid_charge','surplus_only','daily_deadline','predictive','auto_season','enabled','tls','retain']);
 const texts=new Set(['host','user','password','device','base','prefix']);
 const fmt=(v,u='')=>v==null?'Non disponibile':typeof v==='number'?new Intl.NumberFormat('it-IT',{maximumFractionDigits:2}).format(v)+(u?' '+u:''):String(v);
 function element(tag,text,cls){let e=document.createElement(tag);if(text!=null)e.textContent=text;if(cls)e.className=cls;return e}
 function rows(id,items){$(id).replaceChildren(...items.map(([key,value,badge])=>{const row=element('div',null,'row'),reading=element('strong',value);if(badge){const mark=element('span',badge,'fresh');mark.dataset.warn=badge!=='Aggiornato';reading.append(document.createTextNode(' · '),mark)}row.append(element('span',key),reading);return row}))}
 async function call(route,opts={}){const r=await fetch(api+route,{cache:'no-store',...opts});if(!r.ok)throw Error((await r.text()).slice(0,140));return r.json()}
-function notice(text,error=false){$('feedback').textContent=text;$('feedback').dataset.error=error;if(error)$('feedback').scrollIntoView({block:'nearest'})}
+let toastTimer=null;
+function notice(text,error=false){const f=$('feedback');f.textContent=text;f.dataset.error=error;clearTimeout(toastTimer);if(text)toastTimer=setTimeout(()=>{f.textContent=''},error?7000:4000)}
 const helpFields={
-strategy:['Selezione','SELF_USE','Tutte','Determina il comportamento locale.'],
-fallback:['Selezione','SELF_USE','TARGET_SOC, MAINTENANCE','Strategia dopo completamento o scadenza.'],
-soc_target:['%',100,'CHARGE_FIRST, TARGET_SOC','Termina la sessione al raggiungimento.'],
-daily_deadline:['Sì/no','Sì','TARGET_SOC','Usa la scadenza locale giornaliera Europe/Rome; con orologio assente usa quella relativa.'],
-deadline_minute:['min',930,'TARGET_SOC','930 corrisponde alle 15:30 locali.'],
-target_deadline_s:['s',14400,'TARGET_SOC','Durata quando la scadenza è relativa.'],
-hold_s:['s',600,'MAINTENANCE','Durata del mantenimento vicino al target.'],
-maintenance_soc:['%',90,'MAINTENANCE','SOC da raggiungere prima del mantenimento.'],
-soc_hysteresis:['punti %',2,'CHARGE_FIRST, MAINTENANCE','Evita cambi di stato ripetuti vicino al target.'],
-maintenance_timeout_s:['s',14400,'MAINTENANCE','Interrompe la sessione alla scadenza.'],
-charge_first_s:['s',7200,'CHARGE_FIRST','Ritorna a SELF_USE alla scadenza.'],
-charge_first_w:['W',1000,'CHARGE_FIRST','Limite specifico della sessione.'],
-target_w:['W',1000,'TARGET_SOC, MAINTENANCE','Massima carica simulata del piano.'],
-grid_charge:['Sì/no','No','Strategie di carica','Consente carica da rete nel solo modello; Safety resta prioritaria.'],
-surplus_only:['Sì/no','Sì','CHARGE_FIRST','Usa esclusivamente il surplus FV.'],
-stale_ms:['ms',5000,'Tutte','Alla scadenza i dati essenziali portano a SAFE_MODE.'],
-soc_min:['%',20,'Tutte','Blocca la scarica al raggiungimento della riserva.'],
-soc_max:['%',100,'Tutte','Blocca la carica al raggiungimento del massimo.'],
-soc_resume:['%',20,'Tutte','Riabilita la scarica sopra questa soglia e sopra il minimo.'],
-charge_a:['A',50,'Tutte','0 disabilita il vincolo; con tensione valida si usa A × V.'],
-discharge_a:['A',50,'Tutte','0 disabilita il vincolo; con tensione valida si usa A × V.'],
-charge_w:['W',1000,'Tutte','Limite finale di potenza in carica.'],
-discharge_w:['W',1000,'Tutte','Limite finale di potenza in scarica.'],
-voltage_min:['V',0,'Tutte','0 disabilita; sotto soglia la Safety blocca il setpoint.'],
-voltage_max:['V',0,'Tutte','0 disabilita; sopra soglia la Safety blocca il setpoint.'],
-capacity_wh:['Wh',10240,'TARGET_SOC, MAINTENANCE','Capacità utile da HA/Solarman per stimare il deficit.'],
-nominal_mv:['mV',51200,'Informativo','51,2 V da HA/Solarman; la conversione usa la tensione misurata.'],
-efficiency_pct:['%',90,'TARGET_SOC, MAINTENANCE','Stima provvisoria del rendimento.'],
-deadband_w:['W',20,'Tutte','Filtra scostamenti minori fra decisioni.'],
-ramp_w_s:['W/s',250,'Tutte','Limita la variazione prima del ricontrollo Safety.'],
-export_limit_w:['W',3300,'Tutte','Limite di immissione simulata, 0 disabilita.'],
-grid_target_w:['W',0,'SELF_USE','Scambio obiettivo: positivo per importazione.']};
-const limits={soc_target:[1,100],predictive:[0,1],auto_season:[0,1],summer_soc_min:[0,99],winter_soc_min:[0,99],full_hold_s:[1,86400],weekday_load_w:[0,20000],weekend_load_w:[0,20000],low_sun_kwh:[0,100],deadline_minute:[0,1439],target_deadline_s:[1,604800],hold_s:[1,604799],maintenance_soc:[1,100],soc_hysteresis:[1,10],maintenance_timeout_s:[2,604800],charge_first_s:[1,604800],charge_first_w:[0,20000],target_w:[0,20000],stale_ms:[500,30000],soc_min:[0,99],soc_max:[1,100],soc_resume:[0,100],charge_a:[0,500],discharge_a:[0,500],charge_w:[0,20000],discharge_w:[0,20000],voltage_min:[0,1000],voltage_max:[0,1000],capacity_wh:[100,100000],nominal_mv:[1000,1000000],efficiency_pct:[1,100],deadband_w:[0,1000],ramp_w_s:[1,20000],export_limit_w:[0,20000],grid_target_w:[-20000,20000]};
+ predictive:['Sì/no','Sì','SELF_USE, CHARGE_FIRST','Abilita la pianificazione predittiva stagionale basata su Solcast, meteo e profilo di carico.'],
+ auto_season:['Sì/no','Sì','Modello predittivo','Imposta automaticamente il SOC minimo al 10% in primavera/estate e al 20% in autunno/inverno.'],
+ summer_soc_min:['%',10,'Modello predittivo','SOC minimo usato durante il periodo primavera/estate.'],
+ winter_soc_min:['%',20,'Modello predittivo','SOC minimo usato durante il periodo autunno/inverno.'],
+ full_hold_s:['s',300,'Modello predittivo','Durata della tenuta al 100% prima di sbloccare la scarica in Self Use.'],
+ weekday_load_w:['W',600,'Modello predittivo','Carico medio feriale usato come fallback se Home Assistant non pubblica il profilo di carico.'],
+ weekend_load_w:['W',900,'Modello predittivo','Carico medio weekend usato come fallback se Home Assistant non pubblica il profilo di carico.'],
+ low_sun_kwh:['kWh',8,'Modello predittivo','Soglia di produzione Solcast sotto la quale la giornata viene considerata a basso irraggiamento.'],
+ strategy:['Selezione','SELF_USE','Tutte','Determina il comportamento locale.'],
+ fallback:['Selezione','SELF_USE','TARGET_SOC, MAINTENANCE','Strategia dopo completamento o scadenza.'],
+ soc_target:['%',100,'CHARGE_FIRST, TARGET_SOC','Termina la sessione al raggiungimento.'],
+ daily_deadline:['Sì/no','Sì','TARGET_SOC','Usa la scadenza locale giornaliera Europe/Rome; con orologio assente usa quella relativa.'],
+ deadline_minute:['min',930,'TARGET_SOC','930 corrisponde alle 15:30 locali.'],
+ target_deadline_s:['s',14400,'TARGET_SOC','Durata quando la scadenza è relativa.'],
+ hold_s:['s',600,'MAINTENANCE','Durata del mantenimento vicino al target.'],
+ maintenance_soc:['%',90,'MAINTENANCE','SOC da raggiungere prima del mantenimento.'],
+ soc_hysteresis:['punti %',2,'CHARGE_FIRST, MAINTENANCE','Evita cambi di stato ripetuti vicino al target.'],
+ maintenance_timeout_s:['s',14400,'MAINTENANCE','Interrompe la sessione alla scadenza.'],
+ charge_first_s:['s',7200,'CHARGE_FIRST','Ritorna a SELF_USE alla scadenza.'],
+ charge_first_w:['W',2560,'CHARGE_FIRST','Limite specifico della sessione.'],
+ target_w:['W',2560,'TARGET_SOC, MAINTENANCE','Massima carica simulata del piano.'],
+ grid_charge:['Sì/no','No','Strategie di carica','Consente carica da rete nel solo modello; Safety resta prioritaria.'],
+ surplus_only:['Sì/no','Sì','CHARGE_FIRST','Usa esclusivamente il surplus FV.'],
+ stale_ms:['ms',5000,'Tutte','Alla scadenza i dati essenziali portano a SAFE_MODE.'],
+ soc_min:['%',20,'Tutte','Blocca la scarica al raggiungimento della riserva.'],
+ soc_max:['%',100,'Tutte','Blocca la carica al raggiungimento del massimo.'],
+ soc_resume:['%',20,'Tutte','Riabilita la scarica sopra questa soglia e sopra il minimo.'],
+ charge_a:['A',50,'Tutte','0 disabilita il vincolo; con tensione valida si usa A × V.'],
+ discharge_a:['A',50,'Tutte','0 disabilita il vincolo; con tensione valida si usa A × V.'],
+ charge_w:['W',2560,'Tutte','Limite finale di potenza in carica.'],
+ discharge_w:['W',2560,'Tutte','Limite finale di potenza in scarica.'],
+ voltage_min:['V',0,'Tutte','0 disabilita; sotto soglia la Safety blocca il setpoint.'],
+ voltage_max:['V',0,'Tutte','0 disabilita; sopra soglia la Safety blocca il setpoint.'],
+ capacity_wh:['Wh',10240,'TARGET_SOC, MAINTENANCE','Capacità utile da HA/Solarman per stimare il deficit.'],
+ nominal_mv:['mV',51200,'Informativo','51,2 V da HA/Solarman; la conversione usa la tensione misurata.'],
+ efficiency_pct:['%',90,'TARGET_SOC, MAINTENANCE','Stima provvisoria del rendimento.'],
+ deadband_w:['W',20,'Tutte','Filtra scostamenti minori fra decisioni.'],
+ ramp_w_s:['W/s',250,'Tutte','Limita la variazione prima del ricontrollo Safety.'],
+ export_limit_w:['W',3300,'Tutte','Limite di immissione simulata, 0 disabilita.'],
+ grid_target_w:['W',0,'SELF_USE','Scambio obiettivo: positivo per importazione.']
+};
+const advancedFields={"damping_w":"Soglia di smorzamento","damping_pct":"Guadagno di correzione"};
+Object.assign(advancedFields,{"trainer_settle_ms":"Assestamento","trainer_abs_w":"Tolleranza assoluta","trainer_pct":"Tolleranza relativa","trainer_timeout_ms":"Timeout comando stabile","trainer_gap_ms":"Tempo senza conferma","trainer_s":"Durata prova","trainer_charge_w":"Tetto prova in carica","trainer_discharge_w":"Tetto prova in scarica"});
+Object.assign(helpFields,{"trainer_settle_ms":["ms",3000,"Trainer LIVE","Attesa minima dopo un cambio di comando prima di confrontare la misura batteria."],"trainer_abs_w":["W",60,"Trainer LIVE","Errore minimo ammesso. Si usa il maggiore tra questa soglia e la tolleranza percentuale."],"trainer_pct":["%",15,"Trainer LIVE","Errore ammesso in percentuale rispetto al modulo del setpoint."],"trainer_timeout_ms":["ms",10000,"Trainer LIVE","Tempo massimo per confermare un comando stabile. Deve superare il tempo di assestamento."],"trainer_gap_ms":["ms",20000,"Trainer LIVE","Tempo massimo in attesa di riscontro fisico anche quando il comando continua a cambiare."],"trainer_s":["s",1800,"Trainer LIVE","Durata massima della prossima prova Trainer. Alla scadenza viene richiesto il rientro al modo nativo."],"trainer_charge_w":["W",200,"Trainer LIVE","Massima carica della prossima prova Trainer. Il limite EMS più restrittivo prevale. Zero blocca la carica."],"trainer_discharge_w":["W",200,"Trainer LIVE","Massima scarica della prossima prova Trainer. Il limite EMS più restrittivo prevale. Zero blocca la scarica."]});
+Object.assign(helpFields,{"damping_w":["W",50,"EMS","Differenza tra richiesta limitata e comando precedente entro cui si mantiene il comando. Aumentala per ridurre piccoli cambi. Il limite di surplus prevale sempre."],"damping_pct":["%",50,"EMS","Quota della variazione richiesta applicata per ciclo. A 50% un aumento di 400 W diventa 200 W. In ChargeFirst solo FV si smorza la risalita."]});
+const limits={damping_w:[0,1000],damping_pct:[1,100],soc_target:[1,100],predictive:[0,1],auto_season:[0,1],summer_soc_min:[0,99],winter_soc_min:[0,99],full_hold_s:[1,86400],weekday_load_w:[0,20000],weekend_load_w:[0,20000],low_sun_kwh:[0,100],deadline_minute:[0,1439],target_deadline_s:[1,604800],hold_s:[1,604799],maintenance_soc:[1,100],soc_hysteresis:[1,10],maintenance_timeout_s:[2,604800],charge_first_s:[1,604800],charge_first_w:[0,20000],target_w:[0,20000],stale_ms:[500,30000],soc_min:[0,99],soc_max:[1,100],soc_resume:[0,100],charge_a:[0,500],discharge_a:[0,500],charge_w:[0,20000],discharge_w:[0,20000],voltage_min:[0,1000],voltage_max:[0,1000],capacity_wh:[100,100000],nominal_mv:[1000,1000000],efficiency_pct:[1,100],deadband_w:[0,1000],ramp_w_s:[1,20000],export_limit_w:[0,20000],grid_target_w:[-20000,20000]};
+Object.assign(limits,{"trainer_settle_ms":[500,10000],"trainer_abs_w":[1,500],"trainer_pct":[1,30],"trainer_timeout_ms":[1000,20000],"trainer_gap_ms":[2000,30000],"trainer_s":[10,1800],"trainer_charge_w":[0,20000],"trainer_discharge_w":[0,20000]});
 const strategyGroups=[
  ['Predittivo & Bilanciamento',['predictive','auto_season','summer_soc_min','winter_soc_min','full_hold_s','deadline_minute','weekday_load_w','weekend_load_w','low_sun_kwh','grid_target_w','deadband_w','ramp_w_s']],
  ['Priorità alla carica',['predictive','soc_target','charge_first_w','full_hold_s','surplus_only','grid_charge','charge_first_s','soc_hysteresis']],
  ['Programma di carica',['soc_target','daily_deadline','deadline_minute','target_deadline_s','target_w','fallback','grid_charge']],
  ['Mantenimento della batteria',['maintenance_soc','hold_s','soc_hysteresis','maintenance_timeout_s','target_w','fallback','grid_charge']],
 ];
-const tabs={
- 0:strategyGroups[0],1:strategyGroups[1],
- 2:['Gestione inverter',[],'L’inverter segue le proprie impostazioni. L’EMS continua a monitorare le misure.'],
- 3:['Sospensione prudenziale',[],'Le decisioni di potenza vengono sospese finché questa modalità è attiva.'],
- 4:strategyGroups[2],5:strategyGroups[3]
-};
+const tabs={0:strategyGroups[0],1:strategyGroups[1],2:['Gestione inverter',[],'L’inverter segue le proprie impostazioni. L’EMS continua a monitorare le misure.'],3:['Sospensione prudenziale',[],'Le decisioni di potenza vengono sospese finché questa modalità è attiva.'],4:strategyGroups[2],5:strategyGroups[3]};
 const batteryGroups=[
  ['Riserva e SOC',['soc_min','soc_max','soc_resume']],
  ['Corrente e potenza',['charge_a','charge_w','discharge_a','discharge_w']],
@@ -133,9 +311,22 @@ const batteryGroups=[
 const fieldLabels={deadline_minute:'Ora obiettivo locale',nominal_mv:'Tensione nominale · HA/Solarman',hold_s:'Mantenimento',stale_ms:'Validità delle misure',grid_target_w:'Scambio obiettivo',deadband_w:'Zona neutra',ramp_w_s:'Velocità di variazione',target_deadline_s:'Scadenza relativa',charge_first_s:'Durata massima',maintenance_timeout_s:'Durata massima della sessione',charge_first_w:'Potenza massima di carica',target_w:'Potenza massima di carica',maintenance_soc:'SOC di manutenzione',export_limit_w:'Limite di immissione'};
 function displayName(value){
  if(value==null||value==='')return '—';
- for(const name of strategies)value=String(value).replaceAll(name.toUpperCase().replaceAll(' ','_'),name);
- const known={LIVE_NOT_QUALIFIED:'Controllo reale non ancora qualificato',SAFETY_LIMIT:'Limitato per sicurezza',TRACK_GRID:'Bilanciamento dello scambio con la rete',NONE:'Nessuno',ACTIVE:'Attiva',IDLE:'In attesa',RUNNING:'In corso',COMPLETED:'Completata',EXPIRED:'Scaduta',RUN:'In corso',OBSERVE:'Monitoraggio',SAFE:'In sicurezza',HOLD:'Mantenimento',TAPER:'Carica in riduzione',NATIVE_OBSERVATION:'Monitoraggio dell’inverter',SOC_RESERVE:'Riserva SOC raggiunta: scarica bloccata',SOC_CEILING:'SOC massimo raggiunto: carica bloccata',POWER_LIMIT:'Limite di potenza applicato',STALE_TELEMETRY:'Telemetria non aggiornata',ESSENTIAL_DATA_UNAVAILABLE:'Dato essenziale non disponibile',OBSERVATION:'Strategia in modalità osservazione',VOLTAGE_LIMIT:'Tensione batteria fuori limite',SAFE_REQUESTED:'Modalità prudenziale richiesta',INPUT_INVALID:'Misure assenti o non attendibili',GRID_BALANCE:'Bilanciamento dello scambio con la rete',CHARGE_REQUEST:'Richiesta di carica simulata',SAFETY_RECLAMP:'Limitato per sicurezza',DEADBAND_OR_RAMP:'Variazione graduale della potenza',STALE_OR_INVALID_TELEMETRY:'Misure assenti o non attendibili',UNREACHABLE_AT_CURRENT_LIMIT:'Obiettivo oltre il limite di carica',MAINTENANCE_HOLD:'Mantenimento del livello di carica',within_limits:'Entro i limiti',ACCEPTED:'Accettato',POLICY_REJECTED:'Impostazione rifiutata',operating_mode:'Modalità operativa',override:'Override temporaneo',target_soc:'Target SOC',maintenance:'Maintenance',policy:'Impostazioni EMS',aux:'Comando AUX1'};
- return known[value]??value;
+ const known={
+  SELF_USE:'Self Use',CHARGE_FIRST:'Charge First',NATIVE_INVERTER:'Native Inverter',SAFE_MODE:'Safe Mode',TARGET_SOC:'Target SOC',MAINTENANCE:'Maintenance',
+  CAPTURE_CHARGE_FIRST:'Cattura Charge First',GENTLE_TARGET:'Carica dolce target',GENTLE_TARGET_CHARGE:'Carica dolce target',FULL_HOLD_5M:'Tenuta 100% (5 min)',FULL_SOC_HOLD_5M:'Tenuta al 100% (5 min)',FULL_SOC_5MIN_COMPLETE:'Tenuta 5 min completata',
+  RECOVERY:'Recupero',GENTLE:'Carica dolce',CAPTURE:'Cattura FV',HOLD_100:'Tenuta 100%',
+  WINTER:'Autunno/Inverno',SUMMER:'Primavera/Estate',
+  APPLICABLE:'Applicabile senza limiti',NO_PV_SURPLUS:'Nessun surplus FV',GRID_CHARGE_DISABLED:'Carica da rete disabilitata',AVAILABLE_POWER_ZERO:'Potenza disponibile nulla',PARTIAL_PV_SURPLUS:'Limitato al surplus FV',PARTIAL_POWER_LIMIT:'Limitato parzialmente',PARTIAL_SAFETY_LIMIT:'Limitato parzialmente (Safety)',RAMP_OR_DEADBAND:'Rampa o zona neutra',INPUT_UNAVAILABLE:'Misure non disponibili',OBSERVATION_ONLY:'Solo osservazione',
+  LIVE_NOT_QUALIFIED:'Controllo reale non ancora qualificato',SAFETY_LIMIT:'Limitato per sicurezza',TRACK_GRID:'Bilanciamento rete',NONE:'Nessuno',ACTIVE:'Attiva',IDLE:'In attesa',RUNNING:'In corso',COMPLETED:'Completata',EXPIRED:'Scaduta',RUN:'In corso',OBSERVE:'Monitoraggio',SAFE:'In sicurezza',HOLD:'Mantenimento',TAPER:'Carica in riduzione',NATIVE_OBSERVATION:'Monitoraggio inverter',SOC_RESERVE:'Riserva SOC raggiunta: scarica bloccata',SOC_CEILING:'SOC massimo raggiunto: carica bloccata',POWER_LIMIT:'Limite di potenza applicato',STALE_TELEMETRY:'Telemetria scaduta',ESSENTIAL_DATA_UNAVAILABLE:'Dato essenziale non disponibile',OBSERVATION:'Modalità osservazione',VOLTAGE_LIMIT:'Tensione batteria fuori limite',SAFE_REQUESTED:'Modalità prudenziale richiesta',INPUT_INVALID:'Misure assenti o non attendibili',GRID_BALANCE:'Bilanciamento rete',CHARGE_REQUEST:'Richiesta di carica simulata',SAFETY_RECLAMP:'Limitato per sicurezza',DEADBAND_OR_RAMP:'Variazione graduale potenza',UNREACHABLE_AT_CURRENT_LIMIT:'Obiettivo oltre il limite di carica',MAINTENANCE_HOLD:'Mantenimento carica',ACCEPTED:'Accettato',POLICY_REJECTED:'Impostazione rifiutata',operating_mode:'Modalità operativa',override:'Override temporaneo',target_soc:'Target SOC',maintenance:'Maintenance',policy:'Impostazioni EMS',aux:'Comando AUX1'
+ };
+ if(known[value])return known[value];
+ let out=String(value);
+ for(const name of strategies)out=out.replaceAll(name.toUpperCase().replaceAll(' ','_'),name);
+ return out;
+}
+function resetLabel(code){
+ const map={1:'Accensione (power-on)',3:'Riavvio software',4:'Reset anomalo (panic)',5:'Watchdog interrupt',6:'Watchdog task',7:'Watchdog altro',8:'Deep sleep',9:'Brownout'};
+ return map[code]?code+' · '+map[code]:fmt(code);
 }
 function duration(seconds){
  if(seconds==null||!Number.isFinite(seconds))return 'Non disponibile';
@@ -147,10 +338,7 @@ function duration(seconds){
  }
  return parts.length?new Intl.ListFormat('it').format(parts):'0 secondi';
 }
-function age(now,then){
- if(then==null)return 'Non disponibile';
- return duration(Math.max(0,(now-then)|0)/1000)+' fa';
-}
+function age(now,then){return then==null?'Non disponibile':duration(Math.max(0,(now-then)|0)/1000)+' fa'}
 let clockState=null;
 function absoluteLocal(utc,reference=clockState?.timestamp){
  const zone=clockState?.zone??'Europe/Rome', value=new Date(utc);
@@ -186,23 +374,15 @@ function field(parent,form,name,title,data){
  const label=element('label',title),error=element('small','','error');
  let input;
  const scale=secondsScale[name]??(name==='nominal_mv'?1000:1);
- if(name==='fallback'){
-  input=element('select');
-  for(const i of [0,2,3]){const o=element('option',strategies[i]);o.value=i;input.add(o)}
- }else{
-  input=element('input');
-  input.type=check.has(name)?'checkbox':name==='password'?'password':texts.has(name)?'text':name==='deadline_minute'?'time':'number';
- }
- input.name=name;input.id=form.id+'-'+name;label.htmlFor=input.id;
- error.id=input.id+'-error';input.setAttribute('aria-describedby',error.id);
+ if(name==='fallback'){input=element('select');for(const i of [0,2,3]){const o=element('option',strategies[i]);o.value=i;input.add(o)}}
+ else{input=element('input');input.type=check.has(name)?'checkbox':name==='password'?'password':texts.has(name)?'text':name==='deadline_minute'?'time':'number'}
+ input.name=name;input.id=form.id+'-'+name;label.htmlFor=input.id;error.id=input.id+'-error';input.setAttribute('aria-describedby',error.id);
  if(input.type==='checkbox')input.checked=!!data[name];
  else if(name==='password'){input.placeholder=data.password_configured?'Password configurata':'Nessuna password';input.autocomplete='new-password'}
  else input.value=data[name]==null?'':input.type==='time'?wallMinute(data[name]):typeof data[name]==='number'?data[name]/scale:data[name];
  const h=helpFields[name],range=limits[name];
  const unit=input.type==='time'?'':scale===1000?(name==='nominal_mv'?'V':'s'):h?.[0]??(name.endsWith('_s')||name==='keepalive'?'s':'');
- if(range&&input.type==='number'){
-  input.min=range[0]/scale;input.max=range[1]/scale;input.step=1/scale;input.required=true;
- }
+ if(range&&input.type==='number'){input.min=range[0]/scale;input.max=range[1]/scale;input.step=1/scale;input.required=true}
  if(input.type==='time')input.required=true;
  head.append(label);
  if(h){
@@ -213,9 +393,7 @@ function field(parent,form,name,title,data){
    const open=panel.hidden||button.getAttribute('aria-expanded')==='false';
    form.querySelector('.formBody').after(panel);
    form.querySelectorAll('.help').forEach(b=>b.setAttribute('aria-expanded','false'));
-   panel.hidden=!open;
-   if(!open)return;
-   button.setAttribute('aria-expanded','true');
+   panel.hidden=!open;if(!open)return;button.setAttribute('aria-expanded','true');
    const heading=element('h2',title),close=element('button','Chiudi spiegazione');
    close.type='button';close.onclick=()=>{panel.hidden=true;button.setAttribute('aria-expanded','false');button.focus()};
    panel.replaceChildren(heading,element('p',displayName(h[3]).replace('930 corrisponde alle 15:30 locali.','L’orario segue la zona configurata in Sistema.')),element('p','Usato da '+displayName(h[2])),element('p','Valore iniziale '+formatField(name,h[1])+(range?' · Intervallo '+formatField(name,range[0])+' – '+formatField(name,range[1])+(unit&&!['s'].includes(unit)?' '+unit:''):'')),close);
@@ -240,32 +418,30 @@ function field(parent,form,name,title,data){
   const unitSelect=element('select',null,'timeUnit');
   unitSelect.setAttribute('aria-label','Unità per '+title);
   const choices=range&&range[1]/scale<60?[[1,'s']]:[[1,'s'],[60,'min'],[3600,'h']];
-  for(const [factor,name] of choices){const option=element('option',name);option.value=factor;unitSelect.add(option)}
-  function setUnit(factor,seconds){
-   input.dataset.factor=factor;unitSelect.value=factor;input.step='any';
-   if(range){input.min=range[0]/scale/factor;input.max=range[1]/scale/factor}
-   input.value=seconds===''?'':Number((seconds/factor).toFixed(8));
-  }
+  for(const [factor,n] of choices){const o=element('option',n);o.value=factor;unitSelect.add(o)}
+  function setUnit(factor,seconds){input.dataset.factor=factor;unitSelect.value=factor;input.step='any';if(range){input.min=range[0]/scale/factor;input.max=range[1]/scale/factor}input.value=seconds===''?'':Number((seconds/factor).toFixed(8))}
   const seconds=input.value===''?'':Number(input.value);
   setUnit(choices.map(([n])=>n).reverse().find(n=>seconds&&seconds%n===0)??1,seconds);
   unitSelect.onchange=()=>setUnit(Number(unitSelect.value),input.value===''?'':Number(input.value)*Number(input.dataset.factor));
   input.oninput=()=>{error.textContent=input.validity.valid?'':input.validationMessage};
-  input.onchange=null;
-  control.append(unitSelect);
+  input.onchange=null;control.append(unitSelect);
  }else if(unit&&!['Sì/no','Selezione','Informativo'].includes(unit))control.append(element('small',unit));
  box.append(head,control,error);parent.append(box);
 }
-function flow(t) {
- const meta=[['pv','pv_w','#f6cf6b',false],['load','load_w','#90c9fb',false],['battery','battery_w','#7dd9ba',true],['grid','grid_w','#a4accc',false]];
+function flow(t){
+ const meta=[['pv','pv_w','#fbbf24',false],['load','load_w','#60a5fa',false],['battery','battery_w','#34d399',true],['grid','grid_w','#94a3b8',false]];
  const badges=[];
  for(const [type,key,color,flip] of meta){
- const v=t[key], q=t.quality?.[key]?.state, edge=$('edge-'+type),active=v!=null&&Math.abs(v)>=20;
- const reverse=flip?v>0:v<0;
- edge.classList.toggle('active',active);edge.classList.toggle('reverse',active&&reverse);
- edge.style.stroke=active?color:'';edge.style.strokeWidth=active?Math.min(8,2+Math.abs(v)/550):2;
- $('node-'+type).classList.toggle('idle',!active);
- $('flow-'+type).textContent=v==null?'—':fmt(Math.abs(v),'W');
- if(q==='stale')badges.push(type+' scaduto');}
+  const v=t[key],q=t.quality?.[key]?.state,edge=$('edge-'+type),active=v!=null&&Math.abs(v)>=20,reverse=flip?v>0:v<0;
+  edge.classList.toggle('active',active);edge.classList.toggle('reverse',active&&reverse);
+  edge.style.stroke=active?color:'';edge.style.strokeWidth=active?Math.min(8,2+Math.abs(v)/550):2;
+  $('node-'+type).classList.toggle('idle',!active);
+  $('flow-'+type).textContent=v==null?'—':fmt(Math.abs(v),'W');
+  if(q==='stale')badges.push(type+' scaduto');
+ }
+ $('sub-grid').textContent=t.grid_w==null?'—':Math.abs(t.grid_w)<20?'Neutra':t.grid_w>0?'Prelievo':'Immissione';
+ $('sub-battery').textContent=t.battery_w==null?'—':Math.abs(t.battery_w)<20?'Inattiva':t.battery_w>0?'In carica':'In scarica';
+ $('sub-pv').textContent=t.pv_w!=null&&t.pv_w>=20?'Produzione':'Inattivo';
  $('flow-soc').textContent=t.soc==null?'Batteria':'Batteria '+fmt(t.soc,'%');
  if(t.load_w!=null)badges.push('Carico derivato');
  $('flowBadges').textContent=badges.join(' · ');
@@ -273,44 +449,25 @@ function flow(t) {
 const savedValues={};
 function makeForm(id,fields,data){
  const form=$(id);
- if(id==='brokerForm'){
-  const grid=form.querySelector('.grid');grid.replaceChildren();
-  for(const name of Object.keys(fields))field(grid,form,name,titleOf(name,fields),data);
-  savedValues[id]=values(form,true);
-  return;
- }
- const body=form.querySelector('.formBody'),panel=form.querySelector('.helpPanel'),all={...strategyFields,...limitFields};
- const draft={...data};
- savedValues[id]={...data};
+ if(id==='brokerForm'){const grid=form.querySelector('.grid');grid.replaceChildren();for(const name of Object.keys(fields))field(grid,form,name,titleOf(name,fields),data);savedValues[id]=values(form,true);return}
+ const body=form.querySelector('.formBody'),panel=form.querySelector('.helpPanel'),all={...strategyFields,...limitFields,...advancedFields};
+ const draft={...data};savedValues[id]={...data};
  function groups(list){
-  panel.hidden=true;
-  body.after(panel);
-  body.replaceChildren();
+  panel.hidden=true;body.after(panel);body.replaceChildren();
   for(const [title,keys,description] of list){
    const tile=element('article',null,'formGroup'),grid=element('div',null,'grid');
-   tile.append(element('h2',title));
-   if(description)tile.append(element('p',description,'sub'));
+   tile.append(element('h2',title));if(description)tile.append(element('p',description,'sub'));
    for(const name of keys)field(grid,form,name,titleOf(name,all),draft);
    if(keys.length)tile.append(grid);
-   if(title==='Corrente e potenza'){
-    const c=element('div',null,'powerComparison');c.id='conversion';
-    c.append(element('div'),element('div'));c.children[0].id='powerCharge';c.children[1].id='powerDischarge';tile.append(c);
-   }
+   if(title==='Corrente e potenza'){const c=element('div',null,'powerComparison');c.id='conversion';c.append(element('div'),element('div'));c.children[0].id='powerCharge';c.children[1].id='powerDischarge';tile.append(c)}
    body.append(tile);
   }
  }
+ if(id==='advancedForm'){groups([['Smorzamento',Object.keys(advancedFields)]]);return}
  if(id==='limitsForm'){groups(batteryGroups);return}
  const bar=$('strategyTabs');bar.replaceChildren();
- function select(index){
-  for(const b of bar.children)b.setAttribute('aria-selected',Number(b.dataset.strategy)===index);
-  groups([tabs[index]??tabs[0],['Comportamento generale',['stale_ms']]]);
-  const hidden=element('input');hidden.type='hidden';hidden.name='strategy';hidden.value=index;body.append(hidden);
- }
- for(const index of [0,1,4,5,2,3]){
-  const button=element('button',strategies[index]);button.type='button';button.dataset.strategy=index;
-  button.onclick=()=>{Object.assign(draft,values(form));select(index);button.focus()};
-  bar.append(button);
- }
+ function select(index){for(const b of bar.children)b.setAttribute('aria-selected',Number(b.dataset.strategy)===index);groups([tabs[index]??tabs[0],['Comportamento generale',['stale_ms']]]);const hidden=element('input');hidden.type='hidden';hidden.name='strategy';hidden.value=index;body.append(hidden)}
+ for(const index of [0,1,4,5,2,3]){const button=element('button',strategies[index]);button.type='button';button.dataset.strategy=index;button.onclick=()=>{Object.assign(draft,values(form));select(index);button.focus()};bar.append(button)}
  select(Number(data.strategy));
 }
 function values(form,broker=false){
@@ -318,103 +475,143 @@ function values(form,broker=false){
  for(const e of form.querySelectorAll('[name]')){
   if(e.type==='password'&&!e.value)continue;
   if(e.type==='checkbox')result[e.name]=broker?e.checked:+e.checked;
-  else if(e.type==='time'){
-   const [hours,minutes]=e.value.split(':').map(Number);
-   result[e.name]=hours*60+minutes;
-  }else if(e.type==='number'||e.tagName==='SELECT'||e.name==='strategy'){
-   const scale=secondsScale[e.name]??(e.name==='nominal_mv'?1000:1);
-   result[e.name]=Math.round(Number(e.value)*scale*Number(e.dataset.factor??1));
-  }else result[e.name]=e.value;
+  else if(e.type==='time'){const [h,m]=e.value.split(':').map(Number);result[e.name]=h*60+m}
+  else if(e.type==='number'||e.tagName==='SELECT'||e.name==='strategy'){const scale=secondsScale[e.name]??(e.name==='nominal_mv'?1000:1);result[e.name]=Math.round(Number(e.value)*scale*Number(e.dataset.factor??1))}
+  else result[e.name]=e.value;
  }
  return result;
 }
 function freshness(q){
  if(!q||q.state==='missing'||q.state==='invalid'||q.state==='unavailable'||q.age_ms==null)return 'Non disponibile';
  if(q.state==='stale')return 'Obsoleto';
- const seconds=Math.floor(q.age_ms/1000);
- return seconds>2?'Ritardo '+seconds+' s':'Aggiornato';
+ const s=Math.floor(q.age_ms/1000);return s>2?'Ritardo '+s+' s':'Aggiornato';
 }
-async function savePolicy(values){return call('ems/config',{method:'POST',body:new URLSearchParams(values)})}
-async function saveBroker(values){return call('mqtt',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(values)})}
+async function savePolicy(v){return call('ems/config',{method:'POST',body:new URLSearchParams(v)})}
+async function saveBroker(v){return call('mqtt',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(v)})}
 function renderInputDetails(data){
  const entries=[['Solcast','forecast_solar'],['Rapporto reale / previsto','forecast_ratio'],['Meteo','weather'],['Profilo di carico','load_profile'],['Heartbeat','heartbeat']];
  const states={valid:'Disponibile',stale:'Obsoleto',unavailable:'Non disponibile'};
  const types={forecast:'Previsione',derived:'Calcolato',observed:'Osservato',profile:'Profilo',legacy:'Formato precedente'};
  const sources={home_assistant:'Home Assistant',legacy_home_assistant:'Home Assistant'};
- const timeCell=(stamp)=>{
-  if(!stamp||!Number.isFinite(Date.parse(stamp)))return '—';
-  const value=element('time',absoluteLocal(stamp));
-  value.dateTime=stamp;
-  return value;
- };
- const cell=(label,value)=>{
-  const td=element('td');
-  td.setAttribute('role','cell');
-  const caption=element('span',label,'inputCellLabel');
-  caption.setAttribute('aria-hidden','true');
-  td.append(caption,typeof value==='string'?element('span',value):value);
-  return td;
- };
+ const timeCell=stamp=>{if(!stamp||!Number.isFinite(Date.parse(stamp)))return '—';const v=element('time',absoluteLocal(stamp));v.dateTime=stamp;return v};
+ const cell=(label,value)=>{const td=element('td'),cap=element('span',label,'inputCellLabel');cap.setAttribute('aria-hidden','true');td.append(cap,typeof value==='string'?element('span',value):value);return td};
  $('inputDetail').replaceChildren(...entries.map(([label,key])=>{
-  const input=data[key]??{}, row=element('tr'), title=element('th',label);
-  row.setAttribute('role','row');
-  title.scope='row';title.setAttribute('role','rowheader');
-  const status=element('span',states[input.status]??states.unavailable,'inputState');
-  status.dataset.state=input.status??'unavailable';
-  title.append(status);
-  const age=cell('Età dato',input.age_s==null?'—':duration(input.age_s));
-  if(key==='forecast_solar'&&input.age_s!=null)age.append(element('small','Dal polling Solcast'));
-  row.append(title,cell('Origine',sources[input.source]??(input.source||'—')),
-   cell('Tipo',types[input.quality]??(input.quality||'—')),
-   cell('Aggiornato',timeCell(input.timestamp)),age,cell('Scadenza',timeCell(input.expires_at)));
+  const input=data[key]??{},row=element('tr'),title=element('th',label);title.scope='row';
+  const st=element('span',states[input.status]??states.unavailable,'inputState');st.dataset.state=input.status??'unavailable';title.append(st);
+  const ageCell=cell('Età dato',input.age_s==null?'—':duration(input.age_s));
+  if(key==='forecast_solar'&&input.age_s!=null)ageCell.append(element('small',' · Dal polling Solcast'));
+  row.append(title,cell('Origine',sources[input.source]??(input.source||'—')),cell('Tipo',types[input.quality]??(input.quality||'—')),cell('Aggiornato',timeCell(input.timestamp)),ageCell,cell('Scadenza',timeCell(input.expires_at)));
   return row;
  }));
 }
+function renderResBars(h){
+ const items=[
+  ['CPU',h.cpu_pct,h.cpu_pct!=null?`${h.cpu_pct.toFixed(1)}%`:'—',`C0 ${h.cpu0_pct??'—'}% · C1 ${h.cpu1_pct??'—'}%`],
+  ['Heap RAM',h.heap_used_pct,h.heap_used_pct!=null?`${h.heap_used_pct.toFixed(1)}%`:'—',`${fmt(Math.round((h.heap||0)/1024))} / ${fmt(Math.round((h.heap_total||0)/1024))} KB`],
+  ['PSRAM',h.psram_used_pct,h.psram_used_pct!=null?`${h.psram_used_pct.toFixed(1)}%`:'—',`${fmt(((h.psram_free||0)/1048576).toFixed(2))} MB liberi`],
+  ['NVS',h.nvs_used_pct,h.nvs_used_pct!=null?`${h.nvs_used_pct.toFixed(1)}%`:'—',`${h.nvs_used_entries??'—'} / ${h.nvs_total_entries??'—'} voci`]
+ ];
+ $('resBars').replaceChildren(...items.map(([name,pct,val,sub])=>{
+  const box=element('div',null,'resCard'),head=element('div',null,'resHead'),track=element('div',null,'barTrack'),fill=element('div',null,'barFill');
+  head.append(element('span',name),element('strong',val));
+  const p=Math.max(0,Math.min(100,Number(pct)||0));fill.style.width=p+'%';
+  if(p>=85)fill.classList.add('danger');else if(p>=70)fill.classList.add('warn');
+  track.append(fill);box.append(head,track,element('small',sub));return box;
+ }));
+}
+function pill(text,cls=''){const p=element('span',text,'pill'+(cls?' '+cls:''));return p}
+let updating=false;
 async function update(){
-try{const [h,t,d,s,b,m,f,c]=await Promise.all(['health','telemetry','ems/decision','system','mqtt','manual','ha/inputs'].map(x=>call(x)).concat(call('time').catch(()=>null)));
-if(c)renderClock(c);
-flow(t);$('opMode').value=m.operating_mode;$('auxStatus').textContent='AUX1 '+m.aux1+' · stato comandato · feedback fisico non disponibile'+(m.last_aux_origin?' · Ultimo comando: '+m.last_aux_origin:'')+(m.aux_auto_off_ms?' · '+duration(Math.ceil(m.aux_auto_off_ms/1000)):'');
-const solar=f.forecast_solar, weather=f.weather, ratio=f.forecast_ratio, load=f.load_profile;
-const shown=(item,value)=>item.status==='stale'?'Obsoleto':item.status!=='valid'?'Non disponibile':value??'Non applicabile';
-const next=[...(solar.data?.today??[]),...(solar.data?.tomorrow??[])].find(p=>p.start+1800>Date.now()/1000);
-rows('forecastRows',[['Home Assistant',f.ha_online?'Online':'Offline'],
- ['Solcast',shown(solar,'Disponibile')],['Periodi oggi / domani',shown(solar,solar.data?solar.data.today.length+' / '+solar.data.tomorrow.length:null)],
- ['Prossimo periodo FV',shown(solar,next?absoluteLocal(new Date(next.start*1000).toISOString())+' · '+fmt(next.kw,'kW'):null)],
- ['Rapporto reale / previsto',shown(ratio,ratio.data?.ratio==null?null:fmt(ratio.data.ratio))],
- ['Nebbia',shown(weather,weather.data?.fog==null?null:weather.data.fog?'Sì':'No')],
- ['Profilo carico oggi',shown(load,load.data?.today_kw==null?null:fmt(load.data.today_kw,'kW'))]]);
-renderInputDetails(f);
-$('live').textContent=t.telemetry_valid?'Telemetria FC04 valida · '+fmt(t.reads)+' letture':'Telemetria non disponibile o scaduta';
-const batteryStatus=t.battery_w==null?'Non disponibile':Math.abs(t.battery_w)<20?'Inattiva':t.battery_w>0?'In carica':'In scarica';
-rows('cards',[['Stato di carica',fmt(t.soc,'%')],['Stato batteria',batteryStatus],['Potenza',fmt(t.battery_w,'W')]]);
-rows('decision',[['Strategia',displayName(d?.strategy)],['Setpoint simulato',fmt(d?.simulated_w,'W')],['Motivo',displayName(d?.safety_reason&&d.safety_reason!=='NONE'?d.safety_reason:d?.reason)],...(d?.uptime_ms!=null?[['Ultima decisione',eventTime(d,h.uptime_ms)]]:[])]);
-rows('signals',Object.entries(signals).map(([k,[label,u]])=>[label,fmt(t[k],u),freshness(t.quality?.[k])]));
-rows('strategyStatus',[['Locale',displayName(d?.configured)],['Effettiva',displayName(d?.strategy)],['Ritorno',strategies[savedValues.strategyForm?.fallback]??'—'],['Stato',displayName(d?.state)],['Motivo',displayName(d?.safety_reason&&d.safety_reason!=='NONE'?d.safety_reason:d?.reason)]]);
-const lv=savedValues.limitsForm??{};
-for(const [id,key,title] of [['powerCharge','charge','Carica'],['powerDischarge','discharge','Scarica']]){
- if(!$(id))continue;
- const current=lv[key+'_a'],cap=lv[key+'_w'];
- const equivalent=t.battery_v==null||!current?null:current*t.battery_v;
- const effective=equivalent==null&&current?null:Math.min(cap,equivalent??Infinity);
- rows(id,[[title+' alla tensione attuale',fmt(equivalent==null?null:equivalent/1000,'kW')],['Limite configurato',fmt(cap,'W')],['Limite effettivo',fmt(effective==null?null:Math.floor(effective),'W')]]);
+ if(updating)return;updating=true;
+ try{
+  const [h,t,d,s]=await Promise.all(['health','telemetry','ems/decision','system'].map(x=>call(x)));
+  const [b,m,f,c]=await Promise.all(['mqtt','manual','ha/inputs'].map(x=>call(x)).concat(call('time').catch(()=>null)));
+  if($('feedback').dataset.error==='true'&&$('feedback').textContent==='Failed to fetch')notice('');
+  if(c)renderClock(c);
+  $('fwBadge').textContent=(h.firmware||'ESP32-S3')+' · '+(h.ota_slot||'')+(h.ota_state?' ('+h.ota_state+')':'');
+  $('ledFc04').dataset.on=t.telemetry_valid?'1':'warn';
+  $('ledMqtt').dataset.on=b.connected?'1':'0';
+  $('ledHa').dataset.on=f.ha_online?'1':'warn';
+  $('ledNtp').dataset.on=c?.time_source==='NTP'?'1':c?.time_valid?'warn':'0';
+  flow(t);
+  $('opMode').value=m.operating_mode;
+  $('modeBadge').textContent=(m.operating_mode||'SHADOW')+' · '+(m.modbus_write_count??h.modbus_write_count??0)+' SCRITTURE';
+  $('livePreflight').hidden=!m.live_trial_available;
+  $('livePreflight').disabled=m.operating_mode==='LIVE'||m.live_trial_pending;
+  $('liveTrainerSettings').hidden=!m.live_trial_available;
+  if(m.live_trial_available){
+   const trainer=$('liveTrainer'), sample=$('liveTrainerSample');
+   const locked=m.operating_mode==='LIVE'||m.live_trial_pending;
+   trainer.disabled=sample.disabled=locked;
+   if(document.activeElement!==trainer)trainer.checked=m.live_trainer;
+   if(document.activeElement!==sample)sample.value=m.live_trainer_sample_s;
+   const statuses={PREFLIGHT_REQUIRED:'LIVE legge la modalità attuale e imposta ExtEms.',LIVE_PREFLIGHT_OK:'Modalità nativa letta. Puoi selezionare LIVE.',LIVE_PREFLIGHT_FAILED:'Lettura modalità nativa non riuscita.',LIVE_TRAINER_COMPLETE_NATIVE_RESTORED:'Trainer concluso. Modalità nativa ripristinata.',LIVE_TRAINER_MISMATCH_NATIVE_RESTORED:'Risposta batteria incoerente. Modalità nativa ripristinata.',LIVE_TRIAL_RUNNING:'Trainer LIVE attivo',LIVE_RUNNING:'LIVE continuo attivo',LIVE_TRIAL_START_REFUSED:'Avvio rifiutato. Verifica comunicazione e tipo di controllo batteria.',LIVE_TRIAL_ABORTED_NATIVE_RESTORED:'LIVE terminato. Modalità nativa ripristinata.',LIVE_TRIAL_FAULT_STOPPED:'LIVE interrotto per guasto.',LIVE_TRIAL_RELEASE_FAILED:'LIVE interrotto. Ripristina Self Use sull’inverter.'};
+   const applied=m.operating_mode==='LIVE'&&m.live_trial_w!=null?' · Ultimo setpoint confermato '+fmt(m.live_trial_w,'W'):'';
+   $('liveTrialStatus').textContent=(statuses[m.live_lock]||m.live_lock)+applied;
+  }
+  const wireWatts=Number.isFinite(d?.simulated_w)?-d.simulated_w:null;
+  $('liveSignHint').textContent=wireWatts==null?'Setpoint non disponibile':'Setpoint Modbus in anteprima · '+fmt(wireWatts||0,'W');
+  $('auxStatus').textContent='AUX1 '+m.aux1+' · stato comandato · feedback fisico non disponibile'+(m.last_aux_origin?' · Ultimo comando: '+m.last_aux_origin:'')+(m.aux_auto_off_ms?' · '+duration(Math.ceil(m.aux_auto_off_ms/1000)):'');
+  const solar=f.forecast_solar,weather=f.weather,ratio=f.forecast_ratio,load=f.load_profile;
+  const shown=(item,value)=>item.status==='stale'?'Obsoleto':item.status!=='valid'?'Non disponibile':value??'Non applicabile';
+  const now=Date.now()/1000;
+  const periods=[...(solar.data?.today??[]),...(solar.data?.tomorrow??[])].sort((a,b)=>a.start-b.start);
+  const current=periods.find(p=>p.start<=now&&now<p.start+(p.duration_s??1800));
+  const next=periods.find(p=>p.start>now);
+  const slot=p=>p?absoluteLocal(new Date(p.start*1000).toISOString())+' · '+fmt(p.kw,'kW'):null;
+  const total=kwh=>Number.isFinite(kwh)?fmt(kwh,'kWh'):null;
+  rows('forecastRows',[['Home Assistant',f.ha_online?'Online':'Offline'],['Solcast',shown(solar,'Disponibile')],['Solcast oggi',shown(solar,total(solar.data?.today_total_kwh))],['Solcast domani',shown(solar,total(solar.data?.tomorrow_total_kwh))],['Slot attuale',shown(solar,slot(current))],['Prossimo slot',shown(solar,slot(next))],['Rapporto reale / previsto',shown(ratio,ratio.data?.ratio==null?null:fmt(ratio.data.ratio))],['Nebbia',shown(weather,weather.data?.fog==null?null:weather.data.fog?'Sì':'No')],['Profilo carico oggi',shown(load,load.data?.today_kw==null?null:fmt(load.data.today_kw,'kW'))]]);
+  renderInputDetails(f);
+  $('live').textContent=t.telemetry_valid?'Telemetria FC04 valida · '+fmt(t.reads)+' letture · '+fmt(t.errors)+' errori':'Telemetria non disponibile o scaduta';
+  const batteryStatus=t.battery_w==null?'Non disponibile':Math.abs(t.battery_w)<20?'Inattiva':t.battery_w>0?'In carica':'In scarica';
+  $('socBig').textContent=fmt(t.soc,'%');
+  const effMin=d?.effective_soc_min??20;
+  $('socMeta').textContent=batteryStatus+' · Min stagionale '+effMin+'%';
+  const socPct=Math.max(0,Math.min(100,Number(t.soc)||0));
+  $('socBar').style.width=socPct+'%';$('socBar').classList.toggle('warn',socPct<=effMin+2);
+  $('socFloor').style.left=Math.max(0,Math.min(99,effMin))+'%';
+  rows('cards',[['Potenza',fmt(t.battery_w,'W')],['Tensione / Corrente',fmt(t.battery_v,'V')+' · '+fmt(t.battery_a,'A')]]);
+  $('battExtra').replaceChildren(...[['SOH (salute)',fmt(t.soh_pct,'%')],['Temperatura',fmt(t.battery_temp_c,'°C')]].map(([k,v])=>{const box=element('div',null,'miniItem');box.append(element('span',k),element('strong',v));return box}));
+  const dispText=displayName(d?.disposition);
+  const dp=$('dispPill');dp.textContent=dispText;dp.className='pill '+(d?.disposition==='APPLICABLE'?'ok':d?.disposition==='INPUT_UNAVAILABLE'?'warn':'');
+  const candTxt=d?.candidate_w==null?'—':fmt(d.candidate_w,'W')+' → '+fmt(d.simulated_w,'W');
+  rows('decision',[['Strategia',displayName(d?.strategy)],['Candidato → Simulato',candTxt],['Motivo',displayName(d?.safety_reason&&d.safety_reason!=='NONE'?d.safety_reason:d?.reason)],...(d?.uptime_ms!=null?[['Ultima decisione',eventTime(d,h.uptime_ms)]]:[])]);
+  const pills=[];
+  if(d?.season&&d.season!=='UNKNOWN')pills.push(pill(displayName(d.season)));
+  if(d?.predictive_phase)pills.push(pill(displayName(d.predictive_phase),'ok'));
+  if(d?.recommended_charge_a)pills.push(pill('Carica cons. '+d.recommended_charge_a+' A'));
+  if(d?.low_sun_mode)pills.push(pill('Poco sole','warn'));
+  if(d?.fog_active)pills.push(pill('Nebbia','warn'));
+  $('predPills').replaceChildren(...pills);
+  rows('signals',Object.entries(signals).map(([k,[label,u]])=>[label,fmt(t[k],u),freshness(t.quality?.[k])]));
+  rows('strategyStatus',[['Locale',displayName(d?.configured)],['Effettiva',displayName(d?.strategy)],['Ritorno',strategies[savedValues.strategyForm?.fallback]??'—'],['Stato',displayName(d?.state)],['Fase predittiva',displayName(d?.predictive_phase)],['Motivo',displayName(d?.safety_reason&&d.safety_reason!=='NONE'?d.safety_reason:d?.reason)]]);
+  const lv=savedValues.limitsForm??{};
+  for(const [id,key,title] of [['powerCharge','charge','Carica'],['powerDischarge','discharge','Scarica']]){
+   if(!$(id))continue;const current=lv[key+'_a'],cap=lv[key+'_w'],eq=t.battery_v==null||!current?null:current*t.battery_v,eff=eq==null&&current?null:Math.min(cap,eq??Infinity);
+   rows(id,[[title+' alla tensione attuale',fmt(eq==null?null:eq/1000,'kW')],['Limite configurato',fmt(cap,'W')],['Limite effettivo',fmt(eff==null?null:Math.floor(eff),'W')]]);
+  }
+  $('brokerStatus').textContent=b.connected?'Broker connesso · '+b.base:b.enabled?'MQTT in attesa del broker':'MQTT disabilitato';
+  function commandText(raw,fallback){if(!raw||raw==='—')return fallback;try{const ev=JSON.parse(raw);return [displayName(ev.action??ev.command),displayName(ev.reason??ev.status)].filter(x=>x!=='—').join(' · ')||fallback}catch{return displayName(raw)}}
+  rows('brokerInfo',[['Ultimo collegamento',b.last_connect_ms?eventTime(b.last_connect_time,h.uptime_ms,b.last_connect_ms):'Non disponibile'],['Ultima pubblicazione',b.last_publish_ms?eventTime(b.last_publish_time,h.uptime_ms,b.last_publish_ms):'Non disponibile'],['Ultimo comando',commandText(b.last_command,'Nessun comando ricevuto')+(b.last_command_time?' · '+eventTime(b.last_command_time,h.uptime_ms):'')],['Ultimo ACK',commandText(b.last_ack,'Nessun ACK disponibile')+(b.last_ack&&b.last_command_time?' · '+eventTime(b.last_command_time,h.uptime_ms):'')]]);
+  $('brokerTech').textContent=JSON.stringify({last_connect_ms:b.last_connect_ms,last_publish_ms:b.last_publish_ms,last_error:b.last_error,mqtt_reconnect_count:h.mqtt_reconnect_count,last_command:b.last_command,last_ack:b.last_ack},null,2);
+  renderResBars(h);
+  rows('device',[['SSID / IP',s.ssid+' · '+h.ip],['Wi-Fi RSSI',fmt(h.rssi_dbm,'dBm')],['Uptime',duration(h.uptime_ms/1000)],['Causa reset',resetLabel(h.reset_reason)],['Firmware',h.firmware+' ('+h.ota_slot+' · '+h.ota_state+')'],['Stack app min',h.min_application_stack_free_b!=null?`${fmt(h.min_application_stack_free_b,'B')} (${h.min_application_stack_name})`:'—'],['Riconnessioni MQTT',fmt(h.mqtt_reconnect_count)],['Letture FC04 / Errori',fmt(t.reads)+' / '+fmt(t.errors)],['AUX1 / GPIO47',h.aux1+' / '+(s.gpio47===0?'LOW':fmt(s.gpio47))],['Scritture Modbus',fmt(h.modbus_write_count)]]);
+  if(Array.isArray(h.tasks)){
+   $('taskRows').replaceChildren(...h.tasks.map(tk=>{
+    const tr=element('tr');
+    tr.append(element('td',tk.name),element('td',tk.role),element('td',tk.classification==='application'?'App':'Sistema'),element('td',fmt(tk.stack_high_water_free_b,'B')+(tk.stack_allocated_b?' / '+fmt(tk.stack_allocated_b,'B'):'')));
+    return tr;
+   }));
+  }
+ }catch(e){$('live').textContent='Dati non aggiornati';notice(e.message,true)}finally{updating=false}
 }
-$('brokerStatus').textContent=b.connected?'Broker connesso · '+b.base:b.enabled?'MQTT in attesa del broker':'MQTT disabilitato';
-function commandText(raw,fallback){
- if(!raw||raw==='—')return fallback;
- try{const event=JSON.parse(raw);return [displayName(event.action??event.command),displayName(event.reason??event.status)].filter(x=>x!=='—').join(' · ')||fallback}
- catch{return displayName(raw)}
-}
-rows('brokerInfo',[['Ultimo collegamento',b.last_connect_ms?eventTime(b.last_connect_time,h.uptime_ms,b.last_connect_ms):'Non disponibile'],['Ultima pubblicazione',b.last_publish_ms?eventTime(b.last_publish_time,h.uptime_ms,b.last_publish_ms):'Non disponibile'],['Ultimo comando',commandText(b.last_command,'Nessun comando ricevuto')+(b.last_command_time?' · '+eventTime(b.last_command_time,h.uptime_ms):'')],['Ultimo ACK',commandText(b.last_ack,'Nessun ACK disponibile')+(b.last_ack&&b.last_command_time?' · '+eventTime(b.last_command_time,h.uptime_ms):'')]]);
-$('brokerTech').textContent=JSON.stringify({last_connect_ms:b.last_connect_ms,last_publish_ms:b.last_publish_ms,last_error:b.last_error,last_command:b.last_command,last_ack:b.last_ack},null,2);
-rows('device',[['SSID',s.ssid],['IP',h.ip],['RSSI',fmt(h.rssi_dbm,'dBm')],['Uptime',duration(h.uptime_ms/1000)],['Causa reset',fmt(h.reset_reason)],['Firmware',h.firmware],['Slot OTA',h.ota_slot+' · '+h.ota_state],['Heap libero',fmt(h.heap,'B')],['PSRAM',fmt(h.psram,'B')],['Letture FC04',fmt(t.reads)],['Errori Modbus',fmt(t.errors)],['Freschezza SOC',freshness(t.quality?.soc)],['AUX1',h.aux1],['GPIO47',s.gpio47===0?'LOW':fmt(s.gpio47)],['Scritture Modbus',fmt(h.modbus_write_count)]]);
-}catch(e){$('live').textContent='Dati non aggiornati';notice(e.message,true)}}
 document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>{document.querySelectorAll('nav button').forEach(n=>n.setAttribute('aria-selected',n===b));document.querySelectorAll('main>section').forEach(s=>s.hidden=s.id!==b.dataset.pane)});
-for(const [id,save] of [['strategyForm',savePolicy],['limitsForm',savePolicy],['brokerForm',saveBroker]])$(id).onsubmit=async e=>{
+for(const [id,save] of [['strategyForm',savePolicy],['limitsForm',savePolicy],['advancedForm',savePolicy],['brokerForm',saveBroker]])$(id).onsubmit=async e=>{
  e.preventDefault();if(!e.target.reportValidity())return;
  const next=values(e.target,id==='brokerForm'),before=savedValues[id]||{};
  const changed=Object.fromEntries(Object.entries(next).filter(([k,v])=>before[k]!==v));
  if(!Object.keys(changed).length){notice('Nessuna modifica');return}
- const diff=Object.entries(changed).map(([k,v])=>k==='password'?'Password MQTT: aggiornata':titleOf(k,{...strategyFields,...limitFields,...brokerFields})+': '+formatField(k,before[k])+' → '+formatField(k,v));
+ const diff=Object.entries(changed).map(([k,v])=>k==='password'?'Password MQTT: aggiornata':titleOf(k,{...strategyFields,...limitFields,...advancedFields,...brokerFields})+': '+formatField(k,before[k])+' → '+formatField(k,v));
  if(!confirm('Applicare queste modifiche?\n'+diff.join('\n')))return;
  try{await save(changed);notice('Configurazione salvata');await load()}catch(e){notice(e.message,true)}
 };
@@ -422,75 +619,55 @@ async function manual(action,payload){
  try{const d=await call('manual/ui',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action,payload})});notice(displayName(d.reason));await update()}
  catch(e){let reason=e.message;try{reason=JSON.parse(reason).reason}catch{}notice(displayName(reason),true);$('opMode').value='SHADOW'}
 }
-$('opMode').onchange=e=>manual('operating_mode',{mode:e.target.value});
-$('auxOn').onclick=()=>{const field=$('auxTtl');if(field.reportValidity()&&confirm('Attivare il relè AUX1?'))manual('aux',{on:true,auto_off_s:Number(field.value)})};
+$('opMode').onchange=e=>{
+ const action=$('liveTrainer').checked?'Avviare il Trainer LIVE per cinque minuti?':'Avviare LIVE continuo?';
+ if(e.target.value==='LIVE'&&!$('livePreflight').hidden&&!confirm(action+' Conferma che l’ESP32 è l’unico controller sul bus.')){
+  e.target.value='SHADOW';
+  return;
+ }
+ manual('operating_mode',{mode:e.target.value});
+};
+$('livePreflight').onclick=()=>manual('operating_mode',{mode:'PREFLIGHT'});
+function saveLiveTrainer(){
+ const field=$('liveTrainerSample');
+ if(field.reportValidity())manual('live_trainer',{enabled:$('liveTrainer').checked,sample_s:field.valueAsNumber});
+}
+$('liveTrainer').onchange=saveLiveTrainer;
+$('liveTrainerSample').onchange=saveLiveTrainer;
+$('auxOn').onclick=()=>{const f=$('auxTtl');if(f.reportValidity()&&confirm('Attivare il relè AUX1?'))manual('aux',{on:true,auto_off_s:Number(f.value)})};
 $('auxOff').onclick=()=>{if(confirm('Spegnere il relè AUX1?'))manual('aux',{on:false})};
 $('mqttTest').onclick=async()=>{try{const initial=await call('mqtt');await call('mqtt/test',{method:'POST'});notice('Verifica connessione in corso…');for(let i=0;i<10;i++){await new Promise(r=>setTimeout(r,650));const state=await call('mqtt');if(state.connected&&state.last_connect_ms!==initial.last_connect_ms){notice('Connessione MQTT verificata');return}}notice('Broker non connesso entro il tempo di prova',true)}catch(e){notice(e.message,true)}};
-$('backup').onclick=async()=>{try{const [policy,mqtt]=await Promise.all(['ems/config','mqtt'].map(x=>call(x)));let filtered=(source,fields)=>Object.fromEntries(Object.keys(fields).filter(k=>k in source).map(k=>[k,source[k]]));const blob=new Blob([JSON.stringify({schema:1,policy:filtered(policy,{...strategyFields,...limitFields}),mqtt:filtered(mqtt,brokerFields)},null,2)],{type:'application/json'});const a=element('a');a.href=URL.createObjectURL(blob);a.download='afore-ems-config.json';a.click();URL.revokeObjectURL(a.href);notice('Backup esportato')}catch(e){notice(e.message,true)}};
+$('backup').onclick=async()=>{try{const [policy,mqtt]=await Promise.all(['ems/config','mqtt'].map(x=>call(x)));let filtered=(source,fields)=>Object.fromEntries(Object.keys(fields).filter(k=>k in source).map(k=>[k,source[k]]));const blob=new Blob([JSON.stringify({schema:1,policy:filtered(policy,{...strategyFields,...limitFields,...advancedFields}),mqtt:filtered(mqtt,brokerFields)},null,2)],{type:'application/json'});const a=element('a');a.href=URL.createObjectURL(blob);a.download='afore-ems-config.json';a.click();URL.revokeObjectURL(a.href);notice('Backup esportato')}catch(e){notice(e.message,true)}};
 $('restore').onchange=async e=>{if(!confirm('Ripristinare la configurazione dal file scelto?'))return;try{const d=JSON.parse(await e.target.files[0].text());if(d.schema!==1||!d.policy||!d.mqtt||'password' in d.mqtt)throw Error('Backup non valido');await savePolicy(d.policy);try{await saveBroker(d.mqtt)}catch(error){await savePolicy({rollback:1});throw error}notice('Configurazione ripristinata');await load()}catch(e){notice(e.message,true)}finally{e.target.value=''}};
 $('rollbackPolicy').onclick=async()=>{if(confirm('Ripristinare i parametri EMS precedenti?'))try{await savePolicy({rollback:1});notice('Parametri EMS ripristinati');await load()}catch(e){notice(e.message,true)}};
 $('rollbackBroker').onclick=async()=>{if(confirm('Ripristinare la configurazione MQTT precedente?'))try{await saveBroker({rollback:true});notice('Configurazione MQTT ripristinata');await load()}catch(e){notice(e.message,true)}};
 $('restart').onclick=async()=>{if(confirm('Riavviare il dispositivo?'))try{await call('reboot',{method:'POST'});notice('Riavvio richiesto')}catch(e){notice(e.message,true)}};
-$('otaForm').onsubmit=async e=>{e.preventDefault();if(!confirm('Installare l’immagine firmata e riavviare?'))return;try{const form=new FormData(e.target),file=form.get('image');const sha=form.get('sha');await call('ota',{method:'POST',headers:{'Content-Type':'application/octet-stream','X-Firmware-SHA256':sha,'X-Firmware-Signature':form.get('signature')},body:file});notice('Immagine accettata. Riavvio in corso.')}catch(e){notice(e.message,true)}};
+$('otaForm').onsubmit=async e=>{e.preventDefault();if(!confirm('Installare l’immagine firmata e riavviare?'))return;try{const form=new FormData(e.target),file=form.get('image'),sha=form.get('sha');await call('ota',{method:'POST',headers:{'Content-Type':'application/octet-stream','X-Firmware-SHA256':sha,'X-Firmware-Signature':form.get('signature')},body:file});notice('Immagine accettata. Riavvio in corso.')}catch(e){notice(e.message,true)}};
 const adminForm=$('adminPasswordForm');
 $('adminSignIn').onclick=()=>location.reload();
 adminForm.onsubmit=async e=>{
- e.preventDefault();
- const form=e.currentTarget,status=$('adminPasswordStatus'),submit=form.querySelector('button[type="submit"],.primary');
- const fields=form.elements;
- status.dataset.error='true';
- const next=fields.new_password.value;
+ e.preventDefault();const form=e.currentTarget,status=$('adminPasswordStatus'),submit=form.querySelector('button[type="submit"],.primary'),fields=form.elements;
+ status.dataset.error='true';const next=fields.new_password.value;
  if(next!==fields.confirm_password.value){status.textContent='Le nuove password non coincidono.';return}
  if(!/^[ -~]{12,64}$/.test(next)||!next.trim()){status.textContent='Usa da 12 a 64 caratteri ASCII stampabili.';return}
  submit.disabled=true;
  try{
-  await call('system/admin-password',{method:'POST',headers:{'Content-Type':'application/json'},
-   body:JSON.stringify({current_password:fields.current_password.value,new_password:next})});
-  clearInterval(updateTimer);
-  form.reset();
-  status.dataset.error='false';
-  status.textContent='Password aggiornata. Accedi di nuovo come admin.';
-  $('adminSignIn').hidden=false;
-  $('adminSignIn').focus();
+  await call('system/admin-password',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({current_password:fields.current_password.value,new_password:next})});
+  clearInterval(updateTimer);form.reset();status.dataset.error='false';status.textContent='Password aggiornata. Accedi di nuovo come admin.';
+  $('adminSignIn').hidden=false;$('adminSignIn').focus();
  }catch(error){status.textContent=error.message;submit.disabled=false}
 };
 const clockForm=$('clockForm');
 function renderClock(state,refreshForm=false){
- const initialized=clockState!==null;
- clockState=state;
- $('clockCard').hidden=false;
- if(!initialized||refreshForm){
-  for(const input of clockForm.elements){
-   if(!input.name)continue;
-   if(input.type==='checkbox')input.checked=state[input.name];
-   else input.value=state[input.name];
-  }
- }
+ const initialized=clockState!==null;clockState=state;$('clockCard').hidden=false;
+ if(!initialized||refreshForm){for(const input of clockForm.elements){if(!input.name)continue;if(input.type==='checkbox')input.checked=state[input.name];else input.value=state[input.name]}}
  $('syncClock').disabled=!state.enabled;
  const status={disabled:'NTP disabilitato',waiting:'In attesa di sincronizzazione',synchronized:'Sincronizzato',offline:'Rete non disponibile'};
- rows('clockStatus',[['Ora locale',state.time_valid?absoluteLocal(state.timestamp):'Non disponibile'],
-  ['Sorgente oraria',state.time_source==='UNSYNCED'?'UNSYNCED · ora non disponibile':state.time_source==='RTC'?'RTC · ora provvisoria':'NTP'],
-  ['Stato sincronizzazione',status[state.sync_state]??'Non disponibile'],
-  ['Ultima sincronizzazione',state.last_sync?eventTime(state.last_sync,state.uptime_ms):'Non disponibile']]);
+ rows('clockStatus',[['Ora locale',state.time_valid?absoluteLocal(state.timestamp):'Non disponibile'],['Sorgente oraria',state.time_source==='UNSYNCED'?'UNSYNCED · ora non disponibile':state.time_source==='RTC'?'RTC · ora provvisoria':'NTP'],['Stato sincronizzazione',status[state.sync_state]??'Non disponibile'],['Ultima sincronizzazione',state.last_sync?eventTime(state.last_sync,state.uptime_ms):'Non disponibile']]);
 }
-$('syncClock').onclick=async()=>{
- try{
-  await call('time/sync',{method:'POST'});
-  notice('Sincronizzazione richiesta');
-  renderClock(await call('time'));
- }catch(e){notice(e.message,true)}
-};
-clockForm.onsubmit=async e=>{
- e.preventDefault();
- const payload=Object.fromEntries(new FormData(clockForm));
- payload.enabled=$('ntpEnabled').checked;
- for(const name of ['zone','primary','fallback1','fallback2'])payload[name]=payload[name].trim();
- try{
-  renderClock(await call('time',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)}),true);
-  notice('Impostazioni orarie salvate');
- }catch(e){notice(e.message,true)}
-};
-async function load(){try{const [p,b]=await Promise.all([call('ems/config'),call('mqtt')]);makeForm('strategyForm',strategyFields,p);makeForm('limitsForm',limitFields,p);makeForm('brokerForm',brokerFields,b);await update()}catch(e){notice(e.message,true)}}
+$('syncClock').onclick=async()=>{try{await call('time/sync',{method:'POST'});notice('Sincronizzazione richiesta');renderClock(await call('time'))}catch(e){notice(e.message,true)}};
+clockForm.onsubmit=async e=>{e.preventDefault();const payload=Object.fromEntries(new FormData(clockForm));payload.enabled=$('ntpEnabled').checked;for(const name of ['zone','primary','fallback1','fallback2'])payload[name]=payload[name].trim();try{renderClock(await call('time',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)}),true);notice('Impostazioni orarie salvate')}catch(e){notice(e.message,true)}};
+async function load(){try{const [p,b]=await Promise.all([call('ems/config'),call('mqtt')]);makeForm('strategyForm',strategyFields,p);makeForm('limitsForm',limitFields,p);makeForm('advancedForm',advancedFields,p);makeForm('brokerForm',brokerFields,b);await update()}catch(e){notice(e.message,true)}}
 if(location.hash==='#system')document.querySelector('[data-pane=system]').click();
 load();const updateTimer=setInterval(update,2000);
 </script></body></html>

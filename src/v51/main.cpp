@@ -11,6 +11,7 @@ SET_LOOP_TASK_STACK_SIZE(12288);
 #include "remote.h"
 #include "ems_runtime.h"
 #include "m5.h"
+#include "live_trial.h"
 #include "drivers/afore/v51_reader.h"
 #include <esp_ota_ops.h>
 
@@ -96,11 +97,13 @@ void loop() {
         lastHeartbeat = millis();
         const auto clock=v51::clockStamp();
         char row[240]{};
-        snprintf(row, sizeof(row), "SHADOW heartbeat=%lu reset=%d heap=%u min_heap=%u "
+        snprintf(row, sizeof(row), "%s heartbeat=%lu reset=%d heap=%u min_heap=%u "
                  "psram=%u psram_free=%u time_source=%s watchdog=%s AUX1=%s gpio47=%d "
-                 "modbus_write_count=0",
-                 static_cast<unsigned long>(++sequence), int(esp_reset_reason()), ESP.getFreeHeap(),
-                 ESP.getMinFreeHeap(), ESP.getPsramSize(), ESP.getFreePsram(), v51::timeSourceName(clock.source), watchdogReady ? "on" : "error", v51::auxOn() ? "ON" : "OFF", gpio_get_level(kAux));
+                 "modbus_write_count=%u",
+                 v51::liveTrialActive() ? "LIVE" : "SHADOW", static_cast<unsigned long>(++sequence),
+                 int(esp_reset_reason()), ESP.getFreeHeap(), ESP.getMinFreeHeap(), ESP.getPsramSize(),
+                 ESP.getFreePsram(), v51::timeSourceName(clock.source), watchdogReady ? "on" : "error",
+                 v51::auxOn() ? "ON" : "OFF", gpio_get_level(kAux), v51::modbusWriteCount());
         v51::recordLog(row);
         const auto& state = reader.state();
         char soc[20], grid[20], pv[20], battery[20], load[20], temperature[20], voltage[20], frequency[20];
@@ -113,7 +116,14 @@ void loop() {
                  state.soc.age(lastHeartbeat).value_or(0), state.grid.age(lastHeartbeat).value_or(0),
                  state.pv.age(lastHeartbeat).value_or(0), state.battery.age(lastHeartbeat).value_or(0));
         v51::recordLog(row);
-        v51::tickEms(state,lastHeartbeat,sequence);
+        const auto decision = v51::tickEms(state,lastHeartbeat,sequence);
+#ifdef V51_LIVE_TRIAL
+        v51::serviceLiveTrial(reader, decision, lastHeartbeat,
+            readsStarted && watchdogReady && !state.readHalted && clock.utc &&
+            state.batteryVoltage.usable(lastHeartbeat).has_value());
+#else
+        (void)decision;
+#endif
     }
     v51::tickRemote(remoteReady && watchdogReady && gpio_get_level(kAux) == 0 &&
                     ESP.getPsramSize() == 8 * 1024 * 1024);

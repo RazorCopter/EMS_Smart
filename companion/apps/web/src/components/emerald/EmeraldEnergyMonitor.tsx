@@ -291,7 +291,7 @@ export function EmeraldEnergyMonitor({
               <circle cx="12" cy="12" r="4.5" fill={flow.pvColor} opacity="0.88" />
               <path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M19.1 4.9L17 7M7 17l-2.1 2.1" />
             </g>
-            <QualityMicroGlyph cx={357} cy={35} kind={flow.pvQualityKind} />
+            <QualityMicroGlyph cx={366} cy={26} kind={flow.pvQualityKind} />
             <text x="380" y="45" fill="var(--text-secondary)" fontSize="12" fontWeight="700">
               Fotovoltaico
             </text>
@@ -324,7 +324,7 @@ export function EmeraldEnergyMonitor({
             <g transform="translate(114, 192)" stroke={flow.gridColor} strokeWidth="1.8" fill="none" strokeLinecap="round" strokeLinejoin="round">
               <path d="M12 2v20M7 22l5-16 5 16M5 9h14M6.5 14h11" />
             </g>
-            <QualityMicroGlyph cx={153} cy={178} kind={flow.gridQualityKind} />
+            <QualityMicroGlyph cx={162} cy={169} kind={flow.gridQualityKind} />
             <text x="126" y="259" textAnchor="middle" fill="var(--text-secondary)" fontSize="12" fontWeight="700">
               Rete
             </text>
@@ -357,7 +357,7 @@ export function EmeraldEnergyMonitor({
             <g transform="translate(522, 193)" stroke={flow.loadColor} strokeWidth="1.9" fill="none" strokeLinecap="round" strokeLinejoin="round">
               <path d="M3 10.5L12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z" />
             </g>
-            <QualityMicroGlyph cx={561} cy={178} kind={flow.loadQualityKind} />
+            <QualityMicroGlyph cx={570} cy={169} kind={flow.loadQualityKind} />
             <text x="534" y="259" textAnchor="middle" fill="var(--text-secondary)" fontSize="12" fontWeight="700">
               Casa
             </text>
@@ -407,7 +407,7 @@ export function EmeraldEnergyMonitor({
             <text x="330" y="362" textAnchor="middle" fill="var(--text-muted)" fontSize="12" fontWeight="700">
               SOC
             </text>
-            <QualityMicroGlyph cx={359} cy={318} kind={flow.battQualityKind} />
+            <QualityMicroGlyph cx={369} cy={309} kind={flow.battQualityKind} />
 
             <text x="382" y="330" fill="var(--text-secondary)" fontSize="12" fontWeight="700">
               Batteria
@@ -527,7 +527,7 @@ export function EmeraldEnergyMonitor({
               <circle cx="12" cy="12" r="4" fill={flow.pvColor} />
               <path d="M12 2v3M12 19v3M2 12h3M19 12h3" />
             </g>
-            <QualityMicroGlyph cx={82} cy={51} kind={flow.pvQualityKind} />
+            <QualityMicroGlyph cx={94} cy={55} kind={flow.pvQualityKind} />
           </g>
 
           {/* Top Center: Grid Circle */}
@@ -551,7 +551,7 @@ export function EmeraldEnergyMonitor({
             <g transform="translate(168, 60)" stroke={flow.gridColor} strokeWidth="1.8" fill="none">
               <path d="M12 2v20M7 22l5-16 5 16M5 9h14" />
             </g>
-            <QualityMicroGlyph cx={202} cy={51} kind={flow.gridQualityKind} />
+            <QualityMicroGlyph cx={214} cy={55} kind={flow.gridQualityKind} />
           </g>
 
           {/* Top Right: Home Circle */}
@@ -575,7 +575,7 @@ export function EmeraldEnergyMonitor({
             <g transform="translate(288, 60)" stroke={flow.loadColor} strokeWidth="1.8" fill="none">
               <path d="M3 10.5L12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z" />
             </g>
-            <QualityMicroGlyph cx={322} cy={51} kind={flow.loadQualityKind} />
+            <QualityMicroGlyph cx={334} cy={55} kind={flow.loadQualityKind} />
           </g>
 
           {/* Center Afore Circle */}
@@ -625,7 +625,7 @@ export function EmeraldEnergyMonitor({
             <text x="144" y="287" textAnchor="middle" fill={flow.battColor} fontSize="14" fontWeight="800" className="mono">
               {flow.soc != null ? `${Math.round(flow.soc)}%` : "N/D"}
             </text>
-            <QualityMicroGlyph cx={172} cy={258} kind={flow.battQualityKind} />
+            <QualityMicroGlyph cx={179} cy={253} kind={flow.battQualityKind} />
             <text x="192" y="278" fill={flow.battColor} fontSize="17" fontWeight="800" className="mono">
               {battSplit.num} {battSplit.unit}
             </text>

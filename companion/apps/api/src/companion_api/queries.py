@@ -19,6 +19,7 @@ from companion_db.models import (
     EmsStrategyInterval,
     EnergySample,
     ExternalInput,
+    MqttMessage,
     SemComparison,
     SystemHealth,
     TelemetrySample,
@@ -1112,9 +1113,16 @@ async def query_battery_summary(
     ).scalars().all()
 
     cfg_json = cfg.config_json if cfg else {}
-    raw_tel = (latest.raw_payload_json or {}) if latest and hasattr(latest, "raw_payload_json") else {}
-    soh_val = raw_tel.get("soh_pct")
-    btemp_val = raw_tel.get("battery_temp_c")
+    last_tel_mqtt = (
+        await session.execute(
+            select(MqttMessage.payload_json)
+            .where(MqttMessage.topic.endswith("/telemetry"))
+            .order_by(desc(MqttMessage.received_at))
+            .limit(1)
+        )
+    ).scalar_one_or_none() or {}
+    soh_val = last_tel_mqtt.get("soh_pct")
+    btemp_val = last_tel_mqtt.get("battery_temp_c")
     return {
         "specifications": {
             "model": {"value": "HA / Solarman Battery Profile", "provenance": "configured"},

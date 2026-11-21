@@ -30,9 +30,9 @@ template:
         unit_of_measurement: '°C'
         icon: mdi:weather-fog
         availability: >-
-          {{ is_number(states('sensor.sense_esterno_temperature')) and is_number(states('sensor.punto_di_rugiada')) }}
+          {{ is_number(states('sensor.temp_esterna')) and is_number(states('sensor.punto_di_rugiada')) }}
         state: >-
-          {{ (states('sensor.sense_esterno_temperature') | float(0) - states('sensor.punto_di_rugiada') | float(0)) | round(1) }}
+          {{ (states('sensor.temp_esterna') | float(0) - states('sensor.punto_di_rugiada') | float(0)) | round(1) }}
 
       - name: SEM Rapporto reale previsto
         unique_id: sem_ratio
@@ -75,7 +75,7 @@ template:
           - sensor.solcast_pv_forecast_previsione_per_oggi
           - sensor.solcast_pv_forecast_previsione_per_domani
           - sensor.solarman_pv_power_media_15_min
-          - sensor.sense_esterno_temperature
+          - sensor.temp_esterna
           - sensor.punto_di_rugiada
           - sensor.radiazione_solare
           - select.solarman_modalita_ems
@@ -99,12 +99,13 @@ template:
             {% set today = state_attr('sensor.solcast_pv_forecast_previsione_per_oggi','detailedForecast') or [] %}
             {% set tomorrow = state_attr('sensor.solcast_pv_forecast_previsione_per_domani','detailedForecast') or [] %}
             {% set forecast_ok = fresh and today | count > 0 %}
-            {% set t = states('sensor.sense_esterno_temperature') %}
+            {% set t = states('sensor.temp_esterna') %}
             {% set d = states('sensor.punto_di_rugiada') %}
             {% set rad = states('sensor.radiazione_solare') %}
             {% set spread_ok = is_number(t) and is_number(d) %}
-            {% set spread = t | float(0) - d | float(0) if spread_ok else 99 %}
-            {% set fog = spread_ok and spread <= 1.5 and (not is_number(rad) or rad | float(0) < 100) and now() < today_at('11:30:00') %}
+            {% set spread = t | float - d | float if spread_ok else none %}
+            {% set fog = (spread <= 1.5 and (not is_number(rad) or rad | float < 100))
+              if spread is not none and spread >= 0 else none %}
             {% set ratio = states('sensor.sem_rapporto_reale_previsto') | float(1) %}
             {% set ns = namespace(target=0.0, day=0.0, tomorrow=0.0) %}
             {% for x in today if x is mapping %}
@@ -115,8 +116,10 @@ template:
                 {% set current = as_timestamp(now()) %}
                 {% if end > current %}
                   {% set factor = 1.0 %}
-                  {% if fog and start < as_timestamp(today_at('11:30:00')) %}{% set factor = [factor,0.3] | min %}{% endif %}
-                  {% if start < current + 7200 %}{% set factor = [factor,ratio] | min %}{% endif %}
+                  {% if start < current + 7200 %}
+                    {% if fog %}{% set factor = [factor,0.3] | min %}{% endif %}
+                    {% set factor = [factor,ratio] | min %}
+                  {% endif %}
                   {% set surplus = [raw | float(0) * factor - load, 0] | max %}
                   {% set ns.day = ns.day + surplus * (end - [start,current] | max) / 3600 %}
                   {% set overlap = [0, ([end,as_timestamp(target_time)] | min) - ([start,current] | max)] | max %}
@@ -232,7 +235,12 @@ template:
       - name: SEM Nebbia
         unique_id: sem_fog
         icon: mdi:weather-fog
-        state: "{{ state_attr('sensor.sem_calcoli','dati').get('fog',false) if state_attr('sensor.sem_calcoli','dati') is mapping else false }}"
+        availability: >-
+          {% set data = state_attr('sensor.sem_calcoli','dati') %}
+          {{ data is mapping and data.get('fog') is boolean }}
+        state: >-
+          {% set data = state_attr('sensor.sem_calcoli','dati') %}
+          {{ data is mapping and data.get('fog') is true }}
       - name: SEM Previsione valida
         unique_id: sem_fc_ok
         icon: mdi:check-network

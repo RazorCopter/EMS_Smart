@@ -3,6 +3,7 @@
 
 #include "transport/v51_read_only.h"
 #include "v51/energy_state.h"
+#include <array>
 #ifdef V51_LIVE_TRIAL
 #include "external_ems_actuator.h"
 #endif
@@ -29,7 +30,9 @@ private:
     ReadOnlyModbusTransport transport_;
     EnergyState state_;
     uint32_t nextPoll_ = 0;
-    size_t block_ = 0;
+    uint8_t phase_ = 0, lowIndex_ = 0;
+    std::array<uint16_t, 125> gridWords_{};
+    uint32_t gridStamp_ = 0;
     unsigned failures_ = 0;
     bool started_ = false;
     bool probed_ = false;

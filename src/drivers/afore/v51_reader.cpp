@@ -134,12 +134,41 @@ void AforeReader::tick(uint32_t now) {
         return;
     }
 
-    const auto block = probed_ ? kBlocks[block_] : kSocProbe;
+    constexpr uint32_t kHighPairGapMs = 150, kPostPairGapMs = 350, kPostLowGapMs = 350;
+    constexpr uint16_t addresses[]{507, 2000, 552, 2515};
+    constexpr uint32_t gaps[]{kHighPairGapMs, kPostPairGapMs, kPostLowGapMs};
+    const auto address = addresses[phase_ < 2 ? phase_ : 2 + lowIndex_];
+    auto block = kSocProbe;
+    if (probed_) {
+        for (const auto& candidate : kBlocks) {
+            if (candidate.address == address) { block = candidate; break; }
+        }
+        if (block.address != address) {
+            state_.readHalted = true;
+            recordLog("FC04_PRIORITY_PROFILE_BLOCK_MISSING");
+            return;
+        }
+    }
+    const auto gap = probed_ ? gaps[phase_] : kPostLowGapMs;
     std::array<uint16_t, 125> words{};
     const auto result = transport_.readInputRegisters(kUnit, block.address, block.count, words.data());
     bool ok = result == ReadOnlyModbusTransport::Result::Ok;
     const auto stamp = millis();
-    update(state_, block, words.data(), stamp, ok);
+    if (block.address == 507 && ok) {
+        // Validate the grid block now, but publish the high-priority pair together.
+        EnergyState decoded = state_;
+        update(decoded, block, words.data(), stamp, true);
+        ok = decoded.grid.status == Quality::Valid;
+        if (ok) {
+            gridWords_ = words;
+            gridStamp_ = stamp;
+        } else {
+            state_.grid.status = Quality::Invalid;
+            recordLog("FC04_DECODE_INVALID");
+        }
+    } else {
+        update(state_, block, words.data(), stamp, ok);
+    }
     if (block.address == 2000 && block.count >= 4) {
         if (!ok) {
             state_.soh.status = Quality::ReadError;
@@ -153,12 +182,19 @@ void AforeReader::tick(uint32_t now) {
     if (ok && ((block.address == 2002 || block.address == 2000) &&
                (state_.soc.status != Quality::Valid ||
                 (block.address == 2000 && state_.battery.status != Quality::Valid)) ||
-               (block.address == 507 && state_.grid.status != Quality::Valid) ||
                (block.address == 552 && state_.pv.status != Quality::Valid))) {
         recordLog("FC04_DECODE_INVALID");
         ok = false;
     }
     if (ok) {
+        if (block.address == 2000) {
+            for (const auto& candidate : kBlocks) {
+                if (candidate.address == 507) {
+                    update(state_, candidate, gridWords_.data(), gridStamp_, true);
+                    break;
+                }
+            }
+        }
         if (state_.goodReads <= kBlockCount) {
             char line[220];
             int used = snprintf(line, sizeof(line), "FC04_BLOCK addr=%u count=%u raw_hex=", block.address, block.count);
@@ -175,7 +211,8 @@ void AforeReader::tick(uint32_t now) {
             snprintf(line, sizeof(line), "FC04_SOC_PROBE addr=2002 valid=%d raw=%u", state_.soc.status == Quality::Valid, words[0]);
             recordLog(line);
         } else {
-            block_ = (block_ + 1) % kBlockCount;
+            if (phase_ == 2) lowIndex_ ^= 1;
+            phase_ = (phase_ + 1) % 3;
         }
     } else {
         ++state_.errors;
@@ -187,6 +224,6 @@ void AforeReader::tick(uint32_t now) {
                       state_.readHalted ? " RS485_HALTED" : "");
         recordLog(line);
     }
-    nextPoll_ = stamp + (ok ? 400 : 1000);
+    nextPoll_ = stamp + (ok ? gap : 1000);
 }
 }

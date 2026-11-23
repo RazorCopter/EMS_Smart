@@ -214,7 +214,7 @@ summary{cursor:pointer;padding:8px 0;font-weight:600;color:var(--text)}
    <p class="tag" id="liveTrialStatus">🔒 Controllo reale non ancora qualificato</p>
    <button type="button" id="livePreflight" hidden>Leggi modalità nativa</button>
    <div id="liveTrainerSettings" hidden>
-    <label><input id="liveTrainer" type="checkbox" checked> Trainer LIVE (5 min)</label>
+    <label><input id="liveTrainer" type="checkbox" checked> Trainer LIVE</label>
     <label>Campiona il log ogni (s)<input id="liveTrainerSample" type="number" min="1" max="30" step="1" value="2"></label>
    </div>
    <small id="liveSignHint">Anteprima del comando con la polarità Afore.</small>
@@ -239,7 +239,7 @@ const strategyFields={strategy:'Strategia locale',fallback:'Strategia di ritorno
 const limitFields={soc_min:'SOC minimo (%)',soc_max:'SOC massimo (%)',soc_resume:'SOC di riattivazione (%)',charge_a:'Corrente massima carica (A)',discharge_a:'Corrente massima scarica (A)',charge_w:'Potenza massima carica (W)',discharge_w:'Potenza massima scarica (W)',voltage_min:'Tensione minima batteria (V)',voltage_max:'Tensione massima batteria (V)',capacity_wh:'Capacità utile · HA/Solarman (Wh)',nominal_mv:'Tensione nominale · HA/Solarman (mV)',efficiency_pct:'Efficienza provvisoria (%)',deadband_w:'Deadband (W)',ramp_w_s:'Rampa (W/s)',export_limit_w:'Limite immissione (W, 0 disabilita)',grid_target_w:'Target scambio rete (W)'};
 const brokerFields={enabled:'MQTT abilitato',host:'Host o IP broker',port:'Porta',tls:'TLS',user:'Utente',password:'Password MQTT',device:'Identificativo dispositivo',base:'Topic base',prefix:'Prefisso Home Assistant Discovery',qos:'QoS',retain:'Mantieni stato sul broker',telemetry_s:'Intervallo telemetria (s)',diagnostics_s:'Intervallo diagnostica (s)',keepalive:'Keepalive (s)',timeout_ms:'Timeout connessione (ms)'};
 const signals={soc:['SOC batteria','%'],soh_pct:['Stato di salute batteria (SOH)','%'],battery_temp_c:['Temperatura batteria','°C'],battery_w:['Potenza batteria','W'],battery_v:['Tensione batteria','V'],battery_a:['Corrente batteria','A'],pv_w:['Fotovoltaico totale','W'],pv1_v:['Tensione PV1','V'],pv1_a:['Corrente PV1','A'],pv1_w:['Potenza PV1','W'],pv2_v:['Tensione PV2','V'],pv2_a:['Corrente PV2','A'],pv2_w:['Potenza PV2','W'],grid_w:['Potenza rete','W'],grid_v:['Tensione rete','V'],hz:['Frequenza rete','Hz'],temp_c:['Dissipatore inverter','°C'],inverter_w:['Potenza AC inverter','W'],load_w:['Carico derivato','W']};
-const check=new Set(['grid_charge','surplus_only','daily_deadline','predictive','auto_season','enabled','tls','retain']);
+const check=new Set(['delegate_native_self_use','grid_charge','surplus_only','daily_deadline','predictive','auto_season','enabled','tls','retain']);
 const texts=new Set(['host','user','password','device','base','prefix']);
 const fmt=(v,u='')=>v==null?'Non disponibile':typeof v==='number'?new Intl.NumberFormat('it-IT',{maximumFractionDigits:2}).format(v)+(u?' '+u:''):String(v);
 function element(tag,text,cls){let e=document.createElement(tag);if(text!=null)e.textContent=text;if(cls)e.className=cls;return e}
@@ -289,12 +289,23 @@ const helpFields={
  export_limit_w:['W',3300,'Tutte','Limite di immissione simulata, 0 disabilita.'],
  grid_target_w:['W',0,'SELF_USE','Scambio obiettivo: positivo per importazione.']
 };
-const advancedFields={"damping_w":"Soglia di smorzamento","damping_pct":"Guadagno di correzione"};
+const advancedFields={"native_switch_cooldown_s":"Intervallo minimo tra cambi modalità","max_mode_switches_per_day":"Budget giornaliero cambi modalità","damping_w":"Soglia di smorzamento","damping_pct":"Guadagno di correzione"};
+const nativeFields=['native_switch_cooldown_s','max_mode_switches_per_day'];
 Object.assign(advancedFields,{"trainer_settle_ms":"Assestamento","trainer_abs_w":"Tolleranza assoluta","trainer_pct":"Tolleranza relativa","trainer_timeout_ms":"Timeout comando stabile","trainer_gap_ms":"Tempo senza conferma","trainer_s":"Durata prova","trainer_charge_w":"Tetto prova in carica","trainer_discharge_w":"Tetto prova in scarica"});
-Object.assign(helpFields,{"trainer_settle_ms":["ms",3000,"Trainer LIVE","Attesa minima dopo un cambio di comando prima di confrontare la misura batteria."],"trainer_abs_w":["W",60,"Trainer LIVE","Errore minimo ammesso. Si usa il maggiore tra questa soglia e la tolleranza percentuale."],"trainer_pct":["%",15,"Trainer LIVE","Errore ammesso in percentuale rispetto al modulo del setpoint."],"trainer_timeout_ms":["ms",10000,"Trainer LIVE","Tempo massimo per confermare un comando stabile. Deve superare il tempo di assestamento."],"trainer_gap_ms":["ms",20000,"Trainer LIVE","Tempo massimo in attesa di riscontro fisico anche quando il comando continua a cambiare."],"trainer_s":["s",1800,"Trainer LIVE","Durata massima della prossima prova Trainer. Alla scadenza viene richiesto il rientro al modo nativo."],"trainer_charge_w":["W",200,"Trainer LIVE","Massima carica della prossima prova Trainer. Il limite EMS più restrittivo prevale. Zero blocca la carica."],"trainer_discharge_w":["W",200,"Trainer LIVE","Massima scarica della prossima prova Trainer. Il limite EMS più restrittivo prevale. Zero blocca la scarica."]});
+Object.assign(helpFields,{"trainer_settle_ms":["ms",3000,"Trainer LIVE","Attesa minima dopo un cambio di comando prima di confrontare la misura batteria."],"trainer_abs_w":["W",60,"Trainer LIVE","Errore minimo ammesso. Si usa il maggiore tra questa soglia e la tolleranza percentuale."],"trainer_pct":["%",15,"Trainer LIVE","Errore ammesso in percentuale rispetto al modulo del setpoint."],"trainer_timeout_ms":["ms",10000,"Trainer LIVE","Tempo massimo per confermare un comando stabile. Deve superare il tempo di assestamento."],"trainer_gap_ms":["ms",20000,"Trainer LIVE","Tempo massimo per ottenere un riscontro fisico anche se il comando cambia. Alla scadenza il Trainer avvia l?unico recupero se ha una misura assestata e uno scarto moderato; altrimenti ripristina il controllo nativo."],"trainer_s":["s",1800,"Trainer LIVE","Durata massima della prossima prova Trainer. Alla scadenza viene richiesto il rientro al modo nativo."],"trainer_charge_w":["W",200,"Trainer LIVE","Massima carica della prossima prova Trainer. Il limite EMS più restrittivo prevale. Zero blocca la carica."],"trainer_discharge_w":["W",200,"Trainer LIVE","Massima scarica della prossima prova Trainer. Il limite EMS più restrittivo prevale. Zero blocca la scarica."]});
 Object.assign(helpFields,{"damping_w":["W",50,"EMS","Differenza tra richiesta limitata e comando precedente entro cui si mantiene il comando. Aumentala per ridurre piccoli cambi. Il limite di surplus prevale sempre."],"damping_pct":["%",50,"EMS","Quota della variazione richiesta applicata per ciclo. A 50% un aumento di 400 W diventa 200 W. In ChargeFirst solo FV si smorza la risalita."]});
 const limits={damping_w:[0,1000],damping_pct:[1,100],soc_target:[1,100],predictive:[0,1],auto_season:[0,1],summer_soc_min:[0,99],winter_soc_min:[0,99],full_hold_s:[1,86400],weekday_load_w:[0,20000],weekend_load_w:[0,20000],low_sun_kwh:[0,100],deadline_minute:[0,1439],target_deadline_s:[1,604800],hold_s:[1,604799],maintenance_soc:[1,100],soc_hysteresis:[1,10],maintenance_timeout_s:[2,604800],charge_first_s:[1,604800],charge_first_w:[0,20000],target_w:[0,20000],stale_ms:[500,30000],soc_min:[0,99],soc_max:[1,100],soc_resume:[0,100],charge_a:[0,500],discharge_a:[0,500],charge_w:[0,20000],discharge_w:[0,20000],voltage_min:[0,1000],voltage_max:[0,1000],capacity_wh:[100,100000],nominal_mv:[1000,1000000],efficiency_pct:[1,100],deadband_w:[0,1000],ramp_w_s:[1,20000],export_limit_w:[0,20000],grid_target_w:[-20000,20000]};
-Object.assign(limits,{"trainer_settle_ms":[500,10000],"trainer_abs_w":[1,500],"trainer_pct":[1,30],"trainer_timeout_ms":[1000,20000],"trainer_gap_ms":[2000,30000],"trainer_s":[10,1800],"trainer_charge_w":[0,20000],"trainer_discharge_w":[0,20000]});
+Object.assign(advancedFields,{"trainer_critical_w":"Soglia critica assoluta","trainer_critical_pct":"Soglia critica relativa","trainer_recovery_ms":"Finestra di recupero","trainer_recovery_pct":"Potenza di recupero"});
+Object.assign(helpFields,{
+ trainer_critical_w:["W",200,"Verifica Trainer","Componente assoluta della soglia critica. Vale il maggiore tra questo valore e la soglia percentuale. Due letture nuove e assestate oltre soglia fanno ripristinare il controllo nativo."],
+ trainer_critical_pct:["%",30,"Verifica Trainer","Componente della soglia critica proporzionale al modulo del comando confermato. La risposta significativa in verso opposto ? considerata grave."],
+ trainer_recovery_ms:["ms",12000,"Verifica Trainer","Finestra massima per l'unico tentativo a potenza ridotta. Include la scrittura, il readback e l'assestamento. Alla scadenza viene ripristinato il controllo nativo."],
+ trainer_recovery_pct:["%",50,"Verifica Trainer","Percentuale del comando confermato da usare per il recupero, entro i limiti correnti. Il recupero richiede una risposta fisica al comando ridotto."],
+});
+Object.assign(limits,{"trainer_critical_w":[1,2000],"trainer_critical_pct":[1,100],"trainer_recovery_ms":[501,30000],"trainer_recovery_pct":[25,90]});
+Object.assign(limits,{"trainer_settle_ms":[500,10000],"trainer_abs_w":[1,500],"trainer_pct":[1,30],"trainer_timeout_ms":[1000,20000],"trainer_gap_ms":[2000,30000],"trainer_s":[10,86400],"trainer_charge_w":[0,20000],"trainer_discharge_w":[0,20000]});
+Object.assign(limits,{delegate_native_self_use:[0,1],native_switch_cooldown_s:[300,7200],max_mode_switches_per_day:[2,24]});
+Object.assign(helpFields,{delegate_native_self_use:['Sì/no',0,'LIVE continuo','Delega il Self-Use all’inverter con target rete a zero e SOC sopra la riserva. Il Trainer usa sempre il controllo esterno.'],native_switch_cooldown_s:['s',1800,'LIVE continuo','Tempo minimo dall’ultima scrittura di modalità prima di una nuova delega. Il ritorno a ExtEMS per applicare i limiti ha precedenza.'],max_mode_switches_per_day:['scritture',8,'LIVE continuo','Budget per nuove deleghe. Viene riservato un cambio per riprendere il controllo. Le scritture necessarie al rientro restano disponibili.']});
 const strategyGroups=[
  ['Predittivo & Bilanciamento',['predictive','auto_season','summer_soc_min','winter_soc_min','full_hold_s','deadline_minute','weekday_load_w','weekend_load_w','low_sun_kwh','grid_target_w','deadband_w','ramp_w_s']],
  ['Priorità alla carica',['predictive','soc_target','charge_first_w','full_hold_s','surplus_only','grid_charge','charge_first_s','soc_hysteresis']],
@@ -463,7 +474,7 @@ function makeForm(id,fields,data){
    body.append(tile);
   }
  }
- if(id==='advancedForm'){groups([['Smorzamento',Object.keys(advancedFields)]]);return}
+ if(id==='advancedForm'){groups([['Regolazione',Object.keys(advancedFields).filter(k=>!nativeFields.includes(k)&&!k.startsWith('trainer_'))],['Trainer LIVE e gestione anomalie',Object.keys(advancedFields).filter(k=>k.startsWith('trainer_'))],['Self-Use nativo',nativeFields]]);return}
  if(id==='limitsForm'){groups(batteryGroups);return}
  const bar=$('strategyTabs');bar.replaceChildren();
  function select(index){for(const b of bar.children)b.setAttribute('aria-selected',Number(b.dataset.strategy)===index);groups([tabs[index]??tabs[0],['Comportamento generale',['stale_ms']]]);const hidden=element('input');hidden.type='hidden';hidden.name='strategy';hidden.value=index;body.append(hidden)}
@@ -535,7 +546,7 @@ async function update(){
   $('ledNtp').dataset.on=c?.time_source==='NTP'?'1':c?.time_valid?'warn':'0';
   flow(t);
   $('opMode').value=m.operating_mode;
-  $('modeBadge').textContent=(m.operating_mode||'SHADOW')+' · '+(m.modbus_write_count??h.modbus_write_count??0)+' SCRITTURE';
+  $('modeBadge').textContent=(m.live_delegated_native?'LIVE · SELF-USE NATIVO':(m.operating_mode||'SHADOW'))+' · '+(m.modbus_write_count??h.modbus_write_count??0)+' SCRITTURE';
   $('livePreflight').hidden=!m.live_trial_available;
   $('livePreflight').disabled=m.operating_mode==='LIVE'||m.live_trial_pending;
   $('liveTrainerSettings').hidden=!m.live_trial_available;
@@ -545,7 +556,7 @@ async function update(){
    trainer.disabled=sample.disabled=locked;
    if(document.activeElement!==trainer)trainer.checked=m.live_trainer;
    if(document.activeElement!==sample)sample.value=m.live_trainer_sample_s;
-   const statuses={PREFLIGHT_REQUIRED:'LIVE legge la modalità attuale e imposta ExtEms.',LIVE_PREFLIGHT_OK:'Modalità nativa letta. Puoi selezionare LIVE.',LIVE_PREFLIGHT_FAILED:'Lettura modalità nativa non riuscita.',LIVE_TRAINER_COMPLETE_NATIVE_RESTORED:'Trainer concluso. Modalità nativa ripristinata.',LIVE_TRAINER_MISMATCH_NATIVE_RESTORED:'Risposta batteria incoerente. Modalità nativa ripristinata.',LIVE_TRIAL_RUNNING:'Trainer LIVE attivo',LIVE_RUNNING:'LIVE continuo attivo',LIVE_TRIAL_START_REFUSED:'Avvio rifiutato. Verifica comunicazione e tipo di controllo batteria.',LIVE_TRIAL_ABORTED_NATIVE_RESTORED:'LIVE terminato. Modalità nativa ripristinata.',LIVE_TRIAL_FAULT_STOPPED:'LIVE interrotto per guasto.',LIVE_TRIAL_RELEASE_FAILED:'LIVE interrotto. Ripristina Self Use sull’inverter.'};
+   const statuses={PREFLIGHT_REQUIRED:'LIVE legge la modalità attuale e imposta ExtEms.',LIVE_PREFLIGHT_OK:'Modalità nativa letta. Puoi selezionare LIVE.',LIVE_PREFLIGHT_FAILED:'Lettura modalità nativa non riuscita.',LIVE_TRAINER_COMPLETE_NATIVE_RESTORED:'Trainer concluso. Modalità nativa ripristinata.',LIVE_TRAINER_MISMATCH_NATIVE_RESTORED:'Risposta batteria incoerente. Modalità nativa ripristinata.',LIVE_TRIAL_RUNNING:'Trainer LIVE attivo',LIVE_RUNNING:'LIVE continuo attivo',LIVE_TRIAL_START_REFUSED:'Avvio rifiutato. Verifica comunicazione e tipo di controllo batteria.',LIVE_TRIAL_ABORTED_NATIVE_RESTORED:'LIVE terminato. Modalità nativa ripristinata.',LIVE_TRIAL_FAULT_STOPPED:'LIVE interrotto per guasto.',LIVE_NATIVE_SELF_USE_UNAVAILABLE:'LIVE terminato. Delega Self Use indisponibile.',LIVE_TRIAL_RELEASE_FAILED:'LIVE interrotto. Ripristina Self Use sull’inverter.'};
    const applied=m.operating_mode==='LIVE'&&m.live_trial_w!=null?' · Ultimo setpoint confermato '+fmt(m.live_trial_w,'W'):'';
    $('liveTrialStatus').textContent=(statuses[m.live_lock]||m.live_lock)+applied;
   }
@@ -620,7 +631,7 @@ async function manual(action,payload){
  catch(e){let reason=e.message;try{reason=JSON.parse(reason).reason}catch{}notice(displayName(reason),true);$('opMode').value='SHADOW'}
 }
 $('opMode').onchange=e=>{
- const action=$('liveTrainer').checked?'Avviare il Trainer LIVE per cinque minuti?':'Avviare LIVE continuo?';
+ const action=$('liveTrainer').checked?'Avviare il Trainer LIVE per la durata configurata?':'Avviare LIVE continuo?';
  if(e.target.value==='LIVE'&&!$('livePreflight').hidden&&!confirm(action+' Conferma che l’ESP32 è l’unico controller sul bus.')){
   e.target.value='SHADOW';
   return;

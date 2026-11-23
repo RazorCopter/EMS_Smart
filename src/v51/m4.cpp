@@ -123,6 +123,10 @@ void telemetry(JsonDocument &d, const EnergyState &e, uint32_t now) {
   d["reads"] = e.goodReads;
   d["errors"] = e.errors;
   d["fault"] = e.readHalted;
+  d["grid_batt_skew_ms"] = nullptr;
+  if (e.grid.usable(now) && e.battery.usable(now))
+    d["grid_batt_skew_ms"] = std::min(e.grid.stamp - e.battery.stamp,
+                                      e.battery.stamp - e.grid.stamp);
   d["telemetry_valid"] = !e.readHalted && e.grid.usable(now).has_value() &&
                          e.soc.usable(now).has_value() &&
                          e.battery.usable(now).has_value();

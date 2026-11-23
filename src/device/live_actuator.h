@@ -15,6 +15,9 @@ public:
     // Recheck ownership before releasing it. A failed release leaves the
     // output state unknown and stops all setpoint renewal.
     virtual bool release() = 0;
+    virtual bool enterNativeMode() { return release(); }
+    virtual bool verifyNativeMode() { return false; }
+    virtual bool enterExternalBatteryControl() { return false; }
 };
 
 }

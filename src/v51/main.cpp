@@ -96,7 +96,7 @@ void loop() {
     if (millis() - lastHeartbeat >= 1000) {
         lastHeartbeat = millis();
         const auto clock=v51::clockStamp();
-        char row[240]{};
+        char row[320]{};
         snprintf(row, sizeof(row), "%s heartbeat=%lu reset=%d heap=%u min_heap=%u "
                  "psram=%u psram_free=%u time_source=%s watchdog=%s AUX1=%s gpio47=%d "
                  "modbus_write_count=%u",
@@ -107,14 +107,16 @@ void loop() {
         v51::recordLog(row);
         const auto& state = reader.state();
         char soc[20], grid[20], pv[20], battery[20], load[20], temperature[20], voltage[20], frequency[20];
-        snprintf(row, sizeof(row), "EnergyState reads=%u errors=%u halted=%d soc=%s grid_w=%s pv_w=%s battery_w=%s load_w=%s temp_c=%s grid_v=%s hz=%s ages_ms=%u/%u/%u/%u",
+        snprintf(row, sizeof(row), "EnergyState reads=%u errors=%u halted=%d soc=%s grid_w=%s pv_w=%s battery_w=%s load_w=%s temp_c=%s grid_v=%s hz=%s ages_ms=%u/%u/%u/%u grid_batt_skew_ms=%u",
                  state.goodReads, state.errors, state.readHalted,
                  sampleValue(state.soc, lastHeartbeat, soc), sampleValue(state.grid, lastHeartbeat, grid),
                  sampleValue(state.pv, lastHeartbeat, pv), sampleValue(state.battery, lastHeartbeat, battery),
                  sampleValue(state.load, lastHeartbeat, load), sampleValue(state.temperature, lastHeartbeat, temperature),
                  sampleValue(state.voltage, lastHeartbeat, voltage), sampleValue(state.frequency, lastHeartbeat, frequency),
                  state.soc.age(lastHeartbeat).value_or(0), state.grid.age(lastHeartbeat).value_or(0),
-                 state.pv.age(lastHeartbeat).value_or(0), state.battery.age(lastHeartbeat).value_or(0));
+                 state.pv.age(lastHeartbeat).value_or(0), state.battery.age(lastHeartbeat).value_or(0),
+                 state.grid.value && state.battery.value
+                     ? std::min(state.grid.stamp - state.battery.stamp, state.battery.stamp - state.grid.stamp) : UINT32_MAX);
         v51::recordLog(row);
         const auto decision = v51::tickEms(state,lastHeartbeat,sequence);
 #ifdef V51_LIVE_TRIAL

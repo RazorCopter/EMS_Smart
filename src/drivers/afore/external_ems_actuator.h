@@ -5,6 +5,7 @@
 #include "device/live_actuator.h"
 
 #include <limits>
+#include <cstdio>
 
 namespace heliograph::afore {
 
@@ -21,8 +22,9 @@ public:
 // Its settings remain fixed for the lifetime of the session.
 class ExternalEmsActuator final : public v51::LiveActuator {
 public:
-    ExternalEmsActuator(ExternalEmsBus& bus, uint8_t unit, uint16_t nativeMode, bool invertSign)
-        : bus_(bus), unit_(unit), nativeMode_(nativeMode), invertSign_(invertSign) {}
+    ExternalEmsActuator(ExternalEmsBus& bus, uint8_t unit, uint16_t nativeMode, bool invertSign,
+                        void (*log)(const char*) = nullptr)
+        : bus_(bus), unit_(unit), nativeMode_(nativeMode), invertSign_(invertSign), log_(log) {}
 
     bool hasControl() const override {
         return unit_ >= 1 && unit_ <= 247 && nativeMode_ != kExternalMode && bus_.ownsBus();
@@ -36,7 +38,11 @@ public:
         return mode;
     }
 
-    bool enterExternalBatteryControl() {
+    bool verifyNativeMode() override {
+        return observedNativeMode(bus_, unit_) == nativeMode_;
+    }
+
+    bool enterExternalBatteryControl() override {
         uint16_t type = 0;
         const auto current = observedNativeMode(bus_, unit_);
         return hasControl() && current == nativeMode_ &&
@@ -45,6 +51,7 @@ public:
     }
 
     const char* lastError() const { return lastError_; }
+    unsigned modeWriteAttempts() const { return modeWriteAttempts_; }
 
     std::optional<int> writeAndReadBack(int watts) override {
         lastError_ = "NONE";
@@ -63,18 +70,38 @@ public:
             lastError_ = "WRITE_FAILED";
             return std::nullopt;
         }
-        uint16_t words[2]{};
-        if (!bus_.readHolding(unit_, kPower, words, 2) &&
-            !bus_.readHolding(unit_, kPower, words, 2)) {
-            lastError_ = "READBACK_IO_FAILED";
-            return std::nullopt;
+        constexpr unsigned maxReads = 3;
+        const auto expected = static_cast<uint32_t>(wireWatts);
+        for (unsigned attempt = 1; attempt <= maxReads; ++attempt) {
+            if (!hasControl()) {
+                lastError_ = "MODE_OR_CONTROL_LOST";
+                return std::nullopt;
+            }
+            uint16_t words[2]{};
+            const bool ok = bus_.readHolding(unit_, kPower, words, 2);
+            const auto bits = (uint32_t(words[0]) << 16) | words[1];
+            const bool matched = ok && bits == expected;
+            lastError_ = matched ? "NONE" : ok ? "READBACK_MISMATCH" : "READBACK_IO_FAILED";
+            if (log_ && (!matched || attempt > 1)) {
+                char line[256]{};
+                const auto actual = int64_t(bits) - (bits & 0x80000000u ? 0x100000000LL : 0LL);
+                if (ok) {
+                    std::snprintf(line, sizeof(line),
+                        "LIVE_READBACK attempt=%u/%u result=%s ems_w=%d expected_wire_w=%ld expected_raw=%04X:%04X actual_wire_w=%ld actual_raw=%04X:%04X",
+                        attempt, maxReads, matched ? "RECOVERED" : lastError_, watts,
+                        long(wireWatts), unsigned(expected >> 16), unsigned(expected & 0xffff),
+                        long(actual), unsigned(words[0]), unsigned(words[1]));
+                } else {
+                    std::snprintf(line, sizeof(line),
+                        "LIVE_READBACK attempt=%u/%u result=%s ems_w=%d expected_wire_w=%ld expected_raw=%04X:%04X actual_wire_w=NA actual_raw=NA",
+                        attempt, maxReads, lastError_, watts, long(wireWatts),
+                        unsigned(expected >> 16), unsigned(expected & 0xffff));
+                }
+                log_(line);
+            }
+            if (matched) return watts;
         }
-        const auto bits = (uint32_t(words[0]) << 16) | words[1];
-        if (bits != static_cast<uint32_t>(wireWatts)) {
-            lastError_ = "READBACK_MISMATCH";
-            return std::nullopt;
-        }
-        return watts;
+        return std::nullopt;
     }
 
     bool release() override {
@@ -88,6 +115,7 @@ public:
 
 private:
     bool writeMode(uint16_t mode) {
+        ++modeWriteAttempts_;
         std::array<uint8_t, 11> frame{};
         size_t length = 0;
         return modbus::buildWriteMultipleRegisters(unit_, kMode, &mode, 1,
@@ -110,7 +138,9 @@ private:
     uint8_t unit_;
     uint16_t nativeMode_;
     bool invertSign_;
+    void (*log_)(const char*);
     const char* lastError_ = "NONE";
+    unsigned modeWriteAttempts_ = 0;
 };
 
 }

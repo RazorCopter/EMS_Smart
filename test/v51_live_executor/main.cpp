@@ -30,6 +30,7 @@ struct Bus final : heliograph::afore::ExternalEmsBus {
     uint16_t high = 0, low = 0;
     bool mismatch = false, owner = true;
     int writes = 0, failPowerReads = 0;
+    int mismatchPowerReads = 0, powerReads = 0;
 
     bool ownsBus() const override { return owner; }
     bool readHolding(uint8_t unit, uint16_t address, uint16_t* words, uint16_t count) override {
@@ -37,9 +38,11 @@ struct Bus final : heliograph::afore::ExternalEmsBus {
         if (address == 0x09C4 && count == 1) words[0] = mode;
         else if (address == 0x0A08 && count == 1) words[0] = controlType;
         else if (address == 0x0A09 && count == 2) {
+            ++powerReads;
             if (failPowerReads > 0) { --failPowerReads; return false; }
             words[0] = high;
-            words[1] = low ^ unsigned(mismatch);
+            words[1] = low ^ unsigned(mismatch || mismatchPowerReads > 0);
+            if (mismatchPowerReads > 0) --mismatchPowerReads;
         } else return false;
         return true;
     }
@@ -62,7 +65,7 @@ int main() {
     response.confirmed(200, 1000);
     assert(response.observe(200, 2000, 2000) == Response::Waiting);
     assert(response.observe(180, 4000, 4000) == Response::Matched);
-    assert(response.observe(-180, 5000, 5000) == Response::Waiting);
+    assert(response.observe(-180, 5000, 5000) == Response::Warning);
     assert(response.observe(-180, 15000, 15000) == Response::Mismatch);
 
     // A new setpoint resets the mismatch deadline so rapid updates still get full settle time.
@@ -77,7 +80,7 @@ int main() {
     TrainerResponse highPower;
     highPower.confirmed(2000, 1000);
     assert(highPower.observe(1850, 4000, 4000) == Response::Matched);
-    assert(highPower.observe(-2000, 5000, 5000) == Response::Waiting);
+    assert(highPower.observe(-2000, 5000, 5000) == Response::Warning);
     assert(highPower.observe(-2000, 15000, 15000) == Response::Mismatch);
 
     // Changing setpoints every 2s with a stuck battery must still trip within 20s.
@@ -90,8 +93,44 @@ int main() {
     assert(stuck.observe(0, 21000, 21000) == Response::Mismatch);
     assert(std::string_view(stuck.diagnostic().deadline) == "VERIFICATION_GAP_TIMEOUT");
     assert(std::string_view(stuck.diagnostic().sample) == "NO_SETTLED_SAMPLE");
-    assert(std::string_view(response.diagnostic().deadline) == "STABLE_COMMAND_TIMEOUT");
+    assert(std::string_view(response.diagnostic().deadline) == "SEVERE_RESPONSE");
     assert(std::string_view(response.diagnostic().sample) == "OUTSIDE_TOLERANCE");
+
+    TrainerResponse verification;
+    verification.confirmed(200, 1000);
+    verification.confirmed(220, 14000);
+    assert(verification.observe(220, 15000, 15000) == Response::Waiting);
+    assert(verification.verificationSetpoint(240, 0, 300, 14999) == 240);
+    assert(verification.verificationSetpoint(240, 0, 300, 15000) == 220);
+    assert(verification.verificationSetpoint(160, 0, 160, 15000) == 110);
+    assert(verification.verificationSetpoint(160, 140, 160, 15000) == 140);
+    assert(verification.verificationSetpoint(0, 0, 0, 15000) == 0);
+    TrainerResponse fallingSurplus;
+    fallingSurplus.confirmed(2134, 1000);
+    assert(fallingSurplus.verificationSetpoint(2121, 0, 2121, 15000) == 2015);
+    fallingSurplus.confirmed(2015, 15000);
+    assert(fallingSurplus.verificationSetpoint(2060, 0, 2060, 16000) == 2015);
+    assert(fallingSurplus.observe(2020, 18000, 18000) == Response::Matched);
+    assert(verification.observe(220, 17000, 17000) == Response::Matched);
+    assert(verification.verificationSetpoint(240, 0, 300, 17000) == 240);
+
+    TrainerResponse recovery;
+    recovery.confirmed(721, 1000);
+    assert(recovery.observe(600, 4000, 4000) == Response::Warning);
+    assert(recovery.verificationSetpoint(840, 0, 900, 4100) == 721);
+    assert(recovery.observe(600, 11000, 11000) == Response::Recover);
+    assert(recovery.verificationSetpoint(840, 0, 900, 11000) == 360);
+    recovery.confirmed(360, 11000);
+    assert(recovery.observe(340, 14000, 14000) == Response::Recovered);
+    assert(recovery.verificationSetpoint(840, 0, 900, 14000) == 610);
+
+    TrainerResponse failedRecovery;
+    failedRecovery.confirmed(721, 1000);
+    assert(failedRecovery.observe(600, 11000, 11000) == Response::Recover);
+    failedRecovery.confirmed(360, 11000);
+    assert(failedRecovery.observe(250, 14000, 14000) == Response::Waiting);
+    assert(failedRecovery.observe(250, 23000, 23000) == Response::Mismatch);
+    assert(std::string_view(failedRecovery.diagnostic().deadline) == "RECOVERY_TIMEOUT");
 
     Bus takeover;
     takeover.mode = 1;
@@ -101,6 +140,34 @@ int main() {
     takeover.controlType = 0;
     assert(session.enterExternalBatteryControl() && takeover.mode == 5);
     assert(session.release() && takeover.mode == 1 && takeover.writes == 2);
+
+    assert(nativeDelegationBudgetAllows(0, 6, 8));
+    assert(!nativeDelegationBudgetAllows(1, 6, 8));
+    assert(!nativeDelegationBudgetAllows(0, 7, 8));
+    assert(!nativeDelegationBudgetAllows(0, 8, 8));
+    LiveExecutor delegated(session);
+    assert(session.enterExternalBatteryControl() && delegated.arm(0, std::nullopt));
+    assert(delegated.delegateNative(1).status == LiveStatus::NativeDelegated);
+    Decision nativeDecision;
+    nativeDecision.strategy = Strategy::SelfUse;
+    nativeDecision.lower = 0;
+    nativeDecision.upper = 100;
+    nativeDecision.finalWatts = 0;
+    const int afterDelegate = takeover.writes;
+    assert(delegated.tick(nativeDecision, 30001, 30001, 1000).status == LiveStatus::NativeDelegated);
+    assert(takeover.writes == afterDelegate);
+    assert(delegated.resumeExternal(30002).status == LiveStatus::Armed && takeover.mode == 5);
+    assert(delegated.tick(nativeDecision, 30002, 30002, 1000).confirmedWatts == 0);
+    assert(delegated.delegateNative(30003).status == LiveStatus::NativeDelegated);
+    const int beforeDisarm = takeover.writes;
+    assert(delegated.disarm().status == LiveStatus::Shadow && takeover.writes == beforeDisarm);
+
+    LiveExecutor nativeTrainer(session);
+    assert(nativeTrainer.arm(0, 5000, true));
+    assert(nativeTrainer.tick(nativeDecision, 1, 1, 1000).status == LiveStatus::NativeDelegated);
+    assert(takeover.writes == beforeDisarm);
+    assert(nativeTrainer.tick(nativeDecision, 5000, 5000, 1000).status == LiveStatus::LeaseExpired);
+    assert(takeover.writes == beforeDisarm);
 
     // Byte-for-byte command examples from the device protocol specification.
     const std::array<uint8_t, 13> positive{
@@ -206,8 +273,21 @@ int main() {
     bus.failPowerReads = 1;
     assert(direct.writeAndReadBack(500) == 500);
     bus.failPowerReads = 2;
+    assert(direct.writeAndReadBack(500) == 500);
+    bus.failPowerReads = 3;
     assert(!direct.writeAndReadBack(500));
     assert(std::string_view(direct.lastError()) == "READBACK_IO_FAILED");
+    auto writesBeforeRetry = bus.writes;
+    auto readsBeforeRetry = bus.powerReads;
+    bus.mismatchPowerReads = 2;
+    assert(inverted.writeAndReadBack(500) == 500);
+    assert(bus.writes == writesBeforeRetry + 1 && bus.powerReads == readsBeforeRetry + 3);
+    writesBeforeRetry = bus.writes;
+    readsBeforeRetry = bus.powerReads;
+    bus.mismatch = true;
+    assert(!inverted.writeAndReadBack(500));
+    assert(std::string_view(inverted.lastError()) == "READBACK_MISMATCH");
+    assert(bus.writes == writesBeforeRetry + 1 && bus.powerReads == readsBeforeRetry + 3);
 
     Actuator afterReboot;
     LiveExecutor rebooted(afterReboot);

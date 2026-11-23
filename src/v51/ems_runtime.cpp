@@ -28,8 +28,15 @@ constexpr Field fields[]={
     {"trainer_timeout_ms", &Policy::trainerTimeoutMs},
     {"trainer_gap_ms", &Policy::trainerGapMs},
     {"trainer_s", &Policy::trainerSec},
+    {"trainer_critical_w", &Policy::trainerCriticalW},
+    {"trainer_critical_pct", &Policy::trainerCriticalPct},
+    {"trainer_recovery_ms", &Policy::trainerRecoveryMs},
+    {"trainer_recovery_pct", &Policy::trainerRecoveryPct},
     {"trainer_charge_w", &Policy::trainerChargeW},
     {"trainer_discharge_w", &Policy::trainerDischargeW},
+    {"delegate_native_self_use", &Policy::delegateNativeSelfUse},
+    {"native_switch_cooldown_s", &Policy::nativeSwitchCooldownSec},
+    {"max_mode_switches_per_day", &Policy::maxModeSwitchesPerDay},
     {"grid_target_w",&Policy::gridTarget},{"export_limit_w",&Policy::exportLimit},
     {"strategy",&Policy::strategy},{"fallback",&Policy::fallback},{"soc_min",&Policy::floor},
     {"soc_max",&Policy::ceiling},{"soc_target",&Policy::target},{"charge_w",&Policy::charge},
@@ -441,6 +448,11 @@ Policy savedPolicy() {
     return current;
 }
 
+Policy activePolicy() {
+    const std::lock_guard guard(lock);
+    return overridePolicy.value_or(current);
+}
+
 PolicyStatus policyStatus() {
     const std::lock_guard guard(lock);
     return {revision,static_cast<Strategy>(overridePolicy.value_or(current).strategy)};
@@ -459,16 +471,16 @@ bool applyPolicy(const std::string& form,uint32_t leaseMs,int cancel) {
     if (cancel) {
         if (cancel==3) {
             Policy previous;
-            if (!storage || storage->getBytesLength("ems-v4-prev")!=sizeof(previous) ||
-                storage->getBytes("ems-v4-prev",&previous,sizeof(previous))!=sizeof(previous) ||
-                !previous.valid() || storage->putBytes("ems-policy-v4",&previous,sizeof(previous))!=sizeof(previous))
+            if (!storage || storage->getBytesLength("ems-v5-prev")!=sizeof(previous) ||
+                storage->getBytes("ems-v5-prev",&previous,sizeof(previous))!=sizeof(previous) ||
+                !previous.valid() || storage->putBytes("ems-policy-v5",&previous,sizeof(previous))!=sizeof(previous))
                 return false;
             current=previous;
         }
         if (cancel==2 && (current.strategy==1 || current.strategy>=4)) {
             Policy next=current;
             next.strategy=current.strategy==1 ? 0 : current.fallback;
-            if (!storage || storage->putBytes("ems-policy-v4",&next,sizeof(next))!=sizeof(next))
+            if (!storage || storage->putBytes("ems-policy-v5",&next,sizeof(next))!=sizeof(next))
                 return false;
             current=next;
         }
@@ -512,8 +524,8 @@ bool applyPolicy(const std::string& form,uint32_t leaseMs,int cancel) {
         leaseStart=millis();
         leaseDuration=leaseMs;
     } else {
-        if (!storage || storage->putBytes("ems-v4-prev",&current,sizeof(current))!=sizeof(current) ||
-            storage->putBytes("ems-policy-v4",&next,sizeof(next))!=sizeof(next))
+        if (!storage || storage->putBytes("ems-v5-prev",&current,sizeof(current))!=sizeof(current) ||
+            storage->putBytes("ems-policy-v5",&next,sizeof(next))!=sizeof(next))
             return false;
         current=next;
         overridePolicy.reset();
@@ -543,32 +555,25 @@ void loadPolicy(Preferences& preferences) {
 
     constexpr size_t v2Size = offsetof(Policy, predictive);
     Policy saved;
-    constexpr size_t previousSize = offsetof(Policy, dampingW);
-    for (const char* key : {"ems-policy-v4", "ems-v4-prev"}) {
-        if (preferences.getBytesLength(key) == previousSize) {
-            Policy previous;
-            if (preferences.getBytes(key, &previous, previousSize) == previousSize && previous.valid())
-                preferences.putBytes(key, &previous, sizeof(previous));
-        }
-    }
-    if (preferences.getBytesLength("ems-policy-v4") == sizeof(saved) &&
-        preferences.getBytes("ems-policy-v4", &saved, sizeof(saved)) == sizeof(saved) && saved.valid()) {
-        current = saved;
-        return;
-    }
-    if (preferences.getBytesLength("ems-v4-prev") == sizeof(saved) &&
-        preferences.getBytes("ems-v4-prev", &saved, sizeof(saved)) == sizeof(saved) && saved.valid()) {
-        current = saved;
-        return;
-    }
-    if (preferences.getBytesLength("ems-policy-v3") == sizeof(saved) &&
-        preferences.getBytes("ems-policy-v3", &saved, sizeof(saved)) == sizeof(saved) && saved.valid()) {
-        unlockPowerCaps(saved);
-        if (saved.valid()) {
+    for (const char* key : {"ems-policy-v5", "ems-v5-prev"}) {
+        if (preferences.getBytesLength(key) == sizeof(saved) &&
+            preferences.getBytes(key, &saved, sizeof(saved)) == sizeof(saved) && saved.valid()) {
             current = saved;
-            preferences.putBytes("ems-policy-v4", &current, sizeof(current));
             return;
         }
+    }
+    for (const char* key : {"ems-policy-v4", "ems-v4-prev", "ems-policy-v3"}) {
+        const auto size = preferences.getBytesLength(key);
+        if (size != offsetof(Policy, dampingW) && size != offsetof(Policy, delegateNativeSelfUse) &&
+            size != offsetof(Policy, trainerCriticalW)) continue;
+        Policy previous;
+        if (preferences.getBytes(key, &previous, size) != size) continue;
+        previous.trainerCriticalW = std::max(previous.trainerCriticalW, previous.trainerAbsW);
+        if (strcmp(key, "ems-policy-v3") == 0) unlockPowerCaps(previous);
+        if (!previous.valid()) continue;
+        current = previous;
+        preferences.putBytes("ems-policy-v5", &current, sizeof(current));
+        return;
     }
     // Migrate v2 policy into predictive-capable v4 preserving all user parameters
     Policy migrated;
@@ -587,7 +592,7 @@ void loadPolicy(Preferences& preferences) {
         unlockPowerCaps(migrated);
         if (migrated.valid()) {
             current = migrated;
-            preferences.putBytes("ems-policy-v4", &current, sizeof(current));
+            preferences.putBytes("ems-policy-v5", &current, sizeof(current));
             return;
         }
     }
@@ -648,6 +653,8 @@ void registerEms(httpd_handle_t server,bool (*authorize)(httpd_req_t*)) {
     const httpd_uri_t routes[]={
         {"/api/v1/ems/config",HTTP_GET,getPolicy,nullptr},
         {"/api/v1/ems/config",HTTP_POST,setPolicy,nullptr},
+        {"/api/v1/ems/policy",HTTP_GET,getPolicy,nullptr},
+        {"/api/v1/ems/policy",HTTP_POST,setPolicy,nullptr},
         {"/api/v1/ems/replay",HTTP_GET,replay,nullptr},
         {"/api/v1/ems/replay/m9b",HTTP_GET,replayM9b,nullptr},
     };

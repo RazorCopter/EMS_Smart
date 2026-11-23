@@ -6,6 +6,7 @@
 
 namespace heliograph::v51 {
 Policy savedPolicy();
+Policy activePolicy();
 struct PolicyStatus {uint32_t revision;Strategy configured;};
 PolicyStatus policyStatus();
 void loadPolicy(Preferences& preferences);

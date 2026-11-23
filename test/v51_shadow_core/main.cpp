@@ -13,6 +13,20 @@ EnergyState sample(double soc, double grid, int ms) {
   return e;
 }
 int main() {
+  Policy delegation;
+  assert(delegation.valid() && delegation.delegateNativeSelfUse == 0);
+  delegation.delegateNativeSelfUse = 2;
+  assert(!delegation.valid());
+  delegation.delegateNativeSelfUse = 1;
+  for (int invalid : {299, 7201}) {
+    delegation.nativeSwitchCooldownSec = invalid;
+    assert(!delegation.valid());
+  }
+  delegation.nativeSwitchCooldownSec = 1800;
+  for (int invalid : {1, 25}) {
+    delegation.maxModeSwitchesPerDay = invalid;
+    assert(!delegation.valid());
+  }
   StrategyManager m;
   Policy p;
   assert(p.target == 100 && p.capacityWh == 10240 && p.nominalMv == 51200 &&

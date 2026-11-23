@@ -70,6 +70,8 @@ async def mqtt_loop(settings: CollectorSettings, engine: IngestionEngine) -> Non
         (f"{base}/input/#", 1),
         (f"{base}/forecast/solar", 1),
         (f"{sem}/#", 1),
+        ("zigbee2mqtt/POW-Generale", 0),
+        ("zigbee2mqtt/POW-Prese", 0),
     ]
 
     backoff = 2.0
@@ -122,43 +124,69 @@ async def esp32_rest_loop(settings: CollectorSettings, engine: IngestionEngine) 
     client = Esp32ReadOnlyClient(settings.esp32_url, settings.esp32_username, settings.esp32_password)
     did_bootstrap = False
     last_backfill = 0.0
+    health_failures = 0
+    interval = max(5, settings.esp32_poll_health_s)
 
     while True:
+        problems: dict[str, str] = {}
         try:
             health = await client.fetch_health()
-            config = await client.fetch_config()
-            manual = await client.fetch_manual()
-            ha_inputs = await client.fetch_ha_inputs()
-            time_info = await client.fetch_time()
-            await engine.ingest_rest_health_bundle(
-                health=health, config=config, manual=manual, ha_inputs=ha_inputs, time_info=time_info
-            )
+        except Exception as exc:
+            health_failures += 1
+            problems["health"] = str(exc)[:160] or type(exc).__name__
+            mqtt_seen = engine.state.last_mqtt_telemetry_at
+            mqtt_fresh = mqtt_seen is not None and asyncio.get_running_loop().time() - mqtt_seen <= max(15, interval * 2)
+            if health_failures >= 3 or mqtt_fresh:
+                with contextlib.suppress(Exception):
+                    await engine.update_component_health(
+                        "esp32", "online" if mqtt_fresh else "offline",
+                        {"url": settings.esp32_url, "source": "mqtt" if mqtt_fresh else "health",
+                         "health_failures": health_failures, "error": problems["health"]},
+                    )
+        else:
+            health_failures = 0
+            try:
+                await engine.ingest_rest_health_bundle(health=health)
+            except Exception as exc:
+                problems["health_storage"] = str(exc)[:160] or type(exc).__name__
 
-            tel = await client.fetch_telemetry()
-            if tel:
-                await engine.ingest_rest_telemetry(tel)
+            for name, fetch in (
+                ("config", client.fetch_config), ("manual", client.fetch_manual),
+                ("ha_inputs", client.fetch_ha_inputs), ("time_info", client.fetch_time),
+                ("telemetry", client.fetch_telemetry),
+            ):
+                try:
+                    payload = await fetch()
+                    if payload is not None:
+                        if name == "telemetry":
+                            await engine.ingest_rest_telemetry(payload)
+                        else:
+                            await engine.ingest_rest_health_bundle(**{name: payload})
+                except Exception as exc:
+                    problems[name] = str(exc)[:160] or type(exc).__name__
 
             now_loop = asyncio.get_running_loop().time()
             if not did_bootstrap or engine.state.needs_backfill or (
                 now_loop - last_backfill >= settings.esp32_backfill_interval_s
             ):
-                decisions = await client.fetch_decisions_ndjson()
-                if decisions:
-                    inserted = await engine.ingest_rest_decisions(decisions)
-                    logger.info("REST decision backfill synced %d/%d records", inserted, len(decisions))
-                engine.state.needs_backfill = False
-                did_bootstrap = True
-                last_backfill = now_loop
-        except asyncio.CancelledError:
-            raise
-        except Exception as exc:
-            logger.warning("ESP32 REST poll warning: %s", exc)
-            with contextlib.suppress(Exception):
-                await engine.update_component_health(
-                    "esp32", "offline", {"url": settings.esp32_url, "error": str(exc)[:160]}
-                )
+                try:
+                    decisions = await client.fetch_decisions_ndjson()
+                    if decisions:
+                        inserted = await engine.ingest_rest_decisions(decisions)
+                        logger.info("REST decision backfill synced %d/%d records", inserted, len(decisions))
+                    engine.state.needs_backfill = False
+                    did_bootstrap = True
+                    last_backfill = now_loop
+                except Exception as exc:
+                    problems["decision_backfill"] = str(exc)[:160] or type(exc).__name__
 
-        await asyncio.sleep(max(5, settings.esp32_poll_health_s))
+        if problems:
+            logger.warning("ESP32 REST synchronization degraded: %s", problems)
+        with contextlib.suppress(Exception):
+            await engine.update_component_health(
+                "esp32_sync", "degraded" if problems else "online", {"errors": problems}
+            )
+        await asyncio.sleep(interval)
 
 
 async def main() -> None:

@@ -535,6 +535,42 @@
 /* =========================================================================
    4. EMERALD DASHBOARD GRID (Row 1: 65/35, Row 2: 3, Row 3: 4, Row 4: 75/25)
    ========================================================================= */
+.em-dec-measured {
+  margin: 0;
+}
+.em-dec-measured dd {
+  margin-inline-start: 0;
+}
+
+.em-balance {
+  padding: 1rem;
+}
+.em-balance summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+.em-balance-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: .75rem;
+}
+.em-balance-scroll {
+  max-height: 22rem;
+  overflow: auto;
+  margin-block-start: .75rem;
+}
+.em-balance table {
+  width: 100%;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+.em-balance th, .em-balance td {
+  text-align: right;
+  padding: .45rem .6rem;
+  white-space: nowrap;
+}
+
 .em-dashboard {
   display: flex;
   flex-direction: column;

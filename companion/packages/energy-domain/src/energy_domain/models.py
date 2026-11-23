@@ -282,7 +282,7 @@ class ConfigStatePayload(BaseModel):
 class ManualStatePayload(BaseModel):
     model_config = ConfigDict(extra="allow")
 
-    operating_mode: str = "SHADOW"
+    operating_mode: str | None = None
     live_lock: str | None = None
     aux1: str | None = None
     physical_feedback: Any = None

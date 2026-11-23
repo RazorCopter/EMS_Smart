@@ -11,6 +11,7 @@ export type LiveChartRange = "1h" | "3h" | "6h" | "12h" | "today";
 
 export interface LiveResponse {
   generated_at: string;
+  house_meter?: { watts: number; received_at: string } | null;
   timezone: string;
   telemetry: any;
   decision: any;

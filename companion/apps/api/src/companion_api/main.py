@@ -49,6 +49,7 @@ from .auth import (
 from .config import ApiSettings
 from .pdf_export import build_simple_pdf
 from .queries import (
+    power_balance_hour,
     get_live_payload,
     get_system_resources,
     get_system_status,
@@ -346,6 +347,24 @@ async def live(
         tz_name=tz_name,
         battery_capacity_wh=cfg.battery_capacity_wh,
     )
+
+
+@app.get("/api/v1/diagnostics/power-balance")
+async def power_balance(
+    request: Request,
+    format: str = "json",
+    _user: SessionInfo = Depends(require_viewer),
+    db: AsyncSession = Depends(get_db),
+) -> Response:
+    rows = await power_balance_hour(db, request.app.state.settings.device_id)
+    if format != "csv":
+        return JSONResponse({"rows": rows})
+    output = io.StringIO()
+    writer = csv.DictWriter(output, fieldnames=list(rows[0]) if rows else ["sample_utc"])
+    writer.writeheader()
+    writer.writerows(rows)
+    return Response("\ufeff" + output.getvalue(), media_type="text/csv",
+                    headers={"Content-Disposition": 'attachment; filename="bilancio-ultima-ora.csv"'})
 
 
 @app.websocket("/api/v1/ws/live")

@@ -4,6 +4,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 import json
 import logging
+import time
 from typing import Any
 import uuid
 
@@ -65,6 +66,7 @@ COLLECTOR_REBOOTS_TOTAL = Counter(
 
 @dataclass
 class DeviceRuntimeState:
+    last_mqtt_telemetry_at: float | None = None
     boot_id: str | None = None
     last_seq: int | None = None
     last_uptime_ms: int | None = None
@@ -190,6 +192,8 @@ class IngestionEngine:
                     await self._handle_telemetry(
                         session, parsed_json, now, provenance="mqtt", source_topic=topic, raw_msg_id=raw_msg.id
                     )
+                    if not retain:
+                        self.state.last_mqtt_telemetry_at = time.monotonic()
                 elif suffix in {"ems/decision", "ems/state"}:
                     await self._handle_decision(session, parsed_json, now)
                 elif suffix == "ems/ack":

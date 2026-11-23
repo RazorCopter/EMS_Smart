@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import type { SystemHealthViewModel } from "../../viewmodels/dashboardViewModel";
 import { HelpTip } from "../HelpTip";
+import { espModeLabel } from "./espModeLabel";
 
 interface Props {
   system: SystemHealthViewModel;
@@ -37,17 +38,19 @@ function StatusIcon({ tone }: { tone: "ok" | "warn" | "err" | "neutral" }) {
 export function EmeraldSystemPanel({ system, variant = "panel" }: Props) {
   const comps = system.components ?? {};
   const espMeta = statusMeta(comps.esp32?.status);
+  const syncMeta = statusMeta(comps.esp32_sync?.status);
   const mqttMeta = statusMeta(comps.mqtt?.status);
   const haMeta = statusMeta(comps.home_assistant?.status);
   const ntpMeta = statusMeta(comps.ntp?.status);
 
   const items = [
     { key: "esp32", icon: Cpu, label: "ESP32", tone: espMeta.tone, value: espMeta.label === "Attivo" ? "Online" : espMeta.label },
+    { key: "esp32_sync", icon: Database, label: "Sincronizzazione ESP", tone: syncMeta.tone, value: syncMeta.label },
     { key: "mqtt", icon: Radio, label: "MQTT", tone: mqttMeta.tone, value: comps.mqtt?.status === "online" ? "Connesso" : mqttMeta.label },
     { key: "ha", icon: Home, label: "Home Assistant", tone: haMeta.tone, value: haMeta.label === "Attivo" ? "Online" : haMeta.label },
     { key: "ctrl", icon: Lock, label: "Controllo reale", tone: "neutral" as const, value: "Disabilitato" },
     { key: "sem", icon: Server, label: "SEM", tone: system.semOnline ? ("ok" as const) : ("neutral" as const), value: system.semOnline ? "Attivo" : "N/D" },
-    { key: "mode", icon: Activity, label: "Modalità ESP", tone: "warn" as const, value: system.modalitaEsp },
+    { key: "mode", icon: Activity, label: "Modalità ESP", tone: "neutral" as const, value: espModeLabel(comps.aux1).replace(/^ESP · /, "") },
     { key: "aux", icon: HardDrive, label: "AUX", tone: system.aux1State !== "OFF" ? ("ok" as const) : ("neutral" as const), value: system.aux1State },
     { key: "ntp", icon: Database, label: "NTP", tone: ntpMeta.tone, value: comps.ntp?.status === "online" ? "Sync" : ntpMeta.label },
   ];

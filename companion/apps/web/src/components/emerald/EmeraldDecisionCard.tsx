@@ -7,9 +7,11 @@ import { EmeraldStatusPill } from "./EmeraldChrome";
 
 interface Props {
   decision: DecisionViewModel;
+  batteryW?: number | null;
+  gridW?: number | null;
 }
 
-export function EmeraldDecisionCard({ decision }: Props) {
+export function EmeraldDecisionCard({ decision, batteryW, gridW }: Props) {
   const limitsText =
     decision.safetyMinW != null && decision.safetyMaxW != null
       ? `${Math.round(decision.safetyMinW)} / ${Math.round(decision.safetyMaxW)} W`
@@ -29,7 +31,7 @@ export function EmeraldDecisionCard({ decision }: Props) {
           <h2 className="em-card-title">Decisione EMS</h2>
           <p className="em-card-sub">Valutazione autonoma locale</p>
         </div>
-        <EmeraldStatusPill tone="shadow" label="SHADOW" />
+        <EmeraldStatusPill tone="shadow" label="Simulazione EMS" />
       </div>
 
       {/* Primary Hero Block: Strategia attiva + Setpoint simulato */}
@@ -63,6 +65,17 @@ export function EmeraldDecisionCard({ decision }: Props) {
           <div className="em-dec-setpoint-val mono">{fmtWatts(decision.simulatedW, "W")}</div>
         </div>
       </div>
+
+      <dl className="em-dec-compare-grid em-dec-measured" aria-label="Misure dell’impianto">
+        <div className="em-dec-tile">
+          <dt className="em-dec-tile-k">Batteria misurata</dt>
+          <dd className="em-dec-tile-v mono">{fmtWatts(batteryW ?? null, "W")}</dd>
+        </div>
+        <div className="em-dec-tile">
+          <dt className="em-dec-tile-k">Scambio rete</dt>
+          <dd className="em-dec-tile-v mono">{fmtWatts(gridW ?? null, "W")}</dd>
+        </div>
+      </dl>
 
       {/* Secondary Comparison Row: Richiesta iniziale & Safety */}
       <div className="em-dec-compare-grid">
@@ -113,7 +126,7 @@ export function EmeraldDecisionCard({ decision }: Props) {
       <div className="em-dec-shadow-strip" role="note">
         <Info size={15} aria-hidden="true" />
         <span>
-          <strong>SHADOW</strong> — Decisioni simulate, nessun comando applicato all&apos;inverter
+          <strong>Setpoint calcolato</strong> · Il valore confermato dall’ESP può differire durante il LIVE.
         </span>
       </div>
 

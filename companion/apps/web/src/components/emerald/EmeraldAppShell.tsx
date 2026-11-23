@@ -167,9 +167,9 @@ export function EmeraldAppShell({ user, system, theme, onToggleTheme, onLogout }
               <div className="em-shadow-box" role="note">
                 <div className="em-shadow-box-title">
                   <ShieldCheck size={14} aria-hidden="true" />
-                  <span>SHADOW · SOLA LETTURA</span>
+                  <span>COMPANION · SOLA LETTURA</span>
                 </div>
-                <div className="em-shadow-box-sub">Decisioni simulate · 0 scritture Modbus</div>
+                <div className="em-shadow-box-sub">Monitoraggio e storico dell’impianto</div>
               </div>
             </>
           )}

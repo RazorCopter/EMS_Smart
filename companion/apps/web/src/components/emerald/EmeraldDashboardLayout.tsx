@@ -9,7 +9,9 @@ import {
 } from "../../viewmodels/dashboardViewModel";
 import { EChart } from "../EChart";
 import { HelpTip } from "../HelpTip";
+import { apiFetch } from "../../lib/api";
 import { EmeraldDetailDrawer, EmeraldPageHeader, EmeraldStatusPill } from "./EmeraldChrome";
+import { espModeLabel } from "./espModeLabel";
 import { EmeraldDecisionCard } from "./EmeraldDecisionCard";
 import { EmeraldEnergyMonitor } from "./EmeraldEnergyMonitor";
 import { EmeraldKpiSection } from "./EmeraldKpiSection";
@@ -31,8 +33,30 @@ function formatStartedAtLabel(iso: string | null | undefined, startedToday: bool
 
 export function EmeraldDashboardLayout({ vm, chartRange, onChangeChartRange }: Props) {
   const [sysDrawerOpen, setSysDrawerOpen] = useState(false);
+  const [balance, setBalance] = useState<Array<Record<string, number | string | null>>>([]);
+  const [balanceStatus, setBalanceStatus] = useState("");
 
   const tel = vm.telemetry;
+  const meter = vm.raw.house_meter;
+  const meterAge = meter ? (Date.now() - Date.parse(meter.received_at)) / 1000 : Infinity;
+  const measured = meter && meterAge >= -2 && meterAge <= 15 ? meter.watts : null;
+  const derived = tel?.stale ? null : tel?.load_w ?? null;
+  const flowTelemetry = tel && measured !== null && !tel.stale ? {
+    ...tel,
+    load_w: measured,
+    quality: { ...tel.quality, load_w: { source: "measured", state: "valid", age_ms: Math.max(0, meterAge * 1000) } },
+  } : tel;
+  const watts = (v: unknown) => typeof v === "number" ? `${Math.round(v)} W` : "N/D";
+  async function loadBalance() {
+    setBalanceStatus("Caricamento…");
+    try {
+      const response = await apiFetch<{ rows: typeof balance }>("/api/v1/diagnostics/power-balance");
+      setBalance(response.rows.slice().reverse());
+      setBalanceStatus(response.rows.length ? `${response.rows.length} campioni` : "Nessun campione nell’ultima ora");
+    } catch {
+      setBalanceStatus("Impossibile caricare lo storico.");
+    }
+  }
   const cov = vm.coverage;
   const telStateLabel = !tel
     ? "In attesa di telemetria"
@@ -52,7 +76,7 @@ export function EmeraldDashboardLayout({ vm, chartRange, onChangeChartRange }: P
       {/* TALL CONTEXTUAL EMERALD HEADER */}
       <EmeraldPageHeader
         title="Dashboard Live"
-        subtitle="Monitoraggio energetico in tempo reale · Analisi autonoma in SHADOW"
+        subtitle="Flussi energetici e regolazione dell’impianto"
         badges={
           <>
             <span className="em-header-clock mono">
@@ -63,7 +87,7 @@ export function EmeraldDashboardLayout({ vm, chartRange, onChangeChartRange }: P
             </span>
             <EmeraldStatusPill tone={vm.telStateClass} label={telStateLabel} />
             <EmeraldStatusPill tone="info" label={vm.decision.effectiveStrategyLabel} />
-            <EmeraldStatusPill tone="shadow" label="Modalità SHADOW" />
+            <EmeraldStatusPill tone="info" label={espModeLabel(vm.system.components.aux1)} />
           </>
         }
         actions={
@@ -82,49 +106,39 @@ export function EmeraldDashboardLayout({ vm, chartRange, onChangeChartRange }: P
       {/* ROW 1: 65% RADIAL ENERGY MONITOR / 35% HIERARCHICAL DECISION CARD */}
       <section className="em-row-hero">
         <EmeraldEnergyMonitor
-          telemetry={tel}
+          telemetry={flowTelemetry}
           safetyMinW={vm.decision.safetyMinW}
           safetyMaxW={vm.decision.safetyMaxW}
           selfConsumptionPct={vm.kpis.selfConsumptionPct}
         />
-        <EmeraldDecisionCard decision={vm.decision} />
+        <EmeraldDecisionCard decision={vm.decision} batteryW={tel?.stale ? null : tel?.battery_w} gridW={tel?.stale ? null : tel?.grid_w} />
       </section>
 
-      {/* ROW 2 (3 HERO PANELS) & ROW 3 (4 CONTINUOUS SPARKLINE CARDS) */}
-      <EmeraldKpiSection
-        kpis={vm.kpis}
-        battPowerW={tel?.battery_w}
-        formulas={vm.raw.kpi_today?.formulas}
-      />
+      <details className="em-card em-balance" onToggle={(event) => {
+        if (event.currentTarget.open) void loadBalance();
+      }}>
+        <summary>
+          {measured !== null ? `Casa misurata · ${watts(measured)}` : `Casa stimata · ${watts(derived)}`}
+          {measured !== null && ` · POW-Generale · ${Math.max(0, Math.floor(meterAge))} s fa`}
+          {" · Bilancio ultima ora"}
+        </summary>
+        <p>Casa Afore {watts(derived)} · Differenza {watts(measured !== null && derived !== null ? measured - derived : null)}</p>
+        <div className="em-balance-actions">
+          <button className="btn" type="button" onClick={() => void loadBalance()}>Aggiorna</button>
+          <a className="inline-action-link" href="/api/v1/diagnostics/power-balance?format=csv" download>Scarica CSV</a>
+          <span role="status">{balanceStatus}</span>
+        </div>
+        {balance.length > 0 && <div className="em-balance-scroll" tabIndex={0} aria-label="Misure dell’ultima ora">
+          <table>
+            <thead><tr>{["Ora", "Casa Tongou", "Casa Afore", "Δ casa", "FV", "AC inverter", "Rete", "Batteria", "Residuo Afore", "Residuo Tongou"].map(label => <th key={label} scope="col">{label}</th>)}</tr></thead>
+            <tbody>{balance.map((row, index) => <tr key={`${row.sample_utc}-${index}`}>
+              <td>{fmtTime(String(row.sample_utc), vm.timezone)}</td>
+              {["house_measured_w", "house_derived_w", "house_delta_w", "pv_w", "inverter_w", "grid_w", "battery_w", "residual_afore_w", "residual_tongou_w"].map(key => <td key={key}>{watts(row[key])}</td>)}
+            </tr>)}</tbody>
+          </table>
+        </div>}
+      </details>
 
-      {/* SLEEK COVERAGE & DATA QUALITY RIBBON */}
-      <section className="em-coverage-ribbon" aria-label="Copertura e qualità acquisizione dati">
-        <div className="em-cov-left">
-          <EmeraldStatusPill
-            tone={cov.pct != null && cov.pct >= 95 ? "ok" : cov.pct == null ? "neutral" : "warn"}
-            label={`Copertura: ${cov.pct != null ? fmtPct(cov.pct) : "N/D"}`}
-          />
-          <span className="label-with-tip em-cov-note">
-            {formatStartedAtLabel(cov.firstSampleAt, cov.monitoringStartedToday, vm.timezone)}
-            <HelpTip
-              id="tip-em-coverage"
-              title="Copertura telemetrica"
-              text="Percentuale di secondi con dati validi dal primo avvio del Companion."
-              align="left"
-            />
-          </span>
-        </div>
-        <div className="em-cov-pills">
-          {cov.monitoringStartedToday && (
-            <span className="em-cov-chip">Pre-avvio escluso ({fmtDurationCompact(cov.unmonitoredPreInstallSec)})</span>
-          )}
-          <span className="em-cov-chip">Gap: {fmtDurationCompact(cov.gapSeconds)}</span>
-          <span className="em-cov-chip">Invalidi: {cov.invalidSamples}</span>
-          {cov.unavailableSeconds > 0 && (
-            <span className="em-cov-chip em-cov-chip-err">Unavailable: {fmtDurationCompact(cov.unavailableSeconds)}</span>
-          )}
-        </div>
-      </section>
 
       {/* ROW 4: 75% WIDE LIVE CHART + 25% AUTONOMOUS STATO IMPIANTO PANEL */}
       <section className="em-row-bottom">
@@ -165,6 +179,43 @@ export function EmeraldDashboardLayout({ vm, chartRange, onChangeChartRange }: P
 
         <div className="em-system-desktop-slot">
           <EmeraldSystemPanel system={vm.system} variant="panel" />
+        </div>
+      </section>
+
+      <h2 className="em-card-title">Energia di oggi</h2>
+      {/* ROW 2 (3 HERO PANELS) & ROW 3 (4 CONTINUOUS SPARKLINE CARDS) */}
+      <EmeraldKpiSection
+        kpis={vm.kpis}
+        battPowerW={tel?.battery_w}
+        formulas={vm.raw.kpi_today?.formulas}
+      />
+
+      {/* SLEEK COVERAGE & DATA QUALITY RIBBON */}
+      <section className="em-coverage-ribbon" aria-label="Copertura e qualità acquisizione dati">
+        <div className="em-cov-left">
+          <EmeraldStatusPill
+            tone={cov.pct != null && cov.pct >= 95 ? "ok" : cov.pct == null ? "neutral" : "warn"}
+            label={`Copertura: ${cov.pct != null ? fmtPct(cov.pct) : "N/D"}`}
+          />
+          <span className="label-with-tip em-cov-note">
+            {formatStartedAtLabel(cov.firstSampleAt, cov.monitoringStartedToday, vm.timezone)}
+            <HelpTip
+              id="tip-em-coverage"
+              title="Copertura telemetrica"
+              text="Percentuale di secondi con dati validi dal primo avvio del Companion."
+              align="left"
+            />
+          </span>
+        </div>
+        <div className="em-cov-pills">
+          {cov.monitoringStartedToday && (
+            <span className="em-cov-chip">Pre-avvio escluso ({fmtDurationCompact(cov.unmonitoredPreInstallSec)})</span>
+          )}
+          <span className="em-cov-chip">Gap: {fmtDurationCompact(cov.gapSeconds)}</span>
+          <span className="em-cov-chip">Invalidi: {cov.invalidSamples}</span>
+          {cov.unavailableSeconds > 0 && (
+            <span className="em-cov-chip em-cov-chip-err">Unavailable: {fmtDurationCompact(cov.unavailableSeconds)}</span>
+          )}
         </div>
       </section>
 

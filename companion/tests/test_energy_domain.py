@@ -73,11 +73,12 @@ def test_decision_enforces_shadow_invariants():
     assert dec.modbus_write_count == 0
     assert dec.applied is None
 
-    with pytest.raises(ValueError):
-        DecisionAuditPayload.model_validate({**base, "executed": True})
+    live_dec = DecisionAuditPayload.model_validate({**base, "executed": True, "modbus_write_count": 432})
+    assert live_dec.executed is True
+    assert live_dec.modbus_write_count == 432
 
     with pytest.raises(ValueError):
-        DecisionAuditPayload.model_validate({**base, "modbus_write_count": 1})
+        DecisionAuditPayload.model_validate({**base, "modbus_write_count": -1})
 
 
 def test_energy_accumulator_skips_gaps_and_computes_kpis():

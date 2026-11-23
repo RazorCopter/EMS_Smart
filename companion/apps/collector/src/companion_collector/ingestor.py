@@ -296,8 +296,8 @@ class IngestionEngine:
         return {
             **self._esp32_diag_cache,
             "mode": self._esp32_diag_cache.get("mode", "SHADOW"),
-            "executed": False,
-            "modbus_write_count": 0,
+            "executed": bool(self._esp32_diag_cache.get("executed", False)),
+            "modbus_write_count": int(self._esp32_diag_cache.get("modbus_write_count", 0)),
         }
 
     async def ingest_rest_health_bundle(

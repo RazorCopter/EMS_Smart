@@ -48,6 +48,7 @@ from .auth import (
     sign_session,
     verify_session,
 )
+from . import __version__
 from .config import ApiSettings
 from .pdf_export import build_simple_pdf
 from .queries import (
@@ -188,7 +189,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="Afore EMS Companion API",
-    version="0.1.0",
+    version=__version__,
     description="Read-only telemetry, history, decision audit, and SHADOW comparison API.",
     lifespan=lifespan,
 )
@@ -200,7 +201,7 @@ async def get_db(request: Request) -> AsyncSession:
 
 
 @app.get("/api/v1/health")
-async def health(request: Request, db: AsyncSession = Depends(get_db)) -> dict[str, Any]:
+async def health(db: AsyncSession = Depends(get_db)) -> dict[str, Any]:
     db_ok = False
     try:
         await db.execute(text("SELECT 1"))
@@ -213,7 +214,7 @@ async def health(request: Request, db: AsyncSession = Depends(get_db)) -> dict[s
         "operating_mode": "SHADOW",
         "read_only": True,
         "modbus_write_capable": False,
-        "version": request.app.state.settings.companion_version,
+        "version": __version__,
         "timestamp": datetime.now(timezone.utc).isoformat(),
     }
 

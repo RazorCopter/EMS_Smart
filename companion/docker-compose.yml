@@ -72,7 +72,6 @@ services:
       TZ: ${TZ:-Europe/Rome}
       COMPANION_TIMEZONE: ${COMPANION_TIMEZONE:-Europe/Rome}
       COMPANION_LOCALE: ${COMPANION_LOCALE:-it-IT}
-      COMPANION_VERSION: ${COMPANION_VERSION:-0.1.0}
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-afore_companion}:${POSTGRES_PASSWORD}@timescaledb:5432/${POSTGRES_DB:-afore_companion}
       ALEMBIC_DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-afore_companion}:${POSTGRES_PASSWORD}@timescaledb:5432/${POSTGRES_DB:-afore_companion}
       COMPANION_SECRET_KEY: ${COMPANION_SECRET_KEY:?COMPANION_SECRET_KEY required}

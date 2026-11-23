@@ -1,3 +1,4 @@
+import { version as companionVersion } from "../../../package.json";
 import { useState } from "react";
 import { NavLink, Outlet } from "react-router-dom";
 import {
@@ -193,7 +194,7 @@ export function EmeraldAppShell({ user, system, theme, onToggleTheme, onLogout }
             >
               <LogOut size={14} />
             </button>
-            {!collapsed && <span className="em-version-tag">v0.1.0</span>}
+            {!collapsed && <span className="em-version-tag">v{companionVersion}</span>}
           </div>
         </div>
       </aside>
@@ -237,7 +238,7 @@ export function EmeraldAppShell({ user, system, theme, onToggleTheme, onLogout }
               <div className="em-mobile-drawer-head">
                 <div>
                   <strong>Afore EMS · {user.username}</strong>
-                  <div className="em-version-tag">Emerald Control v0.1.0</div>
+                  <div className="em-version-tag">Emerald Control v{companionVersion}</div>
                 </div>
                 <button type="button" className="btn em-icon-btn" onClick={() => setMobileMenuOpen(false)} aria-label="Chiudi menu">
                   <X size={16} />

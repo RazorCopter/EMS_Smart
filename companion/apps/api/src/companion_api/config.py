@@ -6,7 +6,6 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class ApiSettings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
-    companion_version: str = "0.1.0"
     companion_timezone: str = "Europe/Rome"
     companion_locale: str = "it-IT"
     database_url: str = "postgresql+asyncpg://afore_companion:afore_companion@timescaledb:5432/afore_companion"

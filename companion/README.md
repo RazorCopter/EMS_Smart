@@ -1,4 +1,4 @@
-# Afore EMS Companion · v0.1.0
+# Afore EMS Companion · v1.0.0
 
 Companion container premium, **strettamente in sola lettura (SHADOW)**, per monitoraggio live, storico su TimescaleDB, timeline decisioni EMS, confronto SEM/ESP32, KPI energetici, diagnostica ed esportazioni.
 
@@ -41,3 +41,11 @@ Tutti i Dockerfile (`api`, `collector`, `web`, `backup`) e l'immagine ufficiale 
 ```bash
 docker buildx build --platform linux/amd64,linux/arm64 -f deploy/docker/Dockerfile.api .
 ```
+
+## Release version
+
+For each Companion release, bump the same version in the API package's
+`companion_api/__init__.py`, the collector, database and energy-domain package
+metadata, the web package and lockfile, the Companion contracts metadata, and
+this README. The API and both dashboard themes read their version from the
+built packages. Verify the reported version after the container rebuild.

@@ -1,3 +1,4 @@
+import { version as companionVersion } from "../../../package.json";
 import { useState } from "react";
 import { NavLink, Outlet } from "react-router-dom";
 import {
@@ -90,7 +91,7 @@ export function ClassicAppShell({ user, system, theme, onToggleTheme, onLogout }
               {!collapsed && (
                 <div>
                   <div className="brand-title">Afore EMS</div>
-                  <div className="brand-sub">Companion · v0.1.0</div>
+                  <div className="brand-sub">Companion · v{companionVersion}</div>
                 </div>
               )}
             </div>

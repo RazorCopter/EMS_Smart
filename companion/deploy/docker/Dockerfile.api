@@ -26,6 +26,8 @@ RUN pip install --no-cache-dir /wheels/*.whl && rm -rf /wheels
 COPY database/alembic.ini ./database/alembic.ini
 COPY database/migrations ./database/migrations
 
+RUN install -d -o companion -g companion /var/lib/companion/esp-logs
+
 USER companion
 EXPOSE 8000
 

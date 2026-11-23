@@ -23,6 +23,8 @@ WORKDIR /app
 COPY --from=builder /wheels /wheels
 RUN pip install --no-cache-dir /wheels/*.whl && rm -rf /wheels
 
+RUN install -d -o companion -g companion /var/lib/companion/esp-logs
+
 USER companion
 EXPOSE 9101
 

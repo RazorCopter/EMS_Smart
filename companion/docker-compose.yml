@@ -52,6 +52,8 @@ services:
       SEM_CONCORDANCE_WATT_THRESHOLD: ${SEM_CONCORDANCE_WATT_THRESHOLD:-100}
       POWER_DEADBAND_W: ${POWER_DEADBAND_W:-20}
       BATTERY_NOMINAL_V: ${BATTERY_NOMINAL_V:-51.2}
+    volumes:
+      - esp_logs:/var/lib/companion/esp-logs
     depends_on:
       timescaledb:
         condition: service_healthy
@@ -98,6 +100,8 @@ services:
       SEM_CONCORDANCE_WATT_THRESHOLD: ${SEM_CONCORDANCE_WATT_THRESHOLD:-100}
       BATTERY_CAPACITY_WH: ${BATTERY_CAPACITY_WH:-10240}
       BATTERY_NOMINAL_V: ${BATTERY_NOMINAL_V:-51.2}
+    volumes:
+      - esp_logs:/var/lib/companion/esp-logs:ro
     depends_on:
       timescaledb:
         condition: service_healthy
@@ -162,6 +166,7 @@ services:
 volumes:
   pgdata:
   backups:
+  esp_logs:
 
 networks:
   internal:

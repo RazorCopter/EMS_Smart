@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import asyncio
-from contextlib import asynccontextmanager, suppress
+from contextlib import ExitStack, asynccontextmanager, suppress
 import csv
 from datetime import datetime, timezone
 import io
@@ -29,6 +29,8 @@ from pydantic import BaseModel, Field
 from sqlalchemy import desc, select, text
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+
+from energy_domain.esp_logs import esp_log_segments
 
 from companion_db.models import CompanionSetting, EmsDecision, EmsEvent, SystemHealth
 from energy_domain import SecretRedactingFilter
@@ -346,6 +348,48 @@ async def live(
         cfg.device_id,
         tz_name=tz_name,
         battery_capacity_wh=cfg.battery_capacity_wh,
+    )
+
+
+@app.get("/api/v1/diagnostics/esp-logs")
+def export_esp_logs(_user: SessionInfo = Depends(require_viewer)) -> StreamingResponse:
+    stack = ExitStack()
+    snapshots = []
+    try:
+        for path in esp_log_segments():
+            try:
+                stream = stack.enter_context(path.open("rb"))
+            except FileNotFoundError:
+                # The collector may rotate the oldest segment during enumeration.
+                continue
+            size = stream.seek(0, 2)
+            offset = max(0, size - 4096)
+            stream.seek(offset)
+            end = stream.read(size - offset).rfind(b"\n")
+            if end >= 0:
+                stream.seek(0)
+                snapshots.append((stream, offset + end + 1))
+        if not snapshots:
+            raise HTTPException(status_code=404, detail="Nessun log ESP32 registrato")
+    except BaseException:
+        stack.close()
+        raise
+
+    def chunks():
+        with stack:
+            for stream, remaining in snapshots:
+                while remaining:
+                    chunk = stream.read(min(remaining, 64 * 1024))
+                    if not chunk:
+                        break
+                    remaining -= len(chunk)
+                    yield chunk
+
+    stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    return StreamingResponse(
+        chunks(),
+        media_type="text/plain; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="esp32-log-{stamp}.log"', "Cache-Control": "no-store"},
     )
 
 

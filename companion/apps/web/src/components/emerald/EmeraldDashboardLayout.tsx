@@ -114,6 +114,14 @@ export function EmeraldDashboardLayout({ vm, chartRange, onChangeChartRange }: P
         <EmeraldDecisionCard decision={vm.decision} batteryW={tel?.stale ? null : tel?.battery_w} gridW={tel?.stale ? null : tel?.grid_w} />
       </section>
 
+      <details className="em-card em-balance">
+        <summary>Log ESP32</summary>
+        <div className="em-balance-actions">
+          <a className="inline-action-link" href="/api/v1/diagnostics/esp-logs" download>Scarica log ESP32</a>
+        </div>
+        <p>Archivio del Companion con telemetria, eventi del Trainer e interruzioni della raccolta.</p>
+      </details>
+
       <details className="em-card em-balance" onToggle={(event) => {
         if (event.currentTarget.open) void loadBalance();
       }}>

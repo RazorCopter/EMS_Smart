@@ -27,6 +27,17 @@ class Esp32ReadOnlyClient:
             resp.raise_for_status()
             return resp.json()
 
+    async def fetch_logs(self) -> list[str]:
+        async with httpx.AsyncClient(base_url=self.base_url, auth=self.auth, timeout=self.timeout_s) as client:
+            async with client.stream("GET", "/api/v1/logs") as response:
+                response.raise_for_status()
+                body = bytearray()
+                async for chunk in response.aiter_bytes():
+                    if len(body) + len(chunk) > 128 * 1024:
+                        raise ValueError("ESP diagnostic ring exceeds the expected size")
+                    body.extend(chunk)
+        return body.decode("utf-8").splitlines()
+
     async def fetch_health(self) -> dict[str, Any] | None:
         return await self._get_json("/api/v1/health")
 

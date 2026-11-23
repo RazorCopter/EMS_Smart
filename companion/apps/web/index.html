@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="it" data-style="classic" data-theme="dark" data-density="comfortable" data-motion="normal">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Afore EMS Companion · SHADOW</title>
+    <script>
+      (function () {
+        try {
+          var r = document.documentElement;
+          var raw = localStorage.getItem("afore_theme_prefs_v2:last");
+          var legacy = localStorage.getItem("afore_companion_theme");
+          var prefs = raw ? JSON.parse(raw) : (legacy === "light" ? { style: "classic", color_scheme: "light" } : {});
+          var style = prefs.style === "emerald" ? "emerald" : "classic";
+          var prefScheme = prefs.color_scheme === "light" || prefs.color_scheme === "system" ? prefs.color_scheme : "dark";
+          var sysLight = window.matchMedia && window.matchMedia("(prefers-color-scheme: light)").matches;
+          var resolved = prefScheme === "system" ? (sysLight ? "light" : "dark") : prefScheme;
+          var density = prefs.density === "compact" ? "compact" : "comfortable";
+          var osReduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+          var motion = (prefs.reduced_motion || osReduce) ? "reduced" : "normal";
+          r.dataset.style = style;
+          r.dataset.theme = resolved;
+          r.dataset.density = density;
+          r.dataset.motion = motion;
+          r.style.colorScheme = resolved;
+        } catch (e) {}
+      })();
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

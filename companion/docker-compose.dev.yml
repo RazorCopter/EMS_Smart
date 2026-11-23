@@ -1,0 +1,18 @@
+services:
+  mosquitto-dev:
+    image: eclipse-mosquitto:2.0
+    restart: unless-stopped
+    ports:
+      - "11883:1883"
+    volumes:
+      - ./deploy/docker/mosquitto-dev.conf:/mosquitto/config/mosquitto.conf:ro
+    networks:
+      - internal
+
+  timescaledb:
+    ports:
+      - "15432:5432"
+
+  api:
+    ports:
+      - "18000:8000"

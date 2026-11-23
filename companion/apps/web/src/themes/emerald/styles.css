@@ -1,0 +1,1395 @@
+/* Afore Emerald Control — Distinct Structural Template Styles & Scoped Overrides */
+
+/* =========================================================================
+   1. SHARED MULTI-STYLE CONTROLS (Settings theme picker)
+   ========================================================================= */
+.theme-style-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.theme-style-option {
+  text-align: left;
+  background: var(--bg-inset);
+  border: 1.5px solid var(--border-strong);
+  border-radius: 12px;
+  padding: 12px;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  transition: border-color var(--transition-fast), background var(--transition-fast);
+}
+
+.theme-style-option:hover {
+  background: var(--bg-elevated);
+}
+
+.theme-style-option.active {
+  border-color: var(--accent-teal);
+  background: var(--accent-teal-soft);
+}
+
+.theme-preview-canvas {
+  border-radius: 8px;
+  padding: 8px;
+  display: grid;
+  grid-template-columns: 36px 1fr;
+  gap: 6px;
+  min-height: 76px;
+}
+
+.theme-preview-sidebar {
+  border-radius: 5px;
+  padding: 5px 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.theme-preview-main {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 5px;
+}
+
+.theme-preview-card {
+  border-radius: 5px;
+  padding: 5px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.theme-preview-dots {
+  display: flex;
+  gap: 4px;
+}
+
+.theme-preview-dots span {
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+}
+
+.option-pill-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.option-pill-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 13px;
+  border-radius: 9px;
+  border: 1px solid var(--border-strong);
+  background: var(--bg-inset);
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 550;
+  min-height: 38px;
+}
+
+.option-pill-btn.active {
+  border-color: var(--accent-teal);
+  background: var(--accent-teal-soft);
+  color: var(--accent-teal);
+  font-weight: 700;
+}
+
+/* =========================================================================
+   2. EMERALD SHELL (Sidebar 240px + Contextual Main Wrap + Mobile Chrome)
+   ========================================================================= */
+.em-shell {
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: 240px minmax(0, 1fr);
+  background: var(--bg-canvas);
+  color: var(--text-primary);
+}
+
+.em-shell.em-shell-collapsed {
+  grid-template-columns: 76px minmax(0, 1fr);
+}
+
+.em-sidebar {
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  background: var(--bg-sidebar);
+  border-right: 1px solid var(--border-subtle);
+  padding: 18px 14px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 16px;
+  overflow-y: auto;
+}
+
+.em-sidebar-top {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.em-brand {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.em-brand-left {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  min-width: 0;
+}
+
+.em-brand-mark {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: var(--accent-teal-soft);
+  border: 1px solid var(--border-strong);
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+}
+
+.em-brand-title {
+  font-size: 16px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--text-primary);
+}
+
+.em-brand-sub {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 1px;
+}
+
+.em-collapse-btn {
+  padding: 6px;
+  min-height: 30px;
+}
+
+.em-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.em-nav-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.em-nav-group-label {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  padding: 0 10px 4px;
+}
+
+.em-nav-item {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  color: var(--text-secondary);
+  font-size: 13.5px;
+  font-weight: 550;
+  text-decoration: none;
+  border: 1px solid transparent;
+  transition: background var(--transition-fast), color var(--transition-fast), border-color var(--transition-fast);
+}
+
+.em-nav-item:hover {
+  background: var(--bg-surface-2);
+  color: var(--text-primary);
+}
+
+.em-nav-item.active {
+  background: var(--accent-teal-soft);
+  border-color: var(--border-strong);
+  color: var(--accent-teal);
+  font-weight: 700;
+}
+
+.em-sidebar-footer {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  border-top: 1px solid var(--border-subtle);
+  padding-top: 14px;
+}
+
+.em-conn-section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.em-conn-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12.5px;
+  color: var(--text-secondary);
+}
+
+.em-conn-meta {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.em-shadow-box {
+  background: var(--shadow-soft);
+  border: 1px solid rgba(56, 189, 248, 0.35);
+  border-radius: 10px;
+  padding: 10px 11px;
+}
+
+.em-shadow-box-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--shadow-blue);
+}
+
+.em-shadow-box-sub {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-top: 3px;
+}
+
+.em-sidebar-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.em-side-btn {
+  flex: 1;
+  padding: 6px 10px;
+}
+
+.em-side-btn-icon {
+  padding: 6px 9px;
+}
+
+.em-version-tag {
+  font-size: 12px;
+  color: var(--text-muted);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+.em-main-wrap {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.em-main {
+  padding: 20px 26px 32px;
+  width: 100%;
+  max-width: 1580px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--grid-gap);
+}
+
+/* Mobile shell header (hidden on desktop) */
+.em-mobile-header {
+  display: none;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 14px;
+  background: var(--bg-sidebar);
+  border-bottom: 1px solid var(--border-subtle);
+  position: sticky;
+  top: 0;
+  z-index: 40;
+}
+
+.em-mobile-header-left,
+.em-mobile-header-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.em-mobile-title {
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.em-mobile-sub {
+  font-size: 12px;
+  color: var(--accent-teal);
+}
+
+.em-mobile-sys-btn {
+  padding: 5px 10px;
+  min-height: 32px;
+  font-size: 12px;
+}
+
+.em-icon-btn {
+  padding: 6px;
+  min-height: 34px;
+}
+
+.em-mobile-drawer-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+
+.em-mobile-drawer-actions {
+  margin-top: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.em-bottom-nav {
+  background: var(--bg-sidebar);
+  border-top: 1px solid var(--border-subtle);
+}
+
+/* =========================================================================
+   3. EMERALD CONTEXTUAL HEADER & REUSABLE SURFACES
+   ========================================================================= */
+.em-page-header {
+  background: linear-gradient(135deg, var(--bg-surface) 0%, var(--bg-surface-2) 100%);
+  border: 1px solid var(--border-strong);
+  border-radius: 16px;
+  padding: 18px 22px;
+  box-shadow: var(--shadow-sm);
+}
+
+.em-page-header-main {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.em-page-title {
+  margin: 0;
+  font-size: 28px;
+  font-weight: 800;
+  letter-spacing: -0.025em;
+  color: var(--text-primary);
+}
+
+.em-page-sub {
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.em-page-header-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.em-header-badges,
+.em-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.em-header-clock {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 11px;
+  border-radius: 999px;
+  background: var(--bg-inset);
+  border: 1px solid var(--border-subtle);
+  font-size: 12.5px;
+  color: var(--text-secondary);
+}
+
+.em-status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 11px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 650;
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-inset);
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.em-tone-ok {
+  background: var(--battery-soft);
+  border-color: rgba(52, 214, 160, 0.35);
+  color: var(--battery-color);
+}
+
+.em-tone-warn {
+  background: var(--safety-soft);
+  border-color: rgba(245, 158, 11, 0.4);
+  color: var(--safety-amber);
+}
+
+.em-tone-err {
+  background: var(--fault-soft);
+  border-color: rgba(240, 93, 108, 0.4);
+  color: var(--fault-red);
+}
+
+.em-tone-shadow {
+  background: var(--shadow-soft);
+  border-color: rgba(56, 189, 248, 0.4);
+  color: var(--shadow-blue);
+}
+
+.em-tone-info {
+  background: var(--accent-teal-soft);
+  border-color: rgba(52, 214, 160, 0.35);
+  color: var(--accent-teal);
+}
+
+.em-tone-text-ok {
+  color: var(--battery-color);
+}
+
+.em-tone-text-warn {
+  color: var(--safety-amber);
+}
+
+.em-tone-text-err {
+  color: var(--fault-red);
+}
+
+.em-tone-text-neutral {
+  color: var(--text-secondary);
+}
+
+.em-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-strong);
+  border-radius: 16px;
+  padding: var(--card-pad);
+  box-shadow: var(--shadow-sm);
+  min-width: 0;
+}
+
+.em-card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.em-card-title {
+  margin: 0;
+  font-size: 16.5px;
+  font-weight: 750;
+  letter-spacing: -0.015em;
+  color: var(--text-primary);
+}
+
+.em-card-sub {
+  margin: 3px 0 0;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.mono {
+  font-variant-numeric: tabular-nums;
+}
+
+.em-page-header .em-mobile-only-btn {
+  display: none;
+}
+
+/* =========================================================================
+   4. EMERALD DASHBOARD GRID (Row 1: 65/35, Row 2: 3, Row 3: 4, Row 4: 75/25)
+   ========================================================================= */
+.em-dec-measured {
+  margin: 0;
+}
+.em-dec-measured dd {
+  margin-inline-start: 0;
+}
+
+.em-balance {
+  padding: 1rem;
+}
+.em-balance summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+.em-balance-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: .75rem;
+}
+.em-balance-scroll {
+  max-height: 22rem;
+  overflow: auto;
+  margin-block-start: .75rem;
+}
+.em-balance table {
+  width: 100%;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+.em-balance th, .em-balance td {
+  text-align: right;
+  padding: .45rem .6rem;
+  white-space: nowrap;
+}
+
+.em-dashboard {
+  display: flex;
+  flex-direction: column;
+  gap: var(--grid-gap);
+}
+
+.em-row-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1.85fr) minmax(320px, 1fr);
+  gap: var(--grid-gap);
+  align-items: stretch;
+}
+
+.em-monitor-card {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.em-monitor-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.em-monitor-desktop-wrap {
+  display: block;
+  width: 100%;
+}
+
+.em-monitor-mobile-wrap {
+  display: none;
+  width: 100%;
+}
+
+.em-radial-svg {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+.em-circle-node {
+  cursor: pointer;
+  outline: none;
+  scroll-margin-top: 84px;
+}
+
+.em-circle-node circle {
+  transition: stroke-width var(--transition-fast), filter var(--transition-fast);
+}
+
+.em-circle-node:hover circle:first-of-type,
+.em-circle-node.selected circle:first-of-type,
+.em-circle-node:focus-visible circle:first-of-type {
+  stroke-width: 3.2px;
+  filter: drop-shadow(0 0 8px rgba(52, 214, 160, 0.35));
+}
+
+/* HIERARCHICAL EMERALD DECISION CARD */
+.em-decision-card {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.em-dec-hero {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 12px;
+  align-items: end;
+  padding: 12px 14px;
+  background: var(--bg-surface-2);
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
+}
+
+.em-dec-kicker {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.em-dec-strategy-val {
+  font-size: 20px;
+  font-weight: 800;
+  color: var(--text-primary);
+  margin-top: 2px;
+}
+
+.em-dec-strategy-base {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-top: 2px;
+}
+
+.em-dec-setpoint-block {
+  text-align: right;
+}
+
+.em-dec-setpoint-val {
+  font-size: 26px;
+  font-weight: 850;
+  letter-spacing: -0.02em;
+  color: var(--accent-teal);
+}
+
+.em-setpoint-safety .em-dec-setpoint-val {
+  color: var(--safety-amber);
+}
+
+.em-setpoint-warn .em-dec-setpoint-val {
+  color: var(--fault-red);
+}
+
+.em-dec-compare-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.em-dec-tile {
+  background: var(--bg-inset);
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+  padding: 10px 12px;
+}
+
+.em-dec-tile-k {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.em-dec-tile-v {
+  font-size: 15px;
+  font-weight: 750;
+  color: var(--text-primary);
+  margin-top: 4px;
+}
+
+.em-dec-safety-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 13px;
+}
+
+.em-dec-tile-sub {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 3px;
+}
+
+.em-dec-reason {
+  background: var(--bg-surface-2);
+  border-left: 3px solid var(--accent-teal);
+  border-radius: 10px;
+  padding: 10px 12px;
+}
+
+.em-dec-reason-safety {
+  border-left-color: var(--safety-amber);
+}
+
+.em-dec-reason-warn {
+  border-left-color: var(--fault-red);
+}
+
+.em-dec-reason-title {
+  font-size: 13.5px;
+  font-weight: 750;
+  color: var(--text-primary);
+  margin-top: 2px;
+}
+
+.em-dec-reason-sub {
+  margin: 4px 0 0;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--text-secondary);
+}
+
+.em-dec-shadow-strip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--shadow-soft);
+  border: 1px solid rgba(56, 189, 248, 0.35);
+  border-radius: 10px;
+  padding: 9px 11px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.em-dec-shadow-strip svg {
+  color: var(--shadow-blue);
+  flex-shrink: 0;
+}
+
+.em-dec-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding-top: 4px;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.em-dec-meta {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.em-dec-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--accent-teal);
+  text-decoration: none;
+}
+
+.em-dec-link:hover {
+  text-decoration: underline;
+}
+
+/* =========================================================================
+   5. EMERALD KPI ROWS (3 Hero Panels + 4 Continuous Sparkline Panels)
+   ========================================================================= */
+.em-kpi-stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--grid-gap);
+}
+
+.em-kpi-row-hero {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--grid-gap);
+}
+
+.em-kpi-panel {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.em-kpi-panel-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.em-kpi-title {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--text-secondary);
+}
+
+.em-kpi-delta {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.em-kpi-huge {
+  font-size: 36px;
+  font-weight: 850;
+  line-height: 1.05;
+  letter-spacing: -0.025em;
+}
+
+.em-thick-bar {
+  height: 10px;
+  border-radius: 999px;
+  background: var(--bg-inset);
+  border: 1px solid var(--border-subtle);
+  overflow: hidden;
+}
+
+.em-thick-bar-fill {
+  height: 100%;
+  border-radius: 999px;
+  transition: width var(--transition-base);
+}
+
+.em-kpi-explain {
+  margin: 0;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.em-batt-state-pill {
+  font-size: 12px;
+  font-weight: 700;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: var(--battery-soft);
+  color: var(--battery-color);
+  border: 1px solid rgba(52, 214, 160, 0.35);
+}
+
+.em-batt-hero-line {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.em-seg-battery {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  flex-shrink: 0;
+}
+
+.em-seg-battery-body {
+  display: grid;
+  grid-template-columns: repeat(10, 8px);
+  gap: 3px;
+  padding: 4px;
+  border-radius: 8px;
+  border: 1.8px solid var(--border-strong);
+  background: var(--bg-inset);
+}
+
+.em-seg-cell {
+  height: 20px;
+  border-radius: 2px;
+  background: var(--border-subtle);
+}
+
+.em-seg-cell.active {
+  background: var(--battery-color);
+}
+
+.em-seg-battery-cap {
+  width: 4px;
+  height: 14px;
+  border-radius: 0 3px 3px 0;
+  background: var(--border-strong);
+}
+
+.em-batt-stats-line {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.em-kpi-row-secondary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--grid-gap);
+}
+
+.em-kpi-spark-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.em-spark-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.em-spark-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 650;
+  color: var(--text-secondary);
+}
+
+.em-prov-tag {
+  font-size: 12px;
+  color: var(--text-muted);
+  background: var(--bg-inset);
+  border: 1px solid var(--border-subtle);
+  border-radius: 999px;
+  padding: 2px 8px;
+}
+
+.em-prov-derived {
+  color: var(--home-color);
+}
+
+.em-spark-val {
+  font-size: 24px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.em-spark-unit {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.em-spark-svg {
+  display: block;
+  width: 100%;
+  height: 36px;
+}
+
+.em-spark-empty {
+  height: 36px;
+  display: flex;
+  align-items: center;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.em-spark-foot {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+/* =========================================================================
+   6. COVERAGE RIBBON, ROW 4 (75% CHART / 25% SYSTEM), EVENTS & DRAWER
+   ========================================================================= */
+.em-coverage-ribbon {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
+  padding: 10px 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.em-cov-left,
+.em-cov-pills {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.em-cov-note {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.em-cov-chip {
+  font-size: 12px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: var(--bg-inset);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-muted);
+}
+
+.em-cov-chip-err {
+  color: var(--fault-red);
+  border-color: rgba(240, 93, 108, 0.35);
+}
+
+.em-row-bottom {
+  display: grid;
+  grid-template-columns: minmax(0, 3fr) minmax(260px, 1fr);
+  gap: var(--grid-gap);
+  align-items: stretch;
+}
+
+.em-chart-head {
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.em-system-panel {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.em-sys-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.em-sys-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 9px;
+  border-radius: 8px;
+  background: var(--bg-surface-2);
+  border: 1px solid var(--border-subtle);
+  font-size: 12px;
+}
+
+.em-sys-key {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--text-secondary);
+  font-weight: 600;
+}
+
+.em-sys-val {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-weight: 700;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.em-sys-resources {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.em-res-chip {
+  background: var(--bg-inset);
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  padding: 7px 9px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.em-res-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.em-res-chip strong {
+  font-size: 13px;
+}
+
+.em-events-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.em-event-item {
+  background: var(--bg-surface-2);
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+  padding: 10px 12px;
+}
+
+.em-event-top {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  align-items: baseline;
+  font-size: 13px;
+}
+
+.em-event-time {
+  font-size: 12px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.em-event-detail {
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+/* DRAWER (Desktop slide-over / Mobile full-screen overlay) */
+.em-drawer-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(2, 10, 8, 0.72);
+  display: flex;
+  justify-content: flex-end;
+  z-index: 90;
+}
+
+.em-drawer-panel {
+  width: min(440px, 92vw);
+  height: 100vh;
+  background: var(--bg-surface);
+  border-left: 1px solid var(--border-strong);
+  border-top: 3px solid var(--accent-teal);
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  overflow-y: auto;
+  box-shadow: var(--shadow-md);
+}
+
+.em-drawer-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.em-drawer-title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 800;
+}
+
+.em-drawer-sub {
+  margin: 4px 0 0;
+  font-size: 12.5px;
+  color: var(--text-muted);
+}
+
+.em-drawer-close {
+  min-height: 36px;
+  padding: 6px 8px;
+}
+
+.em-node-detail-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.em-node-detail-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  background: var(--bg-surface-2);
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+}
+
+.em-node-detail-k {
+  font-size: 12.5px;
+  color: var(--text-secondary);
+}
+
+.em-node-detail-v {
+  font-size: 13.5px;
+  color: var(--text-primary);
+  text-align: right;
+}
+
+/* =========================================================================
+   7. SUBPAGES & UTILITY OVERRIDES SCOPED TO [data-style="emerald"]
+   ========================================================================= */
+:root[data-style="emerald"] .card,
+:root[data-style="emerald"] .kpi-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-strong);
+  border-radius: 16px;
+}
+
+:root[data-style="emerald"] .page-sub,
+:root[data-style="emerald"] .card-sub,
+:root[data-style="emerald"] .kv-label,
+:root[data-style="emerald"] .shadow-banner-sub,
+:root[data-style="emerald"] .diag-table th,
+:root[data-style="emerald"] .data-table th,
+:root[data-style="emerald"] .badge,
+:root[data-style="emerald"] .chip,
+:root[data-style="emerald"] .tip-bubble,
+:root[data-style="emerald"] .mobile-bottom-item {
+  font-size: 12px !important;
+}
+
+:root[data-style="emerald"] .data-table .badge {
+  white-space: normal;
+  text-align: left;
+  line-height: 1.3;
+}
+
+:root[data-style="emerald"] .btn.primary {
+  background: var(--accent-teal);
+  color: var(--accent-teal-contrast);
+  border-color: var(--accent-teal);
+  font-weight: 700;
+}
+
+:root[data-style="emerald"] .btn.primary:hover {
+  background: var(--accent-teal-hover);
+  border-color: var(--accent-teal-hover);
+}
+
+/* =========================================================================
+   8. RESPONSIVE BREAKPOINTS (Tablet & Dedicated Mobile Emerald Layout)
+   ========================================================================= */
+@media (max-width: 1180px) {
+  .em-row-hero {
+    grid-template-columns: 1fr;
+  }
+
+  .em-row-bottom {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 768px) {
+  .em-shell,
+  .em-shell.em-shell-collapsed {
+    grid-template-columns: minmax(0, 1fr);
+    max-width: 100vw;
+    overflow-x: clip;
+  }
+
+  .em-sidebar {
+    display: none;
+  }
+
+  .em-mobile-header {
+    display: flex;
+  }
+
+  .em-main {
+    padding: 12px 10px 86px;
+    gap: 12px;
+    min-width: 0;
+    max-width: 100vw;
+    overflow-x: clip;
+  }
+
+  .em-card {
+    padding: 13px;
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .em-page-header {
+    padding: 14px 14px;
+    border-radius: 14px;
+  }
+
+  .em-page-title {
+    font-size: 22px;
+  }
+
+  .em-page-header .em-mobile-only-btn {
+    display: inline-flex;
+  }
+
+  .em-monitor-desktop-wrap {
+    display: none;
+  }
+
+  .em-monitor-mobile-wrap {
+    display: block;
+  }
+
+  .em-kpi-row-hero {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+
+  .em-kpi-panel-top,
+  .em-spark-head {
+    flex-wrap: wrap;
+    gap: 4px 6px;
+  }
+
+  .em-kpi-battery {
+    grid-column: span 2;
+  }
+
+  .em-kpi-huge {
+    font-size: 26px;
+  }
+
+  .em-kpi-row-secondary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+
+  .em-spark-val {
+    font-size: 18.5px;
+    line-height: 1.2;
+  }
+
+  .chart-controls-wrap {
+    max-width: 100%;
+    flex-wrap: wrap;
+  }
+
+  .em-system-desktop-slot {
+    display: none;
+  }
+
+  .em-events-grid {
+    grid-template-columns: 1fr;
+  }
+
+  /* Full-screen Node & Stato Impianto Detail Overlay on Mobile */
+  .em-drawer-panel {
+    width: 100vw;
+    max-width: 100vw;
+    height: 100dvh;
+    border-left: none;
+    border-radius: 0;
+  }
+
+  .theme-style-grid {
+    grid-template-columns: 1fr;
+  }
+}

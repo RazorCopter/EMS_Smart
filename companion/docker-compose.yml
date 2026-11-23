@@ -1,0 +1,172 @@
+name: afore-ems-companion
+
+x-logging: &default-logging
+  driver: "json-file"
+  options:
+    max-size: "20m"
+    max-file: "5"
+
+services:
+  timescaledb:
+    image: timescale/timescaledb:2.17.2-pg16
+    restart: unless-stopped
+    environment:
+      TZ: ${TZ:-Europe/Rome}
+      POSTGRES_DB: ${POSTGRES_DB:-afore_companion}
+      POSTGRES_USER: ${POSTGRES_USER:-afore_companion}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD required}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-afore_companion} -d ${POSTGRES_DB:-afore_companion}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - internal
+    logging: *default-logging
+
+  collector:
+    build:
+      context: .
+      dockerfile: deploy/docker/Dockerfile.collector
+    restart: unless-stopped
+    environment:
+      TZ: ${TZ:-Europe/Rome}
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-afore_companion}:${POSTGRES_PASSWORD}@timescaledb:5432/${POSTGRES_DB:-afore_companion}
+      MQTT_ENABLED: ${MQTT_ENABLED:-true}
+      MQTT_HOST: ${MQTT_HOST:-10.0.10.10}
+      MQTT_PORT: ${MQTT_PORT:-1883}
+      MQTT_TLS: ${MQTT_TLS:-false}
+      MQTT_USER: ${MQTT_USER:-}
+      MQTT_PASSWORD: ${MQTT_PASSWORD:-}
+      MQTT_CLIENT_ID: ${MQTT_CLIENT_ID:-afore-ems-companion}
+      MQTT_BASE_TOPIC: ${MQTT_BASE_TOPIC:-afore/afore-ems/v1}
+      MQTT_SEM_TOPIC_PREFIX: ${MQTT_SEM_TOPIC_PREFIX:-afore/afore-ems/v1/sem}
+      ESP32_ENABLED: ${ESP32_ENABLED:-true}
+      ESP32_URL: ${ESP32_URL:-http://10.0.0.110}
+      ESP32_USERNAME: ${ESP32_USERNAME:-admin}
+      ESP32_PASSWORD: ${ESP32_PASSWORD:-}
+      ESP32_POLL_HEALTH_S: ${ESP32_POLL_HEALTH_S:-30}
+      ESP32_BACKFILL_INTERVAL_S: ${ESP32_BACKFILL_INTERVAL_S:-60}
+      SEM_CONCORDANCE_WATT_THRESHOLD: ${SEM_CONCORDANCE_WATT_THRESHOLD:-100}
+      POWER_DEADBAND_W: ${POWER_DEADBAND_W:-20}
+      BATTERY_NOMINAL_V: ${BATTERY_NOMINAL_V:-51.2}
+    volumes:
+      - esp_logs:/var/lib/companion/esp-logs
+    depends_on:
+      timescaledb:
+        condition: service_healthy
+      api:
+        condition: service_healthy
+    networks:
+      - internal
+    logging: *default-logging
+
+  api:
+    build:
+      context: .
+      dockerfile: deploy/docker/Dockerfile.api
+    restart: unless-stopped
+    environment:
+      TZ: ${TZ:-Europe/Rome}
+      COMPANION_TIMEZONE: ${COMPANION_TIMEZONE:-Europe/Rome}
+      COMPANION_LOCALE: ${COMPANION_LOCALE:-it-IT}
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-afore_companion}:${POSTGRES_PASSWORD}@timescaledb:5432/${POSTGRES_DB:-afore_companion}
+      ALEMBIC_DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-afore_companion}:${POSTGRES_PASSWORD}@timescaledb:5432/${POSTGRES_DB:-afore_companion}
+      COMPANION_SECRET_KEY: ${COMPANION_SECRET_KEY:?COMPANION_SECRET_KEY required}
+      COMPANION_SESSION_TTL_HOURS: ${COMPANION_SESSION_TTL_HOURS:-24}
+      COMPANION_COOKIE_SECURE: ${COMPANION_COOKIE_SECURE:-false}
+      COMPANION_ADMIN_USER: ${COMPANION_ADMIN_USER:-admin}
+      COMPANION_ADMIN_PASSWORD: ${COMPANION_ADMIN_PASSWORD:?COMPANION_ADMIN_PASSWORD required}
+      COMPANION_VIEWER_USER: ${COMPANION_VIEWER_USER:-viewer}
+      COMPANION_VIEWER_PASSWORD: ${COMPANION_VIEWER_PASSWORD:?COMPANION_VIEWER_PASSWORD required}
+      MQTT_ENABLED: ${MQTT_ENABLED:-true}
+      MQTT_HOST: ${MQTT_HOST:-10.0.10.10}
+      MQTT_PORT: ${MQTT_PORT:-1883}
+      MQTT_USER: ${MQTT_USER:-}
+      MQTT_PASSWORD: ${MQTT_PASSWORD:-}
+      MQTT_BASE_TOPIC: ${MQTT_BASE_TOPIC:-afore/afore-ems/v1}
+      ESP32_ENABLED: ${ESP32_ENABLED:-true}
+      ESP32_URL: ${ESP32_URL:-http://10.0.0.110}
+      ESP32_USERNAME: ${ESP32_USERNAME:-admin}
+      ESP32_PASSWORD: ${ESP32_PASSWORD:-}
+      RETENTION_RAW_MQTT_DAYS: ${RETENTION_RAW_MQTT_DAYS:-30}
+      RETENTION_TELEMETRY_DAYS: ${RETENTION_TELEMETRY_DAYS:-90}
+      RETENTION_AGG_1M_DAYS: ${RETENTION_AGG_1M_DAYS:-730}
+      RETENTION_DECISIONS_DAYS: ${RETENTION_DECISIONS_DAYS:-180}
+      BACKUP_RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-14}
+      SEM_CONCORDANCE_WATT_THRESHOLD: ${SEM_CONCORDANCE_WATT_THRESHOLD:-100}
+      BATTERY_CAPACITY_WH: ${BATTERY_CAPACITY_WH:-10240}
+      BATTERY_NOMINAL_V: ${BATTERY_NOMINAL_V:-51.2}
+    volumes:
+      - esp_logs:/var/lib/companion/esp-logs:ro
+    depends_on:
+      timescaledb:
+        condition: service_healthy
+    networks:
+      - internal
+    logging: *default-logging
+
+  web:
+    build:
+      context: .
+      dockerfile: deploy/docker/Dockerfile.web
+    restart: unless-stopped
+    networks:
+      - internal
+    logging: *default-logging
+
+  reverse-proxy:
+    build:
+      context: .
+      dockerfile: deploy/docker/Dockerfile.proxy
+    restart: unless-stopped
+    ports:
+      - "${COMPANION_HTTP_PORT:-8080}:80"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1/healthz || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+    depends_on:
+      api:
+        condition: service_healthy
+      web:
+        condition: service_healthy
+    networks:
+      - internal
+    logging: *default-logging
+
+  backup:
+    build:
+      context: .
+      dockerfile: deploy/docker/Dockerfile.backup
+    restart: unless-stopped
+    environment:
+      TZ: ${TZ:-Europe/Rome}
+      PGHOST: timescaledb
+      POSTGRES_DB: ${POSTGRES_DB:-afore_companion}
+      POSTGRES_USER: ${POSTGRES_USER:-afore_companion}
+      PGPASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD required}
+      BACKUP_RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-14}
+      BACKUP_INTERVAL_SECONDS: ${BACKUP_INTERVAL_SECONDS:-86400}
+    volumes:
+      - backups:/backups
+    depends_on:
+      timescaledb:
+        condition: service_healthy
+      api:
+        condition: service_healthy
+    networks:
+      - internal
+    logging: *default-logging
+
+volumes:
+  pgdata:
+  backups:
+  esp_logs:
+
+networks:
+  internal:
+    driver: bridge

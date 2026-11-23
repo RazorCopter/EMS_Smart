@@ -1,0 +1,28 @@
+# Dependencies & build artifacts
+node_modules/
+dist/
+.vite/
+*.tsbuildinfo
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+
+# Secrets & local runtime data
+.env
+.env.local
+.env.*.local
+pgdata/
+backups/
+*.bak
+*.sql.gz
+*.dump
+
+# Logs & temporary screenshots
+*.log
+/tmp/

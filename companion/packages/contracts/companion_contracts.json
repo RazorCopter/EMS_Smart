@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "companion_version": "1.0.0",
+  "companion_version": "1.0.1",
   "operating_mode": "SHADOW",
   "mqtt_topics": {
     "availability": "afore/afore-ems/v1/availability",

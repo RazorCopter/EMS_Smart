@@ -41,6 +41,8 @@ class EspLogArchive:
         self.active: Path | None = None
         self.bytes_used = 0
         self.position: tuple[int, int, float | None] | None = None
+        self.last_sample: dict[str, int] = {}
+        self.detail_until = 0
         for segment in reversed(self.segments):
             with segment.open("rb") as stream:
                 offset = max(0, segment.stat().st_size - 4096)
@@ -102,8 +104,25 @@ class EspLogArchive:
                 continue
             if previous and current[0] > previous[0] + 1:
                 records.append(f"# {stamp} GAP first={previous[0] + 1} last={current[0] - 1}")
-            records.append(line)
+            message = line.split(" ", 2)[2]
+            kind = message.split(" ", 1)[0]
+            sampled = kind in {"TRAINER_DEBUG", "TRAINER_POWER", "EnergyState"}
+            event = kind == "TRAINER" and any(
+                message.startswith("TRAINER " + name) for name in ("WARNING", "ERROR", "CRITICAL", "RECOVERED")
+            )
+            if event:
+                self.detail_until = current[1] + 60000
+            if sampled:
+                interval = 2000 if current[1] < self.detail_until else 30000
+                if current[1] - self.last_sample.get(kind, -interval) >= interval:
+                    records.append(line)
+                    self.last_sample[kind] = current[1]
+            elif kind not in {"SHADOW", "LIVE", "TRAINER_VERIFY_HOLD"} and not message.startswith("TRAINER MATCH"):
+                records.append(line)
             previous = current
+        # Preserve the input cursor across collector restarts even when rows were filtered.
+        if previous and records and records[-1] != lines[-1]:
+            records.append(lines[-1])
         self.append("".join(line + "\n" for line in records).encode())
         self.position = previous
 

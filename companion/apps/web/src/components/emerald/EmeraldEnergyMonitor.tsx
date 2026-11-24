@@ -229,12 +229,23 @@ export function EmeraldEnergyMonitor({
           <circle
             cx="330"
             cy="205"
+            r="156"
+            fill="none"
+            stroke="var(--accent-teal)"
+            strokeWidth="1"
+            strokeDasharray="2 10"
+            opacity="0.32"
+            className="em-hud-orbit"
+          />
+          <circle
+            cx="330"
+            cy="205"
             r="142"
             fill="none"
-            stroke="var(--border-subtle)"
-            strokeWidth="1.4"
+            stroke="var(--border-strong)"
+            strokeWidth="1.2"
             strokeDasharray="6 7"
-            opacity="0.7"
+            opacity="0.75"
           />
           <circle cx="330" cy="205" r="96" fill="url(#em-center-glow)" />
 

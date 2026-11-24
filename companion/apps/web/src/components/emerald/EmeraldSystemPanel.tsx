@@ -44,16 +44,24 @@ export function EmeraldSystemPanel({ system, variant = "panel" }: Props) {
   const ntpMeta = statusMeta(comps.ntp?.status);
   const espStatus = espControlStatus(comps.aux1);
 
+  const syncErrors = (comps.esp32_sync as { details?: { errors?: Record<string, string> } } | undefined)?.details?.errors;
+  const syncErrorText =
+    syncErrors && Object.keys(syncErrors).length > 0
+      ? Object.entries(syncErrors)
+          .map(([k, v]) => `${k}: ${v}`)
+          .join(" | ")
+      : null;
+
   const items = [
-    { key: "esp32", icon: Cpu, label: "ESP32", tone: espMeta.tone, value: espMeta.label === "Attivo" ? "Online" : espMeta.label },
-    { key: "esp32_sync", icon: Database, label: "Sincronizzazione ESP", tone: syncMeta.tone, value: syncMeta.label },
-    { key: "mqtt", icon: Radio, label: "MQTT", tone: mqttMeta.tone, value: comps.mqtt?.status === "online" ? "Connesso" : mqttMeta.label },
-    { key: "ha", icon: Home, label: "Home Assistant", tone: haMeta.tone, value: haMeta.label === "Attivo" ? "Online" : haMeta.label },
-    { key: "ctrl", icon: Lock, label: "Controllo reale", tone: espStatus.realControlTone, value: espStatus.realControlValue },
-    { key: "sem", icon: Server, label: "SEM", tone: system.semOnline ? ("ok" as const) : ("neutral" as const), value: system.semOnline ? "Attivo" : "N/D" },
-    { key: "mode", icon: Activity, label: "Modalità ESP", tone: espStatus.modeTone, value: espStatus.modeLabel.replace(/^ESP · /, "") },
-    { key: "aux", icon: HardDrive, label: "AUX", tone: system.aux1State !== "OFF" ? ("ok" as const) : ("neutral" as const), value: system.aux1State },
-    { key: "ntp", icon: Database, label: "NTP", tone: ntpMeta.tone, value: comps.ntp?.status === "online" ? "Sync" : ntpMeta.label },
+    { key: "esp32", icon: Cpu, label: "ESP32", tone: espMeta.tone, value: espMeta.label === "Attivo" ? "Online" : espMeta.label, tip: null as string | null },
+    { key: "esp32_sync", icon: Database, label: "Sincronizzazione ESP", tone: syncMeta.tone, value: syncMeta.label, tip: syncErrorText },
+    { key: "mqtt", icon: Radio, label: "MQTT", tone: mqttMeta.tone, value: comps.mqtt?.status === "online" ? "Connesso" : mqttMeta.label, tip: null as string | null },
+    { key: "ha", icon: Home, label: "Home Assistant", tone: haMeta.tone, value: haMeta.label === "Attivo" ? "Online" : haMeta.label, tip: null as string | null },
+    { key: "ctrl", icon: Lock, label: "Controllo reale", tone: espStatus.realControlTone, value: espStatus.realControlValue, tip: null as string | null },
+    { key: "sem", icon: Server, label: "SEM", tone: system.semOnline ? ("ok" as const) : ("neutral" as const), value: system.semOnline ? "Attivo" : "N/D", tip: null as string | null },
+    { key: "mode", icon: Activity, label: "Modalità ESP", tone: espStatus.modeTone, value: espStatus.modeLabel.replace(/^ESP · /, ""), tip: null as string | null },
+    { key: "aux", icon: HardDrive, label: "AUX", tone: system.aux1State !== "OFF" ? ("ok" as const) : ("neutral" as const), value: system.aux1State, tip: null as string | null },
+    { key: "ntp", icon: Database, label: "NTP", tone: ntpMeta.tone, value: comps.ntp?.status === "online" ? "Sync" : ntpMeta.label, tip: null as string | null },
   ];
 
   const esp = system.resources?.esp32 ?? {};
@@ -75,11 +83,18 @@ export function EmeraldSystemPanel({ system, variant = "panel" }: Props) {
       </div>
 
       <div className="em-sys-list">
-        {items.map(({ key, icon: Icon, label, tone, value }) => (
+        {items.map(({ key, icon: Icon, label, tone, value, tip }) => (
           <div key={key} className="em-sys-row">
             <span className="em-sys-key">
               <Icon size={14} aria-hidden="true" />
               <span>{label}</span>
+              {tip && (
+                <HelpTip
+                  id={`tip-em-sys-${key}-${variant}`}
+                  title={label}
+                  text={tip}
+                />
+              )}
             </span>
             <span className={`em-sys-val em-tone-text-${tone}`}>
               <StatusIcon tone={tone} />

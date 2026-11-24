@@ -62,6 +62,17 @@ export interface LiveResponse {
 
 export type EnergyFlowViewModel = DerivedEnergyFlow;
 
+export interface HaInputsSummary {
+  forecastTodayKwh: number | null;
+  forecastTomorrowKwh: number | null;
+  forecastRatioPct: number | null;
+  fog: boolean | null;
+  tempC: number | null;
+  visibilityKm: number | null;
+  radiationWm2: number | null;
+  loadProfileTodayKw: number | null;
+}
+
 export interface DecisionViewModel {
   configuredStrategyLabel: string;
   effectiveStrategyLabel: string;
@@ -82,6 +93,7 @@ export interface DecisionViewModel {
   seq: number | null;
   detailUrl: string;
   socPct: number | null;
+  haInputs?: HaInputsSummary | null;
 }
 
 export interface SparkPoint {
@@ -316,6 +328,24 @@ export function buildDashboardViewModels(
     kpi.self_consumption_pct,
   );
 
+  const rawHa = dec?.ha_inputs;
+  const fsData = rawHa?.forecast_solar?.data ?? rawHa?.forecast_solar;
+  const frData = rawHa?.forecast_ratio?.data ?? rawHa?.forecast_ratio;
+  const wxData = rawHa?.weather?.data ?? rawHa?.weather;
+  const lpData = rawHa?.load_profile?.data ?? rawHa?.load_profile;
+  const haInputs: HaInputsSummary | null = rawHa
+    ? {
+        forecastTodayKwh: typeof fsData?.today_total_kwh === "number" ? fsData.today_total_kwh : null,
+        forecastTomorrowKwh: typeof fsData?.tomorrow_total_kwh === "number" ? fsData.tomorrow_total_kwh : null,
+        forecastRatioPct: typeof frData?.ratio === "number" ? Math.round(frData.ratio * 100) : null,
+        fog: typeof wxData?.fog === "boolean" ? wxData.fog : null,
+        tempC: typeof wxData?.temperature_c === "number" ? wxData.temperature_c : null,
+        visibilityKm: typeof wxData?.visibility === "number" ? wxData.visibility : null,
+        radiationWm2: typeof wxData?.radiation_w_m2 === "number" ? wxData.radiation_w_m2 : null,
+        loadProfileTodayKw: typeof lpData?.today_kw === "number" ? lpData.today_kw : null,
+      }
+    : null;
+
   const decision: DecisionViewModel = {
     configuredStrategyLabel: strategyLabel(dec?.configured_strategy),
     effectiveStrategyLabel: strategyLabel(dec?.strategy),
@@ -338,6 +368,7 @@ export function buildDashboardViewModels(
     seq: dec?.seq ?? null,
     detailUrl: dec?.id ? `/decisioni?id=${encodeURIComponent(dec.id)}` : "/decisioni",
     socPct,
+    haInputs,
   };
 
   const kpis: DailyKpiViewModel = {

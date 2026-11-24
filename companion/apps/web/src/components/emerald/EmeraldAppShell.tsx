@@ -10,7 +10,6 @@ import {
   ChevronRight,
   Cpu,
   FileText,
-  GitCompareArrows,
   History,
   LayoutDashboard,
   LogOut,
@@ -39,7 +38,6 @@ const NAV_GROUPS = [
     group: "Analisi",
     items: [
       { to: "/analisi", label: "Analisi", icon: BarChart3 },
-      { to: "/confronto-sem", label: "Confronto SEM", icon: GitCompareArrows },
       { to: "/batteria", label: "Batteria", icon: BatteryCharging },
       { to: "/report", label: "Report", icon: FileText },
     ],

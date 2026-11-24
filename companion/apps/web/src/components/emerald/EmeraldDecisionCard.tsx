@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { ArrowRight, Info, ShieldAlert, ShieldCheck } from "lucide-react";
+import { ArrowRight, CloudFog, ShieldAlert, ShieldCheck, Sun, Thermometer } from "lucide-react";
 import { fmtTime, fmtWatts } from "../../lib/format";
 import type { DecisionViewModel } from "../../viewmodels/dashboardViewModel";
 import { HelpTip } from "../HelpTip";
@@ -15,7 +15,7 @@ export function EmeraldDecisionCard({ decision, batteryW, gridW }: Props) {
   const limitsText =
     decision.safetyMinW != null && decision.safetyMaxW != null
       ? `${Math.round(decision.safetyMinW)} / ${Math.round(decision.safetyMaxW)} W`
-      : "Non disponibile";
+      : "N/D";
 
   const setpointToneClass =
     decision.tone === "safety"
@@ -24,12 +24,22 @@ export function EmeraldDecisionCard({ decision, batteryW, gridW }: Props) {
       ? "em-setpoint-warn"
       : "em-setpoint-normal";
 
+  const ha = decision.haInputs;
+  const hasHa = Boolean(
+    ha &&
+      (ha.forecastTodayKwh != null ||
+        ha.forecastTomorrowKwh != null ||
+        ha.fog != null ||
+        ha.tempC != null ||
+        ha.radiationWm2 != null),
+  );
+
   return (
     <article className="em-card em-decision-card" aria-label="Decisione EMS corrente">
       <div className="em-card-head">
         <div>
           <h2 className="em-card-title">Decisione EMS</h2>
-          <p className="em-card-sub">Valutazione autonoma locale</p>
+          <p className="em-card-sub">Valutazione locale &amp; input Home Assistant</p>
         </div>
         <EmeraldStatusPill tone="shadow" label="Simulazione EMS" />
       </div>
@@ -48,17 +58,17 @@ export function EmeraldDecisionCard({ decision, batteryW, gridW }: Props) {
           </div>
           <div className="em-dec-strategy-val">{decision.effectiveStrategyLabel}</div>
           {decision.configuredStrategyLabel !== decision.effectiveStrategyLabel && (
-            <div className="em-dec-strategy-base">Base configurata: {decision.configuredStrategyLabel}</div>
+            <div className="em-dec-strategy-base">Base: {decision.configuredStrategyLabel}</div>
           )}
         </div>
 
         <div className={`em-dec-setpoint-block ${setpointToneClass}`}>
           <div className="em-dec-kicker label-with-tip">
-            Setpoint simulato
+            Setpoint
             <HelpTip
               id="tip-em-sim"
               title="Setpoint simulato"
-              text="Potenza target finale calcolata dopo deadband (±20 W) e rampa graduale. In modalità SHADOW è solo simulata."
+              text="Potenza target finale calcolata dopo deadband (±20 W) e rampa graduale. In LIVE può differire leggermente dal valore confermato dall'ESP."
               align="right"
             />
           </div>
@@ -66,69 +76,92 @@ export function EmeraldDecisionCard({ decision, batteryW, gridW }: Props) {
         </div>
       </div>
 
-      <dl className="em-dec-compare-grid em-dec-measured" aria-label="Misure dell’impianto">
+      {/* Compressed 2x2 Telemetry & Safety Grid */}
+      <dl className="em-dec-compare-grid em-dec-compact-grid" aria-label="Misure e vincoli">
         <div className="em-dec-tile">
-          <dt className="em-dec-tile-k">Batteria misurata</dt>
-          <dd className="em-dec-tile-v mono">{fmtWatts(batteryW ?? null, "W")}</dd>
+          <dt className="em-dec-tile-k">Batteria / Rete</dt>
+          <dd className="em-dec-tile-v mono">
+            {fmtWatts(batteryW ?? null, "W")} <span className="em-dec-sep">·</span> {fmtWatts(gridW ?? null, "W")}
+          </dd>
         </div>
+
         <div className="em-dec-tile">
-          <dt className="em-dec-tile-k">Scambio rete</dt>
-          <dd className="em-dec-tile-v mono">{fmtWatts(gridW ?? null, "W")}</dd>
+          <dt className="em-dec-tile-k">Richiesta / Lim.</dt>
+          <dd className="em-dec-tile-v mono">
+            {fmtWatts(decision.candidateW, "W")} <span className="em-dec-sep">/</span> {fmtWatts(decision.limitedW, "W")}
+          </dd>
+        </div>
+
+        <div className="em-dec-tile">
+          <dt className="em-dec-tile-k">Safety</dt>
+          <dd className="em-dec-tile-v em-dec-safety-row">
+            {decision.hasSafetyLimit ? (
+              <ShieldAlert size={14} className="em-tone-text-warn" aria-hidden="true" />
+            ) : (
+              <ShieldCheck size={14} className="em-tone-text-ok" aria-hidden="true" />
+            )}
+            <span>{decision.hasSafetyLimit ? "Limitato" : "Libero"}</span>
+          </dd>
+          <div className="em-dec-tile-sub mono">{limitsText}</div>
+        </div>
+
+        <div className={`em-dec-tile em-dec-reason-compact em-dec-reason-${decision.tone}`}>
+          <dt className="em-dec-tile-k">Motivazione</dt>
+          <dd className="em-dec-reason-title">{decision.humanTitle}</dd>
         </div>
       </dl>
 
-      {/* Secondary Comparison Row: Richiesta iniziale & Safety */}
-      <div className="em-dec-compare-grid">
-        <div className="em-dec-tile">
-          <div className="em-dec-tile-k label-with-tip">
-            Richiesta iniziale
-            <HelpTip
-              id="tip-em-cand"
-              title="Richiesta iniziale (Candidato)"
-              text="Potenza richiesta dalla strategia prima dei limiti di surplus solare e dei vincoli Safety."
-              align="left"
-            />
-          </div>
-          <div className="em-dec-tile-v mono">{fmtWatts(decision.candidateW, "W")}</div>
-          <div className="em-dec-tile-sub">Limited: {fmtWatts(decision.limitedW, "W")}</div>
-        </div>
-
-        <div className="em-dec-tile">
-          <div className="em-dec-tile-k label-with-tip">
-            Safety
-            <HelpTip
-              id="tip-em-safety"
-              title="Limiti Safety"
-              text="Inviluppo min/max consentito in questo secondo (Min = 0 W blocca la scarica)."
-              align="right"
-            />
-          </div>
-          <div className="em-dec-tile-v em-dec-safety-row">
-            {decision.hasSafetyLimit ? (
-              <ShieldAlert size={15} className="em-tone-text-warn" aria-hidden="true" />
-            ) : (
-              <ShieldCheck size={15} className="em-tone-text-ok" aria-hidden="true" />
+      {/* Home Assistant Forecast & Weather Inputs */}
+      {hasHa && ha && (
+        <div className="em-dec-ha-box" aria-label="Dati Home Assistant">
+          <div className="em-dec-ha-head">
+            <span className="em-dec-kicker">Contesto Home Assistant</span>
+            {ha.forecastRatioPct != null && (
+              <span className="em-dec-ha-badge mono">Resa vs Forecast: {ha.forecastRatioPct}%</span>
             )}
-            <span>{decision.hasSafetyLimit ? "Limitato" : "Nessuna limitazione"}</span>
           </div>
-          <div className="em-dec-tile-sub mono">Limiti: {limitsText}</div>
+          <div className="em-dec-ha-grid">
+            {(ha.forecastTodayKwh != null || ha.forecastTomorrowKwh != null) && (
+              <div className="em-dec-ha-chip">
+                <Sun size={13} aria-hidden="true" />
+                <span>
+                  FV Oggi/Domani:{" "}
+                  <strong className="mono">
+                    {ha.forecastTodayKwh != null ? `${ha.forecastTodayKwh.toFixed(1)}` : "N/D"} /{" "}
+                    {ha.forecastTomorrowKwh != null ? `${ha.forecastTomorrowKwh.toFixed(1)} kWh` : "N/D"}
+                  </strong>
+                </span>
+              </div>
+            )}
+            {ha.fog != null && (
+              <div className={`em-dec-ha-chip ${ha.fog ? "em-dec-ha-warn" : ""}`}>
+                <CloudFog size={13} aria-hidden="true" />
+                <span>
+                  Nebbia: <strong>{ha.fog ? "Presente" : "Assente"}</strong>
+                  {ha.visibilityKm != null ? ` (${ha.visibilityKm.toFixed(1)} km)` : ""}
+                </span>
+              </div>
+            )}
+            {(ha.tempC != null || ha.radiationWm2 != null) && (
+              <div className="em-dec-ha-chip">
+                <Thermometer size={13} aria-hidden="true" />
+                <span>
+                  {ha.tempC != null ? `${ha.tempC.toFixed(1)} °C` : ""}
+                  {ha.tempC != null && ha.radiationWm2 != null ? " · " : ""}
+                  {ha.radiationWm2 != null ? `${Math.round(ha.radiationWm2)} W/m²` : ""}
+                </span>
+              </div>
+            )}
+            {ha.loadProfileTodayKw != null && (
+              <div className="em-dec-ha-chip">
+                <span>
+                  Carico atteso: <strong className="mono">{ha.loadProfileTodayKw.toFixed(2)} kW</strong>
+                </span>
+              </div>
+            )}
+          </div>
         </div>
-      </div>
-
-      {/* Human Explanation Block */}
-      <div className={`em-dec-reason em-dec-reason-${decision.tone}`}>
-        <div className="em-dec-kicker">Motivazione</div>
-        <div className="em-dec-reason-title">{decision.humanTitle}</div>
-        <p className="em-dec-reason-sub">{decision.humanSubtitle}</p>
-      </div>
-
-      {/* Integrated SHADOW Callout */}
-      <div className="em-dec-shadow-strip" role="note">
-        <Info size={15} aria-hidden="true" />
-        <span>
-          <strong>Setpoint calcolato</strong> · Il valore confermato dall’ESP può differire durante il LIVE.
-        </span>
-      </div>
+      )}
 
       <div className="em-dec-footer">
         <span className="em-dec-meta mono">
@@ -136,7 +169,7 @@ export function EmeraldDecisionCard({ decision, batteryW, gridW }: Props) {
           {decision.timestamp ? fmtTime(decision.timestamp, decision.timezone) : "In attesa"}
         </span>
         <Link to={decision.detailUrl} className="em-dec-link">
-          <span>Apri dettaglio decisione</span>
+          <span>Dettaglio</span>
           <ArrowRight size={15} aria-hidden="true" />
         </Link>
       </div>

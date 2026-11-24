@@ -1679,3 +1679,72 @@
     display: none;
   }
 }
+
+/* =========================================================================
+   COMPRESSED DECISION CARD & HOME ASSISTANT CONTEXT
+   ========================================================================= */
+.em-dec-compact-grid {
+  margin-bottom: 0;
+}
+
+.em-dec-sep {
+  color: var(--text-muted);
+  font-weight: 400;
+}
+
+.em-dec-reason-compact {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.em-dec-ha-box {
+  background: var(--bg-inset);
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.em-dec-ha-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.em-dec-ha-badge {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--accent-teal);
+  background: var(--accent-teal-soft);
+  border: 1px solid var(--border-strong);
+  border-radius: 5px;
+  padding: 2px 7px;
+}
+
+.em-dec-ha-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.em-dec-ha-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  background: var(--bg-surface-2);
+  border: 1px solid var(--border-subtle);
+  font-size: 11.5px;
+  color: var(--text-secondary);
+}
+
+.em-dec-ha-chip.em-dec-ha-warn {
+  border-color: rgba(255, 159, 28, 0.5);
+  background: var(--safety-soft);
+  color: var(--safety-amber);
+}

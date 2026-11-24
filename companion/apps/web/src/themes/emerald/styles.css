@@ -489,6 +489,10 @@
   color: var(--fault-red);
 }
 
+.em-tone-text-shadow {
+  color: var(--shadow-blue);
+}
+
 .em-tone-text-neutral {
   color: var(--text-secondary);
 }

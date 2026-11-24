@@ -1,11 +1,11 @@
-export type EspTone = "ok" | "warn" | "neutral";
+export type EspTone = "ok" | "warn" | "shadow" | "neutral";
 
 export interface EspControlStatus {
   modeLabel: string;
   modeTone: EspTone;
   realControlValue: "Abilitato" | "Disabilitato" | "N/D";
   realControlTone: EspTone;
-  pillTone: "ok" | "warn" | "info";
+  pillTone: "ok" | "warn" | "shadow" | "info";
 }
 
 export function espControlStatus(snapshot?: {
@@ -42,18 +42,19 @@ export function espControlStatus(snapshot?: {
       pillTone: "info",
     };
   }
-  const modeLabel =
-    detail.live_delegated_native === true
-      ? "ESP · LIVE · Self-Use nativo"
-      : detail.live_trainer === true
-        ? "ESP · LIVE · Trainer"
-        : "ESP · LIVE · ExtEMS";
+  const nativeDelegated = detail.live_delegated_native === true;
+  const modeLabel = nativeDelegated
+    ? "ESP · LIVE · Self-Use nativo"
+    : detail.live_trainer === true
+      ? "ESP · LIVE · Trainer"
+      : "ESP · LIVE · ExtEMS";
+  const liveTone = nativeDelegated ? "shadow" : "ok";
   return {
     modeLabel,
-    modeTone: "ok",
+    modeTone: liveTone,
     realControlValue: "Abilitato",
-    realControlTone: "ok",
-    pillTone: "ok",
+    realControlTone: liveTone,
+    pillTone: liveTone,
   };
 }
 

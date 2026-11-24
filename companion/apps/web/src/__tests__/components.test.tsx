@@ -317,5 +317,14 @@ describe("espControlStatus", () => {
     expect(live.realControlValue).toBe("Abilitato");
     expect(live.realControlTone).toBe("ok");
     expect(live.pillTone).toBe("ok");
+
+    const nativeSelfUse = espControlStatus({
+      recorded_at: nowIso,
+      detail: { operating_mode: "LIVE", live_delegated_native: true, timestamp: nowIso },
+    });
+    expect(nativeSelfUse.modeLabel).toBe("ESP · LIVE · Self-Use nativo");
+    expect(nativeSelfUse.modeTone).toBe("shadow");
+    expect(nativeSelfUse.realControlTone).toBe("shadow");
+    expect(nativeSelfUse.pillTone).toBe("shadow");
   });
 });

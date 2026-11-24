@@ -28,8 +28,8 @@ function statusMeta(status?: string): { tone: "ok" | "warn" | "err" | "neutral";
   return { tone: "neutral", label: "N/D" };
 }
 
-function StatusIcon({ tone }: { tone: "ok" | "warn" | "err" | "neutral" }) {
-  if (tone === "ok") return <CheckCircle2 size={14} aria-hidden="true" />;
+function StatusIcon({ tone }: { tone: "ok" | "warn" | "err" | "shadow" | "neutral" }) {
+  if (tone === "ok" || tone === "shadow") return <CheckCircle2 size={14} aria-hidden="true" />;
   if (tone === "warn") return <ShieldAlert size={14} aria-hidden="true" />;
   if (tone === "err") return <XCircle size={14} aria-hidden="true" />;
   return <WifiOff size={14} aria-hidden="true" />;

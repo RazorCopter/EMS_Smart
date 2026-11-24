@@ -68,6 +68,17 @@ void releaseSession(const char* reason) {
 
 bool liveTrialActive() { return active.load(); }
 
+bool liveTrialExecuted() {
+    const std::lock_guard guard(trialMutex);
+    return active.load() && executor && !executor->nativeDelegated() && confirmedWatts.has_value();
+}
+
+std::optional<int> liveTrialAppliedWatts() {
+    const std::lock_guard guard(trialMutex);
+    if (active.load() && executor && !executor->nativeDelegated()) return confirmedWatts;
+    return std::nullopt;
+}
+
 bool configureLiveTrainer(bool enabled, unsigned interval) {
     const std::lock_guard guard(trialMutex);
     if (executor || pending != Request::None || interval < 1 || interval > 30) return false;
@@ -156,16 +167,17 @@ void serviceLiveTrial(AforeReader& reader, Decision decision, uint32_t now, bool
         accountedModeWrites = 0;
         actuator.emplace(reader, reader.unit(), *nativeMode, true, recordLog);
         executor.emplace(*actuator);
-        trialPolicy = savedPolicy();
+        trialPolicy = activePolicy();
         durationMs = uint32_t(trialPolicy.trainerSec) * 1000;
         const auto lease = trainer ? std::optional<uint32_t>{durationMs} : std::nullopt;
-        const bool selfUse = decision.strategy == Strategy::SelfUse;
-        if (selfUse && nativeMode != 1) {
-            releaseSession("LIVE_NATIVE_SELF_USE_UNAVAILABLE");
-            return;
-        }
-        if ((!selfUse && !actuator->enterExternalBatteryControl()) ||
-            !executor->arm(now, lease, selfUse)) {
+        const auto socNow = reader.state().soc.usable(now);
+        const bool safeForNative = !trainer && trialPolicy.delegateNativeSelfUse == 1 &&
+            nativeMode == 1 && decision.strategy == Strategy::SelfUse &&
+            trialPolicy.gridTarget == 0 &&
+            std::string_view(decision.safetyReason) == "NONE" &&
+            socNow && *socNow >= decision.effectiveFloor + std::max(trialPolicy.hysteresis, 3);
+        if ((!safeForNative && !actuator->enterExternalBatteryControl()) ||
+            !executor->arm(now, lease, safeForNative)) {
             releaseSession(actuator->release() ? "LIVE_TRIAL_START_REFUSED" : "LIVE_TRIAL_RELEASE_FAILED");
             return;
         }
@@ -178,7 +190,7 @@ void serviceLiveTrial(AforeReader& reader, Decision decision, uint32_t now, bool
         accountModeWrites(now);
         status = trainer ? "LIVE_TRIAL_RUNNING" : "LIVE_RUNNING";
         recordLog(status);
-        if (selfUse) recordLog("LIVE_NATIVE_DELEGATED");
+        if (safeForNative) recordLog("LIVE_NATIVE_DELEGATED");
     }
     if (!executor) return;
 
@@ -188,29 +200,39 @@ void serviceLiveTrial(AforeReader& reader, Decision decision, uint32_t now, bool
                                                           : "LIVE_TRIAL_RELEASE_FAILED");
         return;
     }
+    trialPolicy = activePolicy();
+    durationMs = uint32_t(trialPolicy.trainerSec) * 1000;
+    executor->updateLease(trainer ? std::optional<uint32_t>{durationMs} : std::nullopt);
+    response.updatePolicy(trialPolicy);
     if (!healthy) decision.finalWatts.reset();
     const bool usable = decision.finalWatts && decision.lower && decision.upper &&
         *decision.finalWatts >= *decision.lower && *decision.finalWatts <= *decision.upper &&
         decision.strategy != Strategy::Safe && decision.strategy != Strategy::Native;
-    const bool selfUse = decision.strategy == Strategy::SelfUse;
-    if (usable && selfUse && !executor->nativeDelegated()) {
-        if (nativeMode != 1 ||
-            !nativeDelegationBudgetAllows(cooldownRemaining(now), dailyModeSwitches,
+    const auto socNow = reader.state().soc.usable(now);
+    const bool canDelegateNative = !trainer && trialPolicy.delegateNativeSelfUse == 1 &&
+        nativeMode == 1 && decision.strategy == Strategy::SelfUse &&
+        trialPolicy.gridTarget == 0 &&
+        std::string_view(decision.safetyReason) == "NONE" &&
+        socNow && *socNow >= decision.effectiveFloor + std::max(trialPolicy.hysteresis, 3);
+    const bool mustResumeExternal = !canDelegateNative &&
+        (trainer || !socNow || *socNow <= decision.effectiveFloor + 1 ||
+         decision.strategy != Strategy::SelfUse ||
+         trialPolicy.delegateNativeSelfUse == 0 ||
+         trialPolicy.gridTarget != 0 ||
+         std::string_view(decision.safetyReason) != "NONE");
+    if (usable && canDelegateNative && !executor->nativeDelegated()) {
+        if (nativeDelegationBudgetAllows(cooldownRemaining(now), dailyModeSwitches,
                                          unsigned(trialPolicy.maxModeSwitchesPerDay))) {
-            const auto stopped = executor->disarm();
-            releaseSession(stopped.status == LiveStatus::Shadow ? "LIVE_NATIVE_SELF_USE_UNAVAILABLE"
-                                                               : "LIVE_TRIAL_RELEASE_FAILED");
-            return;
+            if (executor->delegateNative(now).status != LiveStatus::NativeDelegated) {
+                releaseSession("LIVE_TRIAL_RELEASE_FAILED");
+                return;
+            }
+            accountModeWrites(now);
+            confirmedWatts.reset();
+            response = TrainerResponse{trialPolicy};
+            recordLog("LIVE_NATIVE_DELEGATED");
         }
-        if (executor->delegateNative(now).status != LiveStatus::NativeDelegated) {
-            releaseSession("LIVE_TRIAL_RELEASE_FAILED");
-            return;
-        }
-        accountModeWrites(now);
-        confirmedWatts.reset();
-        response = TrainerResponse{trialPolicy};
-        recordLog("LIVE_NATIVE_DELEGATED");
-    } else if (usable && !selfUse && executor->nativeDelegated()) {
+    } else if (usable && mustResumeExternal && executor->nativeDelegated()) {
         const auto resumed = executor->resumeExternal(now);
         if (resumed.status != LiveStatus::Armed) {
             releaseSession(resumed.status == LiveStatus::ReleaseFailed ? "LIVE_TRIAL_RELEASE_FAILED"

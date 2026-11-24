@@ -560,6 +560,21 @@ int main() {
   // Surplus jumps back to 1600: damped K=0.5 rise -> 600 + (1600-600)/2 = 1100
   assert(dampCf.tick(sample(50, -1600, 3000), dampPol, 1, 3000).finalWatts == 1100);
 
+  // ChargeFirst with surplusOnly=0, gridCharge=0: uses full pv_w during day, 0 at night
+  Policy cfPvPol;
+  cfPvPol.strategy = 1;
+  cfPvPol.surplusOnly = 0;
+  cfPvPol.gridCharge = 0;
+  cfPvPol.charge = 2560;
+  cfPvPol.chargeFirstW = 2560;
+  StrategyManager cfPvMgr;
+  EnergyState eDayPv = sample(50, -1400, 1000);
+  eDayPv.pv = {2400.0, 1000, Quality::Valid};
+  assert(cfPvMgr.tick(eDayPv, cfPvPol, 1, 1000).finalWatts == 2400);
+  EnergyState eNightPv = sample(50, 400, 2000);
+  eNightPv.pv = {0.0, 2000, Quality::Valid};
+  assert(cfPvMgr.tick(eNightPv, cfPvPol, 1, 2000).finalWatts == 0);
+
   // Ensure every checked Decision has an explicit non-placeholder disposition
   for (const auto *disp :
        {dSunny.disposition, dRainy.disposition, dNight.disposition,

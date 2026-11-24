@@ -11,6 +11,7 @@ class TrainerResponse {
 public:
     TrainerResponse() = default;
     explicit TrainerResponse(const Policy& p) : settings_(p) {}
+    void updatePolicy(const Policy& p) { settings_ = p; }
     void confirmed(int watts, uint32_t now) {
         if (!pending_) {
             pending_ = true;

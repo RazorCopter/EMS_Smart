@@ -314,6 +314,8 @@ public:
     }
 
     const auto volt = essential(e.batteryVoltage, now, p.staleMs);
+    const auto pvSample = essential(e.pv, now, p.staleMs);
+    const int pvAvailableW = pvSample ? std::max(0, int(std::lround(*pvSample))) : -1;
     const bool haveVoltage = volt && *volt > 0 && *volt <= 1000;
     const bool voltageSafe =
         (!p.minVolt && !p.maxVolt) || (haveVoltage && *volt >= p.minVolt &&
@@ -325,7 +327,7 @@ public:
     // Predictive & seasonal autonomous layer (ACTIVE in SHADOW when
     // p.predictive==1 and mode is SelfUse or ChargeFirst)
     if (p.predictive && (p.strategy == 0 || p.strategy == 1)) {
-      return tickPredictive(*soc, surplus, balance, volt, haveVoltage,
+      return tickPredictive(*soc, surplus, balance, pvAvailableW, volt, haveVoltage,
                             voltageSafe, p, now, local, pred, d);
     }
 
@@ -402,9 +404,12 @@ public:
     if (p.dischargeA)
       d.lower =
           std::max(*d.lower, haveVoltage ? -int(p.dischargeA * *volt) : 0);
+    const int nonGridUpper = (d.strategy == Strategy::ChargeFirst && !p.surplusOnly && pvAvailableW >= 0)
+        ? std::max(std::max(0, surplus), pvAvailableW)
+        : std::max(0, surplus);
     d.upper = *soc >= p.ceiling
                   ? 0
-                  : std::min(cap, permitGrid ? cap : std::max(0, surplus));
+                  : std::min(cap, permitGrid ? cap : nonGridUpper);
     d.surplusW = surplus;
     d.gridPermitted = permitGrid;
     if (p.chargeA)
@@ -448,7 +453,7 @@ private:
     return mmdd >= p.winterStart || mmdd <= p.winterEnd;
   }
 
-  Decision tickPredictive(double soc, int surplus, int balance,
+  Decision tickPredictive(double soc, int surplus, int balance, int pvAvailableW,
                           std::optional<double> volt, bool haveVoltage,
                           bool voltageSafe, const Policy &p, uint32_t now,
                           const tm *local, const PredictiveInputs *pred,
@@ -690,11 +695,14 @@ private:
       d.state = holding100 ? "HOLD_100" : "CAPTURE";
       const int cap = std::min(fullChargeCap, p.chargeFirstW);
       const bool permitGrid = p.gridCharge && !p.surplusOnly;
+      const int nonGridUpper = (!p.surplusOnly && pvAvailableW >= 0)
+          ? std::max(std::max(0, surplus), pvAvailableW)
+          : std::max(0, surplus);
       d.lower = 0; // Block battery discharge strictly while capturing solar /
                    // holding 100%
       d.upper = soc >= p.ceiling
                     ? 0
-                    : std::min(cap, permitGrid ? cap : std::max(0, surplus));
+                    : std::min(cap, permitGrid ? cap : nonGridUpper);
       d.surplusW = surplus;
       d.gridPermitted = permitGrid;
       d.candidate = cap;
@@ -782,8 +790,8 @@ private:
 
     if (priorW_ && effective_ == d.strategy) {
       if (d.strategy == Strategy::SelfUse ||
-          (d.strategy == Strategy::ChargeFirst && !d.gridPermitted &&
-           selected > *priorW_ && std::string_view(state_) != "TAPER")) {
+          ((d.strategy == Strategy::ChargeFirst || d.strategy == Strategy::Target) &&
+           !d.gridPermitted && selected > *priorW_ && std::string_view(state_) != "TAPER")) {
         const int delta = selected - *priorW_;
         selected =
             *priorW_ +

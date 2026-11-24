@@ -18,6 +18,7 @@ public:
 
     bool begin(uint32_t baud);
     bool observeBus();
+    void flushInput();
     Result readInputRegisters(uint8_t slave, uint16_t address, uint16_t count, uint16_t* values);
 #ifdef V51_LIVE_TRIAL
     Result readHoldingRegisters(uint8_t slave, uint16_t address, uint16_t count, uint16_t* values);

@@ -182,7 +182,8 @@ ManualResult manualCommand(const char* action,JsonVariantConst payload,const cha
     if(strcmp(action,"operating_mode")==0) {
         const char* mode=payload["mode"]|"";
 #ifdef V51_LIVE_TRIAL
-        if (strcmp(origin,"WEB_UI")==0 || strcmp(origin,"REST_API")==0) {
+        if (strcmp(origin,"WEB_UI")==0 || strcmp(origin,"REST_API")==0 ||
+            (strcmp(origin,"MQTT")==0 && strcmp(mode,"SHADOW")==0)) {
             const bool accepted = requestLiveTrial(mode);
             return {accepted,accepted?"LIVE_TRIAL_QUEUED":"LIVE_TRIAL_REFUSED"};
         }

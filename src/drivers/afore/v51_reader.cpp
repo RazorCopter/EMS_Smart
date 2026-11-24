@@ -122,11 +122,24 @@ void AforeReader::start(uint32_t now) {
 }
 
 void AforeReader::tick(uint32_t now) {
-    if (!started_ || state_.readHalted) {
+    if (!started_) {
+        return;
+    }
+    if (state_.readHalted) {
+        constexpr uint32_t kRecoveryCooldownMs = 60000;
+        if (now - haltedAt_ >= kRecoveryCooldownMs) {
+            transport_.flushInput();
+            state_.readHalted = false;
+            failures_ = 0;
+            phase_ = 0;
+            nextPoll_ = now + 5000;
+            recordLog("RS485_RECOVERY_ATTEMPT");
+        }
         return;
     }
     if (!transport_.observeBus()) {
         state_.readHalted = true;
+        haltedAt_ = now;
         recordLog("RS485_HALTED unexpected traffic while idle; possible second master");
         return;
     }
@@ -217,7 +230,9 @@ void AforeReader::tick(uint32_t now) {
     } else {
         ++state_.errors;
         ++failures_;
+        if (probed_ && phase_ == 1) phase_ = 0;
         state_.readHalted = result == ReadOnlyModbusTransport::Result::Traffic || failures_ >= 3;
+        if (state_.readHalted) haltedAt_ = stamp;
         char line[128];
         snprintf(line, sizeof(line), "FC04_ERROR addr=%u count=%u result=%d failures=%u%s",
                       block.address, block.count, int(result), failures_,

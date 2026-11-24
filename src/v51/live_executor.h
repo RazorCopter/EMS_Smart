@@ -52,6 +52,11 @@ public:
 
     bool nativeDelegated() const { return armed_ && delegated_; }
 
+    void updateLease(std::optional<uint32_t> leaseMs) {
+        if (!armed_) return;
+        if (!leaseMs || (*leaseMs > 0 && *leaseMs <= INT32_MAX)) leaseMs_ = leaseMs;
+    }
+
     LiveResult delegateNative(uint32_t now) {
         if (!armed_ || delegated_) return {status_, {}};
         if (!actuator_.enterNativeMode()) return stop(LiveStatus::ReleaseFailed, false);

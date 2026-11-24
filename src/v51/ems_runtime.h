@@ -10,6 +10,7 @@ Policy activePolicy();
 struct PolicyStatus {uint32_t revision;Strategy configured;};
 PolicyStatus policyStatus();
 void loadPolicy(Preferences& preferences);
-Decision tickEms(const EnergyState& state,uint32_t now,uint32_t sequence);
+Decision tickEms(const EnergyState& state,uint32_t now,uint32_t sequence,bool recordNow=true);
+void recordEmsDecision(const EnergyState& state,const Decision& result,uint32_t now,uint32_t sequence,bool executed,std::optional<int> applied);
 void registerEms(httpd_handle_t server,bool (*authorize)(httpd_req_t*));
 }

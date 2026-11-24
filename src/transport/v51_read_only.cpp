@@ -44,6 +44,10 @@ bool ReadOnlyModbusTransport::observeBus() {
     return ready_ && uart_get_buffered_data_len(kPort, &size) == ESP_OK && size == 0;
 }
 
+void ReadOnlyModbusTransport::flushInput() {
+    if (ready_) uart_flush_input(kPort);
+}
+
 ReadOnlyModbusTransport::Result ReadOnlyModbusTransport::readInputRegisters(
     uint8_t slave, uint16_t address, uint16_t count, uint16_t* values) {
     return readRegisters(slave, modbus::kReadInputRegisters, address, count, values);

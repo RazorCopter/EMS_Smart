@@ -72,7 +72,8 @@ template<typename T> void number(std::ostream& out,std::optional<T> value) {
     else out<<"null";
 }
 std::string audit(const EnergyState& e,const Policy& p,const Decision& d,
-                  uint32_t now,uint32_t seq,const char* provenance) {
+                  uint32_t now,uint32_t seq,const char* provenance,
+                  bool executed=false,std::optional<int> applied=std::nullopt) {
     std::ostringstream out;
     auto stamp=clockStamp();
     stamp.uptime=now;
@@ -100,7 +101,9 @@ std::string audit(const EnergyState& e,const Policy& p,const Decision& d,
     out<<",\"season\":\""<<d.seasonName<<"\",\"predictive_phase\":\""<<d.phase<<"\"";
     out<<",\"fog_active\":"<<(d.fogActive ? "true":"false")<<",\"low_sun_mode\":"<<(d.lowSunMode ? "true":"false");
     out<<",\"reason\":\""<<d.reason<<"\",\"disposition\":\""<<d.disposition
-       <<"\",\"executed\":false,\"applied\":null,\"aux1\":\""<<(auxOn()?"ON":"OFF")
+       <<"\",\"executed\":"<<(executed?"true":"false")<<",\"applied\":";
+    number(out,applied);
+    out<<",\"aux1\":\""<<(auxOn()?"ON":"OFF")
        <<"\",\"modbus_write_count\":"<<(strcmp(provenance,"MEASURED")==0?modbusWriteCount():0)<<"}";
     return out.str();
 }
@@ -600,7 +603,7 @@ void loadPolicy(Preferences& preferences) {
     current.predictive = 1;
     unlockPowerCaps(current);
 }
-Decision tickEms(const EnergyState& state,uint32_t now,uint32_t seq) {
+Decision tickEms(const EnergyState& state,uint32_t now,uint32_t seq,bool recordNow) {
     static StrategyManager manager;
     Policy p;
     uint32_t version;
@@ -641,12 +644,17 @@ Decision tickEms(const EnergyState& state,uint32_t now,uint32_t seq) {
         }
     }
     setHaUsage({result.usedForecast, result.usedRatio, result.usedWeather, result.usedLoadProfile});
-    auto line=audit(state,p,result,now,seq,"MEASURED");
+    if (recordNow) recordEmsDecision(state,result,now,seq,false,std::nullopt);
+    return result;
+}
+void recordEmsDecision(const EnergyState& state,const Decision& result,uint32_t now,uint32_t seq,
+                       bool executed,std::optional<int> applied) {
+    const auto p = activePolicy();
+    auto line=audit(state,p,result,now,seq,"MEASURED",executed,applied);
     line.pop_back();
     line+=liveTrialActive()?",\"live_trial_active\":true":",\"live_trial_active\":false";
     line+=",\"ha_inputs\":"+haSummary(false)+"}";
     recordDecision(state,now,line);
-    return result;
 }
 void registerEms(httpd_handle_t server,bool (*authorize)(httpd_req_t*)) {
     checkAuth=authorize;

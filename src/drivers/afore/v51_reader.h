@@ -30,6 +30,7 @@ private:
     ReadOnlyModbusTransport transport_;
     EnergyState state_;
     uint32_t nextPoll_ = 0;
+    uint32_t haltedAt_ = 0;
     uint8_t phase_ = 0, lowIndex_ = 0;
     std::array<uint16_t, 125> gridWords_{};
     uint32_t gridStamp_ = 0;

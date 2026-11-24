@@ -118,13 +118,18 @@ void loop() {
                  state.grid.value && state.battery.value
                      ? std::min(state.grid.stamp - state.battery.stamp, state.battery.stamp - state.grid.stamp) : UINT32_MAX);
         v51::recordLog(row);
-        const auto decision = v51::tickEms(state,lastHeartbeat,sequence);
+        const auto decision = v51::tickEms(state,lastHeartbeat,sequence,false);
 #ifdef V51_LIVE_TRIAL
+        const auto pol = v51::activePolicy();
+        const bool needsClock = (pol.predictive == 1 && (pol.strategy == 0 || pol.strategy == 1)) ||
+                                (pol.strategy == 4 && pol.daily == 1);
         v51::serviceLiveTrial(reader, decision, lastHeartbeat,
-            readsStarted && watchdogReady && !state.readHalted && clock.utc &&
+            readsStarted && watchdogReady && !state.readHalted && (!needsClock || clock.utc) &&
             state.batteryVoltage.usable(lastHeartbeat).has_value());
+        v51::recordEmsDecision(state, decision, lastHeartbeat, sequence,
+                               v51::liveTrialExecuted(), v51::liveTrialAppliedWatts());
 #else
-        (void)decision;
+        v51::recordEmsDecision(state, decision, lastHeartbeat, sequence, false, std::nullopt);
 #endif
     }
     v51::tickRemote(remoteReady && watchdogReady && gpio_get_level(kAux) == 0 &&

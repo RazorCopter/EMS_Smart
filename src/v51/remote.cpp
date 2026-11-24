@@ -262,6 +262,9 @@ esp_err_t health(httpd_req_t *request) {
   }
 
   size_t used = 0;
+  const auto appliedW = liveTrialAppliedWatts();
+  char appliedBuf[16] = "null";
+  if (appliedW) snprintf(appliedBuf, sizeof(appliedBuf), "%d", *appliedW);
   appendf(
       response.get(), kHealthBufCap, used,
       "{\"firmware\":\"%s\",\"mode\":\"%s\",\"uptime_ms\":%lu,\"reset_"
@@ -280,7 +283,7 @@ esp_err_t health(httpd_req_t *request) {
       "\"sta_connected\":%s,\"ip\":\"%s\","
       "\"rssi_dbm\":%s,\"ota_slot\":\"%s\",\"ota_state\":\"%s\","
       "\"mqtt_connected\":%s,\"mqtt_reconnect_count\":%u,"
-      "\"aux1\":\"%s\",\"executed\":false,\"applied\":null,\"modbus_write_"
+      "\"aux1\":\"%s\",\"executed\":%s,\"applied\":%s,\"modbus_write_"
       "count\":%u,\"tasks\":[",
       V51_BUILD_ID, liveTrialActive() ? "LIVE" : "SHADOW", static_cast<unsigned long>(millis()),
       int(esp_reset_reason()), res->heapFree, res->heapTotal, res->heapMin,
@@ -293,7 +296,8 @@ esp_err_t health(httpd_req_t *request) {
       sta ? "true" : "false", staIp.c_str(), rssi,
       running ? running->label : "unknown", imageState(bootState.load()),
       mqttConnected() ? "true" : "false", mqttReconnectCount(),
-      auxOn() ? "ON" : "OFF", modbusWriteCount());
+      auxOn() ? "ON" : "OFF", liveTrialExecuted() ? "true" : "false", appliedBuf,
+      modbusWriteCount());
   for (uint32_t i = 0; i < res->reportedTaskCount && used + 128 < kHealthBufCap;
        ++i) {
     const auto &task = res->tasks[i];

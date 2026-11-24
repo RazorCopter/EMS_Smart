@@ -567,6 +567,12 @@ private:
     const bool lowSunMode = isWinter ? (poorSolar || !tomorrowFavorable)
                                      : (poorSolar && !tomorrowFavorable);
     d.lowSunMode = lowSunMode;
+    const bool allowLowSunGentle = !fogActive && ha.forecastValid &&
+                                   soc >= 80.0 && remainingHours > 1.0 &&
+                                   expectedSurplusKwh >= requiredInputKwh * 2.0;
+    const bool keepLowSunGentle = !fogActive && ha.forecastValid &&
+                                  soc >= 78.0 && remainingHours > 1.0 &&
+                                  expectedSurplusKwh >= requiredInputKwh * 1.6;
 
     const double refVolt = haveVoltage ? *volt : (p.nominalMv / 1000.0);
     const int maxAmpW =
@@ -588,7 +594,7 @@ private:
         cyclePhase_ = CyclePhase::FullHold;
         fullHoldAccumMs_ = 0;
         fullHoldLastTick_ = now;
-      } else if (lowSunMode || soc <= effectiveFloor) {
+      } else if ((lowSunMode && !allowLowSunGentle) || soc <= effectiveFloor) {
         cyclePhase_ = CyclePhase::CaptureChargeFirst;
       } else if (remainingHours > 0.0 || inAnticipationWindow) {
         cyclePhase_ = CyclePhase::GentleCharge;
@@ -635,9 +641,10 @@ private:
         cyclePhase_ = CyclePhase::FullHold;
         fullHoldAccumMs_ = 0;
         d.transition = "FULL_HOLD_STARTED";
-      } else if (!lowSunMode && soc > effectiveFloor + p.hysteresis &&
-                 remainingHours > 1.0 && ha.forecastValid &&
-                 expectedSurplusKwh >= requiredInputKwh * 1.15) {
+      } else if ((!lowSunMode && soc > effectiveFloor + p.hysteresis &&
+                  remainingHours > 1.0 && ha.forecastValid &&
+                  expectedSurplusKwh >= requiredInputKwh * 1.15) ||
+                 allowLowSunGentle) {
         cyclePhase_ = CyclePhase::GentleCharge;
         d.transition = "SWITCH_GENTLE_TARGET";
       }
@@ -653,7 +660,7 @@ private:
         cycleDay_ = currentDay;
         cyclePhase_ = CyclePhase::SelfUse;
         d.transition = "DEADLINE_REACHED_SELF_USE";
-      } else if (lowSunMode && !inAnticipationWindow) {
+      } else if (lowSunMode && !inAnticipationWindow && !keepLowSunGentle) {
         cyclePhase_ = CyclePhase::CaptureChargeFirst;
         d.transition = "CYCLE_CHARGE_FIRST";
       }
@@ -663,7 +670,7 @@ private:
       if (soc <= effectiveFloor) {
         dischargingCycle_ = false;
         cycleDay_ = -1;
-        if (lowSunMode || !ha.forecastValid || remainingHours <= 0.0) {
+        if ((lowSunMode && !allowLowSunGentle) || !ha.forecastValid || remainingHours <= 0.0) {
           cyclePhase_ = CyclePhase::CaptureChargeFirst;
           d.transition = "CYCLE_CHARGE_FIRST";
         } else {
@@ -671,7 +678,7 @@ private:
           d.transition = "CYCLE_GENTLE_TARGET";
         }
       } else if (!dischargingCycle_) {
-        if (lowSunMode && !inAnticipationWindow) {
+        if (lowSunMode && !allowLowSunGentle && !inAnticipationWindow) {
           cyclePhase_ = CyclePhase::CaptureChargeFirst;
           d.transition = "CYCLE_CHARGE_FIRST";
         } else if (soc < double(p.target) &&

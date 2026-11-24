@@ -4,6 +4,7 @@ import { fmtTime, fmtWatts } from "../../lib/format";
 import type { DecisionViewModel } from "../../viewmodels/dashboardViewModel";
 import { HelpTip } from "../HelpTip";
 import { EmeraldStatusPill } from "./EmeraldChrome";
+import { EmsCoreBadgeSvg } from "./EmsCoreBadgeSvg";
 
 interface Props {
   decision: DecisionViewModel;
@@ -37,9 +38,12 @@ export function EmeraldDecisionCard({ decision, batteryW, gridW }: Props) {
   return (
     <article className="em-card em-decision-card" aria-label="Decisione EMS corrente">
       <div className="em-card-head">
-        <div>
-          <h2 className="em-card-title">Decisione EMS</h2>
-          <p className="em-card-sub">Valutazione locale &amp; input Home Assistant</p>
+        <div className="em-dec-head-left">
+          <EmsCoreBadgeSvg />
+          <div>
+            <h2 className="em-card-title">Decisione EMS</h2>
+            <p className="em-card-sub">Valutazione locale &amp; input Home Assistant</p>
+          </div>
         </div>
         <EmeraldStatusPill tone="shadow" label="Simulazione EMS" />
       </div>

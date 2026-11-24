@@ -1748,3 +1748,28 @@
   background: var(--safety-soft);
   color: var(--safety-amber);
 }
+
+.em-dec-head-left {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  min-width: 0;
+}
+
+.em-ems-badge-svg {
+  width: 42px;
+  height: 42px;
+  flex-shrink: 0;
+  filter: drop-shadow(0 0 10px rgba(0, 240, 255, 0.25));
+}
+
+.em-ems-orbit {
+  transform-origin: 60px 56px;
+  animation: emHudOrbitSpin 24s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .em-ems-orbit {
+    animation: none;
+  }
+}

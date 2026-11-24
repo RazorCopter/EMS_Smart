@@ -103,45 +103,83 @@ function RadialFlowTrack({
 }) {
   const width = flowStrokeWidth(watts, deadband);
   const dur = flowSpeedSeconds(watts, deadband);
+  const durNum = parseFloat(dur);
 
   return (
     <g>
-      <path d={path} fill="none" stroke="var(--border-subtle)" strokeWidth="2.4" strokeLinecap="round" opacity="0.55" />
+      {/* Subtle base conduit */}
+      <path d={path} fill="none" stroke="var(--border-subtle)" strokeWidth="2" strokeLinecap="round" opacity="0.35" />
+
+      {/* Outer neon energy aura when active */}
+      {active && (
+        <path
+          d={path}
+          fill="none"
+          stroke={color}
+          strokeWidth={width + 4.5}
+          strokeLinecap="round"
+          opacity="0.14"
+        />
+      )}
+
+      {/* Core track */}
       <path
         id={id}
         d={path}
         fill="none"
         stroke={active ? color : "var(--missing-grey)"}
-        strokeWidth={active ? width : 2}
+        strokeWidth={active ? 1.8 : 1.5}
         strokeLinecap="round"
         strokeDasharray={dashed ? "5 5" : undefined}
-        opacity={active ? 0.94 : 0.35}
+        opacity={active ? 0.55 : 0.25}
       />
+
+      {/* Animated energy pulse stream along track */}
+      {active && !dashed && (
+        <path
+          d={path}
+          fill="none"
+          stroke={color}
+          strokeWidth={Math.max(2, width * 0.65)}
+          strokeLinecap="round"
+          strokeDasharray="6 14"
+          opacity="0.72"
+          className={`flow-motion ${reverse ? "em-stream-rev" : "em-stream-fwd"}`}
+          style={{ animationDuration: `${Math.max(0.45, durNum * 0.6).toFixed(2)}s` }}
+        />
+      )}
+
+      {/* Glowing plasma particles with white-hot core */}
       {active && (
         <g className="flow-motion">
-          <circle r="4.2" fill={color}>
-            <animateMotion
-              dur={dur}
-              repeatCount="indefinite"
-              keyPoints={reverse ? "1;0" : "0;1"}
-              keyTimes="0;1"
-              calcMode="linear"
-            >
-              <mpath href={`#${id}`} />
-            </animateMotion>
-          </circle>
-          <circle r="2.6" fill={color} opacity="0.55">
-            <animateMotion
-              dur={dur}
-              begin={`-${(parseFloat(dur) / 2).toFixed(2)}s`}
-              repeatCount="indefinite"
-              keyPoints={reverse ? "1;0" : "0;1"}
-              keyTimes="0;1"
-              calcMode="linear"
-            >
-              <mpath href={`#${id}`} />
-            </animateMotion>
-          </circle>
+          {[0, 1, 2].map((idx) => (
+            <g key={idx}>
+              <circle r={idx === 0 ? 4.6 : 3.6} fill={color} opacity={idx === 0 ? 0.78 : 0.55} filter="url(#em-particle-glow)">
+                <animateMotion
+                  dur={dur}
+                  begin={`-${((durNum * idx) / 3).toFixed(2)}s`}
+                  repeatCount="indefinite"
+                  keyPoints={reverse ? "1;0" : "0;1"}
+                  keyTimes="0;1"
+                  calcMode="linear"
+                >
+                  <mpath href={`#${id}`} />
+                </animateMotion>
+              </circle>
+              <circle r={idx === 0 ? 2.1 : 1.6} fill="#ffffff" opacity="0.95">
+                <animateMotion
+                  dur={dur}
+                  begin={`-${((durNum * idx) / 3).toFixed(2)}s`}
+                  repeatCount="indefinite"
+                  keyPoints={reverse ? "1;0" : "0;1"}
+                  keyTimes="0;1"
+                  calcMode="linear"
+                >
+                  <mpath href={`#${id}`} />
+                </animateMotion>
+              </circle>
+            </g>
+          ))}
         </g>
       )}
     </g>
@@ -276,6 +314,13 @@ export function EmeraldEnergyMonitor({
               <stop offset="0%" stopColor="var(--accent-teal)" stopOpacity="0.07" />
               <stop offset="100%" stopColor="var(--accent-teal)" stopOpacity="0" />
             </radialGradient>
+            <filter id="em-particle-glow" x="-80%" y="-80%" width="260%" height="260%">
+              <feGaussianBlur stdDeviation="2.6" result="blur" />
+              <feMerge>
+                <feMergeNode in="blur" />
+                <feMergeNode in="SourceGraphic" />
+              </feMerge>
+            </filter>
           </defs>
 
           {/* Outer segmented structural guide ring connecting the 4 quadrant arcs */}

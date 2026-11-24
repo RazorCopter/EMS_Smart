@@ -1822,3 +1822,28 @@
     animation: none;
   }
 }
+
+@keyframes emStreamFwd {
+  from { stroke-dashoffset: 20; }
+  to { stroke-dashoffset: 0; }
+}
+
+@keyframes emStreamRev {
+  from { stroke-dashoffset: 0; }
+  to { stroke-dashoffset: 20; }
+}
+
+.em-stream-fwd {
+  animation: emStreamFwd 0.9s linear infinite;
+}
+
+.em-stream-rev {
+  animation: emStreamRev 0.9s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .em-stream-fwd,
+  .em-stream-rev {
+    animation: none;
+  }
+}

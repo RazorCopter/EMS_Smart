@@ -31,6 +31,15 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from energy_domain.esp_logs import esp_log_segments
+from energy_domain.notifications import (
+    NOTIFICATION_CATALOG,
+    NOTIFICATION_SETTINGS_KEY,
+    discover_telegram_chats,
+    format_telegram_event_message,
+    mask_bot_token,
+    normalize_notification_settings,
+    send_telegram_message,
+)
 
 from companion_db.models import CompanionSetting, EmsDecision, EmsEvent, SystemHealth
 from energy_domain import SecretRedactingFilter
@@ -908,3 +917,110 @@ async def test_connection(
         }
     except Exception as exc:
         return {"target": "esp32", "ok": False, "detail": str(exc)[:160]}
+
+
+class NotificationSettingsUpdateRequest(BaseModel):
+    enabled: bool = False
+    bot_token: str | None = None
+    chat_id: str = ""
+    chat_title: str = ""
+    events: dict[str, bool] = Field(default_factory=dict)
+
+
+class TelegramDiscoverRequest(BaseModel):
+    bot_token: str | None = None
+
+
+class TelegramTestRequest(BaseModel):
+    bot_token: str | None = None
+    chat_id: str | None = None
+
+
+async def _load_telegram_notification_settings(db: AsyncSession) -> dict[str, Any]:
+    row = await db.get(CompanionSetting, NOTIFICATION_SETTINGS_KEY)
+    return normalize_notification_settings(row.value_json if row else None)
+
+
+@app.get("/api/v1/notifications/settings")
+async def get_notification_settings(
+    _user: SessionInfo = Depends(require_viewer),
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, Any]:
+    cfg = await _load_telegram_notification_settings(db)
+    return {
+        "enabled": cfg["enabled"],
+        "bot_token_configured": bool(cfg["bot_token"]),
+        "bot_token_masked": mask_bot_token(cfg["bot_token"]),
+        "chat_id": cfg["chat_id"],
+        "chat_title": cfg["chat_title"],
+        "events": cfg["events"],
+        "catalog": NOTIFICATION_CATALOG,
+    }
+
+
+@app.put("/api/v1/notifications/settings")
+async def put_notification_settings(
+    body: NotificationSettingsUpdateRequest,
+    _admin: SessionInfo = Depends(require_admin_csrf),
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, Any]:
+    current = await _load_telegram_notification_settings(db)
+    incoming_token = (body.bot_token or "").strip()
+    token = incoming_token if incoming_token else current["bot_token"]
+    merged = normalize_notification_settings(
+        {
+            "enabled": body.enabled,
+            "bot_token": token,
+            "chat_id": body.chat_id,
+            "chat_title": body.chat_title,
+            "events": {**current["events"], **body.events},
+        }
+    )
+    stmt = (
+        insert(CompanionSetting)
+        .values(key=NOTIFICATION_SETTINGS_KEY, value_json=merged)
+        .on_conflict_do_update(
+            index_elements=["key"],
+            set_={"value_json": merged, "updated_at": datetime.now(timezone.utc)},
+        )
+    )
+    await db.execute(stmt)
+    await db.commit()
+    return {
+        "enabled": merged["enabled"],
+        "bot_token_configured": bool(merged["bot_token"]),
+        "bot_token_masked": mask_bot_token(merged["bot_token"]),
+        "chat_id": merged["chat_id"],
+        "chat_title": merged["chat_title"],
+        "events": merged["events"],
+    }
+
+
+@app.post("/api/v1/notifications/telegram/discover")
+async def telegram_discover(
+    body: TelegramDiscoverRequest,
+    _admin: SessionInfo = Depends(require_admin_csrf),
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, Any]:
+    current = await _load_telegram_notification_settings(db)
+    token = (body.bot_token or "").strip() or current["bot_token"]
+    return await discover_telegram_chats(token)
+
+
+@app.post("/api/v1/notifications/telegram/test")
+async def telegram_test(
+    body: TelegramTestRequest,
+    _admin: SessionInfo = Depends(require_admin_csrf),
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, Any]:
+    current = await _load_telegram_notification_settings(db)
+    token = (body.bot_token or "").strip() or current["bot_token"]
+    chat_id = (body.chat_id or "").strip() or current["chat_id"]
+    msg = format_telegram_event_message(
+        event_type="TELEGRAM_TEST",
+        severity="info",
+        title="Test notifica Telegram",
+        detail="Collegamento tra Afore EMS Companion e Telegram attivo.",
+    )
+    ok, detail = await send_telegram_message(token, chat_id, msg)
+    return {"ok": ok, "detail": detail}

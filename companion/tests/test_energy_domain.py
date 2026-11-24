@@ -174,3 +174,28 @@ def test_password_hashing_and_redaction():
     rec = logging.LogRecord("test", logging.INFO, "", 0, 'password="mysecret"', None, None)
     SecretRedactingFilter().filter(rec)
     assert "mysecret" not in rec.getMessage()
+
+
+def test_telegram_notification_helpers():
+    from energy_domain.notifications import (
+        EVENT_TYPE_TO_NOTIFICATION_KEY,
+        format_telegram_event_message,
+        mask_bot_token,
+        normalize_notification_settings,
+    )
+
+    cfg = normalize_notification_settings({"enabled": True, "bot_token": "123456:ABCDEFGH", "chat_id": "999"})
+    assert cfg["enabled"] is True
+    assert cfg["events"]["mode_fallback_shadow"] is True
+    assert cfg["events"]["strategy_change"] is False
+    assert mask_bot_token(cfg["bot_token"]) == "123456...EFGH"
+    assert EVENT_TYPE_TO_NOTIFICATION_KEY["MODE_FALLBACK_SHADOW"] == "mode_fallback_shadow"
+
+    msg = format_telegram_event_message(
+        event_type="MODE_FALLBACK_SHADOW",
+        severity="error",
+        title="Cambio modalità inatteso: LIVE → SHADOW",
+        detail="Motivo: LIVE_TRAINER_MISMATCH_NATIVE_RESTORED",
+    )
+    assert "MODE_FALLBACK_SHADOW" in msg
+    assert "LIVE_TRAINER_MISMATCH_NATIVE_RESTORED" in msg

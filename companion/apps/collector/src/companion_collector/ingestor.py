@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 import json
@@ -15,6 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from companion_db.models import (
     AuxEvent,
+    CompanionSetting,
     ConfigurationRevision,
     Device,
     EmsDecision,
@@ -42,6 +44,13 @@ from energy_domain import (
     compare_sem_and_esp,
 )
 from energy_domain.models import parse_utc_timestamp
+from energy_domain.notifications import (
+    EVENT_TYPE_TO_NOTIFICATION_KEY,
+    NOTIFICATION_SETTINGS_KEY,
+    format_telegram_event_message,
+    normalize_notification_settings,
+    send_telegram_message,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -78,6 +87,9 @@ class DeviceRuntimeState:
     last_safety_reason: str | None = None
     last_ha_online: bool | None = None
     last_config_revision: int | None = None
+    last_operating_mode: str | None = None
+    last_live_lock: str | None = None
+    last_fault: bool | None = None
     last_sem_snapshot: SemSnapshotPayload | None = None
     active_interval_id: int | None = None
     active_interval_strategy: str | None = None
@@ -109,6 +121,8 @@ class IngestionEngine:
         self.state = DeviceRuntimeState()
         self.resource_sampler = ProcessResourceSampler("/")
         self._esp32_diag_cache: dict[str, Any] = {}
+        self._notif_cache: dict[str, Any] | None = None
+        self._notif_cache_ts: float = 0.0
 
     async def bootstrap_from_db(self) -> None:
         """Restores last known boot_id, seq, and uptime_ms on collector restart."""
@@ -447,6 +461,45 @@ class IngestionEngine:
         )
         await session.execute(stmt)
 
+    async def _dispatch_telegram_notification(
+        self,
+        *,
+        occurred_at: datetime,
+        event_type: str,
+        severity: str,
+        title: str,
+        detail: str | None,
+    ) -> None:
+        notif_key = EVENT_TYPE_TO_NOTIFICATION_KEY.get(event_type)
+        if not notif_key:
+            return
+        try:
+            now_mono = time.monotonic()
+            if self._notif_cache is None or (now_mono - self._notif_cache_ts) > 15.0:
+                async with self.session_factory() as session:
+                    row = await session.get(CompanionSetting, NOTIFICATION_SETTINGS_KEY)
+                    self._notif_cache = normalize_notification_settings(row.value_json if row else None)
+                    self._notif_cache_ts = now_mono
+            cfg = self._notif_cache
+            if not cfg or not cfg["enabled"]:
+                return
+            if not cfg["events"].get(notif_key, False):
+                return
+            if not cfg["bot_token"] or not cfg["chat_id"]:
+                return
+            text_msg = format_telegram_event_message(
+                event_type=event_type,
+                severity=severity,
+                title=title,
+                detail=detail,
+                occurred_at=occurred_at,
+            )
+            ok, msg_err = await send_telegram_message(cfg["bot_token"], cfg["chat_id"], text_msg)
+            if not ok:
+                logger.warning("Telegram notification failed for %s: %s", event_type, msg_err)
+        except Exception as exc:
+            logger.warning("Telegram notification dispatch error for %s: %s", event_type, exc)
+
     async def _emit_event(
         self,
         session: AsyncSession,
@@ -470,6 +523,20 @@ class IngestionEngine:
                 metadata_json=metadata or {},
             )
         )
+        if EVENT_TYPE_TO_NOTIFICATION_KEY.get(event_type):
+            try:
+                loop = asyncio.get_running_loop()
+                loop.create_task(
+                    self._dispatch_telegram_notification(
+                        occurred_at=occurred_at,
+                        event_type=event_type,
+                        severity=severity,
+                        title=title,
+                        detail=detail,
+                    )
+                )
+            except RuntimeError:
+                pass
 
     async def _handle_availability(self, session: AsyncSession, status_text: str, now: datetime) -> None:
         online = status_text.lower() == "online"
@@ -546,6 +613,19 @@ class IngestionEngine:
             .on_conflict_do_nothing(index_elements=["source_timestamp", "device_id", "uptime_ms"])
         )
         res = await session.execute(stmt)
+
+        fault_now = bool(tel.fault)
+        if self.state.last_fault is not None and fault_now and not self.state.last_fault:
+            await self._emit_event(
+                session,
+                occurred_at=src_ts,
+                event_type="INVERTER_FAULT",
+                severity="error",
+                title="Fault telemetria / inverter rilevato",
+                detail=f"SOC {tel.soc}% · PV {tel.pv_w} W · Grid {tel.grid_w} W",
+                metadata={"provenance": provenance},
+            )
+        self.state.last_fault = fault_now
 
         if res.rowcount and self.state.last_telemetry_ts and src_ts > self.state.last_telemetry_ts:
             dt = (src_ts - self.state.last_telemetry_ts).total_seconds()
@@ -700,6 +780,19 @@ class IngestionEngine:
             .on_conflict_do_nothing(index_elements=["source_timestamp", "device_id", "boot_id", "seq"])
         )
         res = await session.execute(stmt)
+
+        fault_now = bool(tel.fault)
+        if self.state.last_fault is not None and fault_now and not self.state.last_fault:
+            await self._emit_event(
+                session,
+                occurred_at=src_ts,
+                event_type="INVERTER_FAULT",
+                severity="error",
+                title="Fault telemetria / inverter rilevato",
+                detail=f"SOC {tel.soc}% · PV {tel.pv_w} W · Grid {tel.grid_w} W",
+                metadata={"provenance": provenance},
+            )
+        self.state.last_fault = fault_now
         inserted = bool(res.rowcount)
 
         if inserted:
@@ -920,6 +1013,32 @@ class IngestionEngine:
             man.model_dump(mode="json"),
             now,
         )
+        mode_now = man.operating_mode
+        if mode_now and self.state.last_operating_mode and mode_now != self.state.last_operating_mode:
+            ts = man.timestamp or now
+            if self.state.last_operating_mode == "LIVE" and mode_now == "SHADOW":
+                await self._emit_event(
+                    session,
+                    occurred_at=ts,
+                    event_type="MODE_FALLBACK_SHADOW",
+                    severity="error",
+                    title="Cambio modalità inatteso: LIVE → SHADOW",
+                    detail=f"Motivo ESP32: {man.live_lock or 'N/D'}",
+                    metadata={"from": "LIVE", "to": "SHADOW", "live_lock": man.live_lock},
+                )
+            elif self.state.last_operating_mode == "SHADOW" and mode_now == "LIVE":
+                await self._emit_event(
+                    session,
+                    occurred_at=ts,
+                    event_type="MODE_LIVE_ACTIVE",
+                    severity="info",
+                    title="Modalità LIVE attivata",
+                    detail=f"Stato: {man.live_lock or 'LIVE'}",
+                    metadata={"from": "SHADOW", "to": "LIVE", "live_lock": man.live_lock},
+                )
+        if mode_now:
+            self.state.last_operating_mode = mode_now
+            self.state.last_live_lock = man.live_lock
 
     async def _handle_ha_inputs(self, session: AsyncSession, data: dict[str, Any], now: datetime) -> None:
         ha_online = bool(data.get("ha_online"))

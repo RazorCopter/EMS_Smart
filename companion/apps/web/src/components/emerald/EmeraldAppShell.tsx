@@ -5,6 +5,7 @@ import {
   Activity,
   BarChart3,
   BatteryCharging,
+  Bell,
   ChevronLeft,
   ChevronRight,
   Cpu,
@@ -45,7 +46,10 @@ const NAV_GROUPS = [
   },
   {
     group: "Sistema",
-    items: [{ to: "/impostazioni", label: "Impostazioni", icon: Settings }],
+    items: [
+      { to: "/notifiche", label: "Notifiche", icon: Bell },
+      { to: "/impostazioni", label: "Impostazioni", icon: Settings },
+    ],
   },
 ];
 

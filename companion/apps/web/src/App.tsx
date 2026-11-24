@@ -15,6 +15,7 @@ const AnalysisPage = lazy(() => import("./pages/AnalysisPage").then((m) => ({ de
 const ComparisonPage = lazy(() => import("./pages/ComparisonPage").then((m) => ({ default: m.ComparisonPage })));
 const BatteryPage = lazy(() => import("./pages/BatteryPage").then((m) => ({ default: m.BatteryPage })));
 const ReportPage = lazy(() => import("./pages/ReportPage").then((m) => ({ default: m.ReportPage })));
+const NotificationsPage = lazy(() => import("./pages/NotificationsPage").then((m) => ({ default: m.NotificationsPage })));
 const SettingsPage = lazy(() => import("./pages/SettingsPage").then((m) => ({ default: m.SettingsPage })));
 
 function ThemedShell({
@@ -104,6 +105,14 @@ function ThemedShell({
               element={
                 <Suspense fallback={pageFallback}>
                   <ReportPage />
+                </Suspense>
+              }
+            />
+            <Route
+              path="/notifiche"
+              element={
+                <Suspense fallback={pageFallback}>
+                  <NotificationsPage user={activeUser} />
                 </Suspense>
               }
             />

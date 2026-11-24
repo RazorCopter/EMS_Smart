@@ -5,6 +5,7 @@ import {
   Activity,
   BarChart3,
   BatteryCharging,
+  Bell,
   ChevronLeft,
   ChevronRight,
   FileText,
@@ -42,6 +43,7 @@ const NAV_ITEMS = [
   { to: "/confronto-sem", label: "Confronto SEM", icon: GitCompareArrows },
   { to: "/batteria", label: "Batteria", icon: BatteryCharging },
   { to: "/report", label: "Report", icon: FileText },
+  { to: "/notifiche", label: "Notifiche", icon: Bell },
   { to: "/impostazioni", label: "Impostazioni", icon: Settings },
 ];
 

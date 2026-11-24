@@ -148,6 +148,47 @@ function RadialFlowTrack({
   );
 }
 
+function AforeInverterGlyph({
+  x,
+  y,
+  scale = 1,
+  statusColor,
+}: {
+  x: number;
+  y: number;
+  scale?: number;
+  statusColor: string;
+}) {
+  return (
+    <g transform={`translate(${x}, ${y}) scale(${scale})`} aria-hidden="true">
+      {/* Main Afore chassis */}
+      <rect x="2" y="1" width="44" height="48" rx="5" fill="#e6edf5" stroke="rgba(0, 240, 255, 0.45)" strokeWidth="1.2" />
+      {/* Top red Afore sunburst */}
+      <g fill="#e11d48">
+        <rect x="23" y="4.5" width="1.8" height="4.2" rx="0.9" />
+        <rect x="19.5" y="5.4" width="1.7" height="4" rx="0.8" transform="rotate(-24 20.3 7.4)" />
+        <rect x="26.8" y="5.4" width="1.7" height="4" rx="0.8" transform="rotate(24 27.6 7.4)" />
+        <rect x="16.5" y="7.4" width="1.6" height="3.8" rx="0.8" transform="rotate(-48 17.3 9.3)" />
+        <rect x="29.9" y="7.4" width="1.6" height="3.8" rx="0.8" transform="rotate(48 30.7 9.3)" />
+      </g>
+      {/* Afore wordmark */}
+      <text x="24" y="16.5" textAnchor="middle" fill="#0f172a" fontSize="6.5" fontWeight="900" letterSpacing="0.02em">
+        Afore
+      </text>
+      {/* Dark control bezel + live status LCD */}
+      <rect x="13.5" y="21" width="21" height="10" rx="2" fill="#0b111a" />
+      <rect x="18" y="24.2" width="12" height="3.6" rx="0.7" fill={statusColor} opacity="0.92" />
+      {/* Lower cover seam */}
+      <line x1="2.5" y1="36.5" x2="45.5" y2="36.5" stroke="#94a3b8" strokeWidth="0.9" />
+      {/* 4 bottom cable glands */}
+      <rect x="8.5" y="49" width="4.2" height="4" rx="1" fill="#1e293b" />
+      <rect x="16.5" y="49" width="4.2" height="4" rx="1" fill="#1e293b" />
+      <rect x="27.3" y="49" width="4.2" height="4" rx="1" fill="#1e293b" />
+      <rect x="35.3" y="49" width="4.2" height="4" rx="1" fill="#1e293b" />
+    </g>
+  );
+}
+
 export function EmeraldEnergyMonitor({
   telemetry,
   safetyMinW,
@@ -461,27 +502,30 @@ export function EmeraldEnergyMonitor({
             <circle
               cx="330"
               cy="205"
-              r="50"
+              r="54"
               fill="var(--bg-surface)"
               stroke={telemetry?.fault ? "var(--fault-red)" : flow.isStale ? "var(--safety-amber)" : "var(--accent-teal)"}
               strokeWidth="2.4"
             />
-            <circle cx="330" cy="205" r="42" fill="none" stroke="var(--border-subtle)" strokeWidth="1.2" strokeDasharray="3 4" />
-            <text x="330" y={invLossW != null ? "194" : "199"} textAnchor="middle" fill="var(--text-primary)" fontSize="16" fontWeight="800" letterSpacing="0.02em">
-              Afore
-            </text>
+            <circle cx="330" cy="205" r="46" fill="none" stroke="var(--border-subtle)" strokeWidth="1.2" strokeDasharray="3 4" />
+            <AforeInverterGlyph
+              x={306}
+              y={162}
+              scale={1}
+              statusColor={telemetry?.fault ? "var(--fault-red)" : flow.isStale ? "var(--safety-amber)" : "var(--accent-teal)"}
+            />
             <text
               x="330"
-              y={invLossW != null ? "212" : "218"}
+              y={invLossW != null ? "230" : "235"}
               textAnchor="middle"
               fill={telemetry?.fault ? "var(--fault-red)" : flow.isStale ? "var(--safety-amber)" : "var(--accent-teal)"}
-              fontSize="12"
+              fontSize="11.5"
               fontWeight="700"
             >
               {flow.invStatusLabel}
             </text>
             {invLossW != null && (
-              <text x="330" y="229" textAnchor="middle" fill="var(--text-muted)" fontSize="10.5" fontWeight="650" className="mono">
+              <text x="330" y="244" textAnchor="middle" fill="var(--text-muted)" fontSize="10" fontWeight="650" className="mono">
                 {`Inv ~${invLossW} W`}
               </text>
             )}
@@ -615,15 +659,18 @@ export function EmeraldEnergyMonitor({
             onClick={() => setSelectedNode("inverter")}
             onKeyDown={onNodeKey("inverter")}
           >
-            <circle cx="180" cy="180" r="39" fill="var(--bg-surface)" stroke="var(--accent-teal)" strokeWidth="2.2" />
-            <text x="180" y={invLossW != null ? "171" : "176"} textAnchor="middle" fill="var(--text-primary)" fontSize="14" fontWeight="800">
-              Afore
-            </text>
-            <text x="180" y={invLossW != null ? "187" : "193"} textAnchor="middle" fill="var(--accent-teal)" fontSize="11.5" fontWeight="700">
+            <circle cx="180" cy="180" r="42" fill="var(--bg-surface)" stroke="var(--accent-teal)" strokeWidth="2.2" />
+            <AforeInverterGlyph
+              x={162}
+              y={146}
+              scale={0.76}
+              statusColor={telemetry?.fault ? "var(--fault-red)" : flow.isStale ? "var(--safety-amber)" : "var(--accent-teal)"}
+            />
+            <text x="180" y={invLossW != null ? "200" : "205"} textAnchor="middle" fill="var(--accent-teal)" fontSize="10.5" fontWeight="700">
               {flow.invStatusLabel}
             </text>
             {invLossW != null && (
-              <text x="180" y="202" textAnchor="middle" fill="var(--text-muted)" fontSize="10" fontWeight="650" className="mono">
+              <text x="180" y="212" textAnchor="middle" fill="var(--text-muted)" fontSize="9.5" fontWeight="650" className="mono">
                 {`Inv ~${invLossW} W`}
               </text>
             )}

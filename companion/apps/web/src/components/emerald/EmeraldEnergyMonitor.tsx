@@ -1,4 +1,4 @@
-import { useState, type KeyboardEvent } from "react";
+import { useRef, useState, type KeyboardEvent } from "react";
 import { fmtAbsKw, fmtPct } from "../../lib/format";
 import { buildEnergyFlowModel, type NodeId, type QualityKind } from "../shared/energyFlowModel";
 import type { TelemetryLive } from "../PowerFlow";
@@ -156,6 +156,7 @@ export function EmeraldEnergyMonitor({
   deadbandW = 20,
 }: Props) {
   const [selectedNode, setSelectedNode] = useState<NodeId | null>(null);
+  const invLossEmaRef = useRef<number | null>(null);
 
   const flow = buildEnergyFlowModel(
     telemetry,
@@ -164,6 +165,17 @@ export function EmeraldEnergyMonitor({
     safetyMaxW,
     selfConsumptionPct,
   );
+
+  // Representative smoothed inverter tare/conversion loss from live balance
+  let invLossW: number | null = invLossEmaRef.current != null ? Math.round(invLossEmaRef.current) : null;
+  if (flow.pv != null && flow.load != null && flow.batt != null && flow.grid != null) {
+    const rawLoss = Math.round(flow.pv + flow.grid - flow.load - flow.batt);
+    if (rawLoss >= 0 && rawLoss <= 1500) {
+      invLossEmaRef.current =
+        invLossEmaRef.current == null ? rawLoss : invLossEmaRef.current * 0.75 + rawLoss * 0.25;
+      invLossW = Math.round(invLossEmaRef.current);
+    }
+  }
 
   const onNodeKey = (node: NodeId) => (e: KeyboardEvent<SVGGElement>) => {
     if (e.key === "Enter" || e.key === " ") {
@@ -455,12 +467,12 @@ export function EmeraldEnergyMonitor({
               strokeWidth="2.4"
             />
             <circle cx="330" cy="205" r="42" fill="none" stroke="var(--border-subtle)" strokeWidth="1.2" strokeDasharray="3 4" />
-            <text x="330" y="199" textAnchor="middle" fill="var(--text-primary)" fontSize="16" fontWeight="800" letterSpacing="0.02em">
+            <text x="330" y={invLossW != null ? "194" : "199"} textAnchor="middle" fill="var(--text-primary)" fontSize="16" fontWeight="800" letterSpacing="0.02em">
               Afore
             </text>
             <text
               x="330"
-              y="218"
+              y={invLossW != null ? "212" : "218"}
               textAnchor="middle"
               fill={telemetry?.fault ? "var(--fault-red)" : flow.isStale ? "var(--safety-amber)" : "var(--accent-teal)"}
               fontSize="12"
@@ -468,6 +480,11 @@ export function EmeraldEnergyMonitor({
             >
               {flow.invStatusLabel}
             </text>
+            {invLossW != null && (
+              <text x="330" y="229" textAnchor="middle" fill="var(--text-muted)" fontSize="10.5" fontWeight="650" className="mono">
+                {`Inv ~${invLossW} W`}
+              </text>
+            )}
           </g>
         </svg>
       </div>
@@ -599,12 +616,17 @@ export function EmeraldEnergyMonitor({
             onKeyDown={onNodeKey("inverter")}
           >
             <circle cx="180" cy="180" r="39" fill="var(--bg-surface)" stroke="var(--accent-teal)" strokeWidth="2.2" />
-            <text x="180" y="176" textAnchor="middle" fill="var(--text-primary)" fontSize="14" fontWeight="800">
+            <text x="180" y={invLossW != null ? "171" : "176"} textAnchor="middle" fill="var(--text-primary)" fontSize="14" fontWeight="800">
               Afore
             </text>
-            <text x="180" y="193" textAnchor="middle" fill="var(--accent-teal)" fontSize="12" fontWeight="700">
+            <text x="180" y={invLossW != null ? "187" : "193"} textAnchor="middle" fill="var(--accent-teal)" fontSize="11.5" fontWeight="700">
               {flow.invStatusLabel}
             </text>
+            {invLossW != null && (
+              <text x="180" y="202" textAnchor="middle" fill="var(--text-muted)" fontSize="10" fontWeight="650" className="mono">
+                {`Inv ~${invLossW} W`}
+              </text>
+            )}
           </g>
 
           {/* Bottom Battery Circle with SOC ring */}

@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Download } from "lucide-react";
 import { apiFetch, rangeQuery } from "../lib/api";
-import { fmtKwh, fmtPct, strategyLabel, type TimeRange } from "../lib/format";
+import { fmtKwh, fmtPct, fmtTime, strategyLabel, type TimeRange } from "../lib/format";
 import { ShadowBanner } from "../components/ShadowBanner";
 import { PageHeader } from "../components/shared/PageHeader";
 
@@ -10,6 +10,20 @@ export function ReportPage() {
   const [range, setRange] = useState<TimeRange>("today");
   const [customStart, setCustomStart] = useState("");
   const [customEnd, setCustomEnd] = useState("");
+  const [balance, setBalance] = useState<Array<Record<string, number | string | null>>>([]);
+  const [balanceStatus, setBalanceStatus] = useState("");
+
+  const watts = (v: unknown) => (typeof v === "number" ? `${Math.round(v)} W` : "N/D");
+  async function loadBalance() {
+    setBalanceStatus("Caricamento…");
+    try {
+      const response = await apiFetch<{ rows: typeof balance }>("/api/v1/diagnostics/power-balance");
+      setBalance(response.rows.slice().reverse());
+      setBalanceStatus(response.rows.length ? `${response.rows.length} campioni` : "Nessun campione nell’ultima ora");
+    } catch {
+      setBalanceStatus("Impossibile caricare lo storico.");
+    }
+  }
 
   const qs = rangeQuery(range, customStart, customEnd);
   const { data, isLoading } = useQuery({
@@ -96,6 +110,53 @@ export function ReportPage() {
           </article>
         </section>
       )}
+
+      <section className="cyber-stack">
+        <details className="em-card em-balance">
+          <summary>Log ESP32</summary>
+          <div className="em-balance-actions">
+            <a className="inline-action-link" href="/api/v1/diagnostics/esp-logs" download>Scarica log ESP32</a>
+          </div>
+          <p>Archivio del Companion con telemetria, eventi del Trainer e interruzioni della raccolta.</p>
+        </details>
+
+        <details
+          className="em-card em-balance"
+          onToggle={(event) => {
+            if (event.currentTarget.open) void loadBalance();
+          }}
+        >
+          <summary>Casa misurata (POW-Generale) · Bilancio ultima ora</summary>
+          <div className="em-balance-actions">
+            <button className="btn" type="button" onClick={() => void loadBalance()}>Aggiorna</button>
+            <a className="inline-action-link" href="/api/v1/diagnostics/power-balance?format=csv" download>Scarica CSV</a>
+            <span role="status">{balanceStatus}</span>
+          </div>
+          {balance.length > 0 && (
+            <div className="em-balance-scroll" tabIndex={0} aria-label="Misure dell’ultima ora">
+              <table>
+                <thead>
+                  <tr>
+                    {["Ora", "Casa Tongou", "Casa Afore", "Δ casa", "FV", "AC inverter", "Rete", "Batteria", "Residuo Afore", "Residuo Tongou"].map((label) => (
+                      <th key={label} scope="col">{label}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {balance.map((row, index) => (
+                    <tr key={`${row.sample_utc}-${index}`}>
+                      <td>{fmtTime(String(row.sample_utc), "Europe/Rome")}</td>
+                      {["house_measured_w", "house_derived_w", "house_delta_w", "pv_w", "inverter_w", "grid_w", "battery_w", "residual_afore_w", "residual_tongou_w"].map((key) => (
+                        <td key={key}>{watts(row[key])}</td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </details>
+      </section>
     </>
   );
 }

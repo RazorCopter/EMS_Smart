@@ -9,7 +9,6 @@ import {
 } from "../../viewmodels/dashboardViewModel";
 import { EChart } from "../EChart";
 import { HelpTip } from "../HelpTip";
-import { apiFetch } from "../../lib/api";
 import { EmeraldDetailDrawer, EmeraldPageHeader, EmeraldStatusPill } from "./EmeraldChrome";
 import { espControlStatus } from "./espModeLabel";
 import { EmeraldDecisionCard } from "./EmeraldDecisionCard";
@@ -33,30 +32,16 @@ function formatStartedAtLabel(iso: string | null | undefined, startedToday: bool
 
 export function EmeraldDashboardLayout({ vm, chartRange, onChangeChartRange }: Props) {
   const [sysDrawerOpen, setSysDrawerOpen] = useState(false);
-  const [balance, setBalance] = useState<Array<Record<string, number | string | null>>>([]);
-  const [balanceStatus, setBalanceStatus] = useState("");
 
   const tel = vm.telemetry;
   const meter = vm.raw.house_meter;
   const meterAge = meter ? (Date.now() - Date.parse(meter.received_at)) / 1000 : Infinity;
   const measured = meter && meterAge >= -2 && meterAge <= 15 ? meter.watts : null;
-  const derived = tel?.stale ? null : tel?.load_w ?? null;
   const flowTelemetry = tel && measured !== null && !tel.stale ? {
     ...tel,
     load_w: measured,
     quality: { ...tel.quality, load_w: { source: "measured", state: "valid", age_ms: Math.max(0, meterAge * 1000) } },
   } : tel;
-  const watts = (v: unknown) => typeof v === "number" ? `${Math.round(v)} W` : "N/D";
-  async function loadBalance() {
-    setBalanceStatus("Caricamento…");
-    try {
-      const response = await apiFetch<{ rows: typeof balance }>("/api/v1/diagnostics/power-balance");
-      setBalance(response.rows.slice().reverse());
-      setBalanceStatus(response.rows.length ? `${response.rows.length} campioni` : "Nessun campione nell’ultima ora");
-    } catch {
-      setBalanceStatus("Impossibile caricare lo storico.");
-    }
-  }
   const cov = vm.coverage;
   const telStateLabel = !tel
     ? "In attesa di telemetria"
@@ -113,40 +98,6 @@ export function EmeraldDashboardLayout({ vm, chartRange, onChangeChartRange }: P
         />
         <EmeraldDecisionCard decision={vm.decision} batteryW={tel?.stale ? null : tel?.battery_w} gridW={tel?.stale ? null : tel?.grid_w} />
       </section>
-
-      <details className="em-card em-balance">
-        <summary>Log ESP32</summary>
-        <div className="em-balance-actions">
-          <a className="inline-action-link" href="/api/v1/diagnostics/esp-logs" download>Scarica log ESP32</a>
-        </div>
-        <p>Archivio del Companion con telemetria, eventi del Trainer e interruzioni della raccolta.</p>
-      </details>
-
-      <details className="em-card em-balance" onToggle={(event) => {
-        if (event.currentTarget.open) void loadBalance();
-      }}>
-        <summary>
-          {measured !== null ? `Casa misurata · ${watts(measured)}` : `Casa stimata · ${watts(derived)}`}
-          {measured !== null && ` · POW-Generale · ${Math.max(0, Math.floor(meterAge))} s fa`}
-          {" · Bilancio ultima ora"}
-        </summary>
-        <p>Casa Afore {watts(derived)} · Differenza {watts(measured !== null && derived !== null ? measured - derived : null)}</p>
-        <div className="em-balance-actions">
-          <button className="btn" type="button" onClick={() => void loadBalance()}>Aggiorna</button>
-          <a className="inline-action-link" href="/api/v1/diagnostics/power-balance?format=csv" download>Scarica CSV</a>
-          <span role="status">{balanceStatus}</span>
-        </div>
-        {balance.length > 0 && <div className="em-balance-scroll" tabIndex={0} aria-label="Misure dell’ultima ora">
-          <table>
-            <thead><tr>{["Ora", "Casa Tongou", "Casa Afore", "Δ casa", "FV", "AC inverter", "Rete", "Batteria", "Residuo Afore", "Residuo Tongou"].map(label => <th key={label} scope="col">{label}</th>)}</tr></thead>
-            <tbody>{balance.map((row, index) => <tr key={`${row.sample_utc}-${index}`}>
-              <td>{fmtTime(String(row.sample_utc), vm.timezone)}</td>
-              {["house_measured_w", "house_derived_w", "house_delta_w", "pv_w", "inverter_w", "grid_w", "battery_w", "residual_afore_w", "residual_tongou_w"].map(key => <td key={key}>{watts(row[key])}</td>)}
-            </tr>)}</tbody>
-          </table>
-        </div>}
-      </details>
-
 
       {/* ROW 4: 75% WIDE LIVE CHART + 25% AUTONOMOUS STATO IMPIANTO PANEL */}
       <section className="em-row-bottom">

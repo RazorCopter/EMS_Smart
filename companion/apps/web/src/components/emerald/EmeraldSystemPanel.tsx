@@ -15,6 +15,7 @@ import {
 import type { SystemHealthViewModel } from "../../viewmodels/dashboardViewModel";
 import { HelpTip } from "../HelpTip";
 import { espControlStatus } from "./espModeLabel";
+import { WaveshareEsp32DinSvg } from "./WaveshareEsp32DinSvg";
 
 interface Props {
   system: SystemHealthViewModel;
@@ -84,26 +85,36 @@ export function EmeraldSystemPanel({ system, variant = "panel" }: Props) {
         </span>
       </div>
 
-      <div className="em-sys-list">
-        {items.map(({ key, icon: Icon, label, tone, value, tip }) => (
-          <div key={key} className="em-sys-row">
-            <span className="em-sys-key">
-              <Icon size={14} aria-hidden="true" />
-              <span>{label}</span>
-              {tip && (
-                <HelpTip
-                  id={`tip-em-sys-${key}-${variant}`}
-                  title={label}
-                  text={tip}
-                />
-              )}
-            </span>
-            <span className={`em-sys-val em-tone-text-${tone}`}>
-              <StatusIcon tone={tone} />
-              <span>{value}</span>
-            </span>
-          </div>
-        ))}
+      <div className={variant === "panel" ? "em-sys-body" : ""}>
+        <div className="em-sys-list">
+          {items.map(({ key, icon: Icon, label, tone, value, tip }) => (
+            <div key={key} className="em-sys-row">
+              <span className="em-sys-key">
+                <Icon size={14} aria-hidden="true" />
+                <span>{label}</span>
+                {tip && (
+                  <HelpTip
+                    id={`tip-em-sys-${key}-${variant}`}
+                    title={label}
+                    text={tip}
+                  />
+                )}
+              </span>
+              <span className={`em-sys-val em-tone-text-${tone}`}>
+                <StatusIcon tone={tone} />
+                <span>{value}</span>
+              </span>
+            </div>
+          ))}
+        </div>
+        {variant === "panel" && (
+          <WaveshareEsp32DinSvg
+            espOnline={espMeta.tone === "ok"}
+            rs485Active={espMeta.tone === "ok"}
+            relayActive={system.aux1State !== "OFF"}
+            liveControl={espStatus.modeTone === "ok" || espStatus.modeTone === "shadow"}
+          />
+        )}
       </div>
 
       <div className="em-sys-resources" aria-label="Risorse ESP32 e Container">

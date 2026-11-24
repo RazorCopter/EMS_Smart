@@ -1605,3 +1605,77 @@
     animation: none;
   }
 }
+
+/* =========================================================================
+   WAVESHARE ESP32-S3 DIN MODULE & ANIMATED LEDS
+   ========================================================================= */
+.em-sys-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 94px;
+  gap: 14px;
+  align-items: center;
+}
+
+.em-esp-din-wrap {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.em-esp-din-svg {
+  width: 90px;
+  height: auto;
+  filter: drop-shadow(0 8px 20px rgba(0, 0, 0, 0.45));
+}
+
+.em-led-off {
+  fill: #334155;
+  opacity: 0.55;
+}
+
+.em-led-pwr-on {
+  fill: #ff3b5c;
+}
+
+@keyframes emLedRs485Pulse {
+  0%, 100% { fill: #00f0ff; opacity: 1; }
+  45% { fill: #38bdf8; opacity: 0.35; }
+  65% { fill: #00f0ff; opacity: 0.95; }
+}
+
+.em-led-rs485 {
+  fill: #00f0ff;
+  animation: emLedRs485Pulse 1.3s ease-in-out infinite;
+}
+
+@keyframes emLedRelayPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.55; }
+}
+
+.em-led-relay-on {
+  fill: #10f5a0;
+  animation: emLedRelayPulse 2s ease-in-out infinite;
+}
+
+.em-led-relay-live {
+  fill: #fbbf24;
+  animation: emLedRelayPulse 2.4s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .em-led-rs485,
+  .em-led-relay-on,
+  .em-led-relay-live {
+    animation: none;
+  }
+}
+
+@media (max-width: 540px) {
+  .em-sys-body {
+    grid-template-columns: 1fr;
+  }
+  .em-esp-din-wrap {
+    display: none;
+  }
+}

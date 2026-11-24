@@ -383,12 +383,16 @@ export function buildDashboardViewModels(
       (live.config?.sem_topic_present || Object.keys(comps).includes("home_assistant")),
   );
 
+  const auxDetail = comps.aux1?.detail ?? {};
+  const isLiveMode = auxDetail.operating_mode === "LIVE";
+  const writeCount = typeof auxDetail.modbus_write_count === "number" ? auxDetail.modbus_write_count : 0;
+
   const system: SystemHealthViewModel = {
     components: comps,
     anyOffline: Object.values(comps).some((c) => c?.status === "offline"),
     resources: live.resources ?? {},
-    modalitaEsp: `SHADOW · ${strategyLabel(dec?.strategy)}`,
-    controlloReale: "Disabilitato (0 scritture Modbus)",
+    modalitaEsp: `${isLiveMode ? "LIVE" : "SHADOW"} · ${strategyLabel(dec?.strategy)}`,
+    controlloReale: isLiveMode ? `Abilitato (${writeCount} scritture Modbus)` : `Disabilitato (${writeCount} scritture Modbus)`,
     aux1State: String(comps.aux1?.detail?.aux1 ?? "OFF"),
     semOnline,
   };

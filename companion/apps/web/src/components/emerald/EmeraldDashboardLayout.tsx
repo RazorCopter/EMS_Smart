@@ -11,7 +11,7 @@ import { EChart } from "../EChart";
 import { HelpTip } from "../HelpTip";
 import { apiFetch } from "../../lib/api";
 import { EmeraldDetailDrawer, EmeraldPageHeader, EmeraldStatusPill } from "./EmeraldChrome";
-import { espModeLabel } from "./espModeLabel";
+import { espControlStatus } from "./espModeLabel";
 import { EmeraldDecisionCard } from "./EmeraldDecisionCard";
 import { EmeraldEnergyMonitor } from "./EmeraldEnergyMonitor";
 import { EmeraldKpiSection } from "./EmeraldKpiSection";
@@ -87,7 +87,7 @@ export function EmeraldDashboardLayout({ vm, chartRange, onChangeChartRange }: P
             </span>
             <EmeraldStatusPill tone={vm.telStateClass} label={telStateLabel} />
             <EmeraldStatusPill tone="info" label={vm.decision.effectiveStrategyLabel} />
-            <EmeraldStatusPill tone="info" label={espModeLabel(vm.system.components.aux1)} />
+            <EmeraldStatusPill tone={espControlStatus(vm.system.components.aux1).pillTone} label={espControlStatus(vm.system.components.aux1).modeLabel} />
           </>
         }
         actions={

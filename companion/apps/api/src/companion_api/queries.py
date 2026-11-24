@@ -304,11 +304,24 @@ async def get_system_status(session: AsyncSession, device_id: str) -> dict[str, 
             components[comp] = {"status": "unknown", "recorded_at": None, "detail": {}}
 
     device = await session.get(Device, device_id)
+    aux_detail = components["aux1"].get("detail") or {}
+    esp_detail = components["esp32"].get("detail") or {}
+    operating_mode = str(
+        aux_detail.get("operating_mode")
+        or esp_detail.get("mode")
+        or (device.operating_mode if device and device.operating_mode else "SHADOW")
+    )
+    executed = bool(esp_detail.get("executed", operating_mode == "LIVE"))
+    modbus_writes = int(
+        aux_detail.get("modbus_write_count")
+        if aux_detail.get("modbus_write_count") is not None
+        else (esp_detail.get("modbus_write_count") or 0)
+    )
     return {
         "device_id": device_id,
-        "operating_mode": "SHADOW",
-        "executed": False,
-        "modbus_write_count": 0,
+        "operating_mode": operating_mode,
+        "executed": executed,
+        "modbus_write_count": modbus_writes,
         "firmware_version": device.firmware_version if device else None,
         "last_seen_at": device.last_seen_at.isoformat() if (device and device.last_seen_at) else None,
         "components": components,

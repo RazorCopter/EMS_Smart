@@ -17,6 +17,7 @@ import { ClassicAppShell } from "../components/classic/ClassicAppShell";
 import { ClassicDashboardLayout } from "../components/classic/ClassicDashboardLayout";
 import { EmeraldAppShell } from "../components/emerald/EmeraldAppShell";
 import { EmeraldDashboardLayout } from "../components/emerald/EmeraldDashboardLayout";
+import { espControlStatus } from "../components/emerald/espModeLabel";
 import { fmtKwh, fmtWatts, humanDecisionDetail } from "../lib/format";
 import { buildDashboardViewModels, type LiveResponse } from "../viewmodels/dashboardViewModel";
 import { getChartPalette } from "../theme/themeRegistry";
@@ -291,5 +292,30 @@ describe("Multi-Theme Provider, Emerald Energy Monitor & Fallback", () => {
     fireEvent.click(screen.getByRole("button", { name: /Passa temporaneamente a Classic/i }));
     expect(onFallback).toHaveBeenCalledTimes(1);
     spy.mockRestore();
+  });
+});
+
+describe("espControlStatus", () => {
+  it("highlights SHADOW in warn (amber) and LIVE in ok (green)", () => {
+    const nowIso = new Date().toISOString();
+    const shadow = espControlStatus({
+      recorded_at: nowIso,
+      detail: { operating_mode: "SHADOW", timestamp: nowIso },
+    });
+    expect(shadow.modeLabel).toBe("ESP · SHADOW");
+    expect(shadow.modeTone).toBe("warn");
+    expect(shadow.realControlValue).toBe("Disabilitato");
+    expect(shadow.realControlTone).toBe("warn");
+    expect(shadow.pillTone).toBe("warn");
+
+    const live = espControlStatus({
+      recorded_at: nowIso,
+      detail: { operating_mode: "LIVE", live_trainer: true, timestamp: nowIso },
+    });
+    expect(live.modeLabel).toBe("ESP · LIVE · Trainer");
+    expect(live.modeTone).toBe("ok");
+    expect(live.realControlValue).toBe("Abilitato");
+    expect(live.realControlTone).toBe("ok");
+    expect(live.pillTone).toBe("ok");
   });
 });

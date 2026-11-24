@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { ArrowRight, CloudFog, ShieldAlert, ShieldCheck, Sun, Thermometer } from "lucide-react";
+import { ArrowRight, CloudFog, Home, ShieldAlert, ShieldCheck, Sun, Thermometer } from "lucide-react";
 import { fmtTime, fmtWatts } from "../../lib/format";
 import type { DecisionViewModel } from "../../viewmodels/dashboardViewModel";
 import { HelpTip } from "../HelpTip";
@@ -115,7 +115,7 @@ export function EmeraldDecisionCard({ decision, batteryW, gridW }: Props) {
         </div>
       </dl>
 
-      {/* Home Assistant Forecast & Weather Inputs */}
+      {/* Home Assistant Forecast & Weather Inputs Table */}
       {hasHa && ha && (
         <div className="em-dec-ha-box" aria-label="Dati Home Assistant">
           <div className="em-dec-ha-head">
@@ -124,32 +124,40 @@ export function EmeraldDecisionCard({ decision, batteryW, gridW }: Props) {
               <span className="em-dec-ha-badge mono">Resa vs Forecast: {ha.forecastRatioPct}%</span>
             )}
           </div>
-          <div className="em-dec-ha-grid">
+          <div className="em-dec-ha-table" role="table" aria-label="Tabella input Home Assistant">
             {(ha.forecastTodayKwh != null || ha.forecastTomorrowKwh != null) && (
-              <div className="em-dec-ha-chip">
-                <Sun size={13} aria-hidden="true" />
-                <span>
-                  FV Oggi/Domani:{" "}
-                  <strong className="mono">
-                    {ha.forecastTodayKwh != null ? `${ha.forecastTodayKwh.toFixed(1)}` : "N/D"} /{" "}
-                    {ha.forecastTomorrowKwh != null ? `${ha.forecastTomorrowKwh.toFixed(1)} kWh` : "N/D"}
-                  </strong>
+              <div className="em-dec-ha-row" role="row">
+                <span className="em-dec-ha-key" role="cell">
+                  <span className="em-dec-ha-ico em-ha-ico-sun" aria-hidden="true"><Sun size={13} /></span>
+                  <span>Forecast FV (Oggi / Domani)</span>
+                </span>
+                <span className="em-dec-ha-val mono" role="cell">
+                  {ha.forecastTodayKwh != null ? `${ha.forecastTodayKwh.toFixed(1)}` : "N/D"} /{" "}
+                  {ha.forecastTomorrowKwh != null ? `${ha.forecastTomorrowKwh.toFixed(1)} kWh` : "N/D"}
                 </span>
               </div>
             )}
             {ha.fog != null && (
-              <div className={`em-dec-ha-chip ${ha.fog ? "em-dec-ha-warn" : ""}`}>
-                <CloudFog size={13} aria-hidden="true" />
-                <span>
-                  Nebbia: <strong>{ha.fog ? "Presente" : "Assente"}</strong>
-                  {ha.visibilityKm != null ? ` (${ha.visibilityKm.toFixed(1)} km)` : ""}
+              <div className={`em-dec-ha-row ${ha.fog ? "em-dec-ha-row-warn" : ""}`} role="row">
+                <span className="em-dec-ha-key" role="cell">
+                  <span className={`em-dec-ha-ico ${ha.fog ? "em-ha-ico-warn" : "em-ha-ico-sky"}`} aria-hidden="true">
+                    <CloudFog size={13} />
+                  </span>
+                  <span>Nebbia &amp; Visibilità</span>
+                </span>
+                <span className="em-dec-ha-val mono" role="cell">
+                  {ha.fog ? "Presente" : "Assente"}
+                  {ha.visibilityKm != null ? ` · ${ha.visibilityKm.toFixed(1)} km` : ""}
                 </span>
               </div>
             )}
             {(ha.tempC != null || ha.radiationWm2 != null) && (
-              <div className="em-dec-ha-chip">
-                <Thermometer size={13} aria-hidden="true" />
-                <span>
+              <div className="em-dec-ha-row" role="row">
+                <span className="em-dec-ha-key" role="cell">
+                  <span className="em-dec-ha-ico em-ha-ico-cyan" aria-hidden="true"><Thermometer size={13} /></span>
+                  <span>Meteo &amp; Irraggiamento</span>
+                </span>
+                <span className="em-dec-ha-val mono" role="cell">
                   {ha.tempC != null ? `${ha.tempC.toFixed(1)} °C` : ""}
                   {ha.tempC != null && ha.radiationWm2 != null ? " · " : ""}
                   {ha.radiationWm2 != null ? `${Math.round(ha.radiationWm2)} W/m²` : ""}
@@ -157,9 +165,13 @@ export function EmeraldDecisionCard({ decision, batteryW, gridW }: Props) {
               </div>
             )}
             {ha.loadProfileTodayKw != null && (
-              <div className="em-dec-ha-chip">
-                <span>
-                  Carico atteso: <strong className="mono">{ha.loadProfileTodayKw.toFixed(2)} kW</strong>
+              <div className="em-dec-ha-row" role="row">
+                <span className="em-dec-ha-key" role="cell">
+                  <span className="em-dec-ha-ico em-ha-ico-home" aria-hidden="true"><Home size={13} /></span>
+                  <span>Carico atteso oggi</span>
+                </span>
+                <span className="em-dec-ha-val mono" role="cell">
+                  {ha.loadProfileTodayKw.toFixed(2)} kW
                 </span>
               </div>
             )}

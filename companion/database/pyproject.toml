@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "afore-companion-db"
-version = "1.0.19"
+version = "1.0.20"
 description = "SQLAlchemy 2 models and TimescaleDB Alembic migrations for Afore EMS Companion"
 requires-python = ">=3.12"
 dependencies = [

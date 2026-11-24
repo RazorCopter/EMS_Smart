@@ -172,3 +172,10 @@ regions at the top of `<body>`. Use it rather than writing into a message elemen
 
 MIT. Protocol knowledge must be reimplemented from community references — do not
 copy-paste. Credit all sources in `LICENSE-THIRD-PARTY.md`.
+
+---
+
+## Companion GitOps Deployment
+
+- The live Companion Docker stack (Portainer GitOps) pulls **`main`** from remote **`dashboard_ems`** (`https://github.com/RazorCopter/dashboard_ems.git`), where `companion/` sits at the repository root.
+- Whenever updating Companion code or bumping its version, push both `EMS_Smart` (`origin`) **and** `RazorCopter/dashboard_ems` (`dashboard_ems` `main`).

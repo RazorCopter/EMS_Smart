@@ -108,7 +108,9 @@
   min-height: 100vh;
   display: grid;
   grid-template-columns: 240px minmax(0, 1fr);
-  background: var(--bg-canvas);
+  background-color: var(--bg-canvas);
+  background-image: radial-gradient(rgba(0, 240, 255, 0.06) 1px, transparent 1px);
+  background-size: 24px 24px;
   color: var(--text-primary);
 }
 
@@ -498,12 +500,18 @@
 }
 
 .em-card {
+  position: relative;
   background: var(--bg-surface);
-  border: 1px solid var(--border-strong);
-  border-radius: 16px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
   padding: var(--card-pad);
   box-shadow: var(--shadow-sm);
   min-width: 0;
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.em-card:hover {
+  border-color: var(--border-strong);
 }
 
 .em-card-head {
@@ -516,15 +524,16 @@
 
 .em-card-title {
   margin: 0;
-  font-size: 16.5px;
-  font-weight: 750;
-  letter-spacing: -0.015em;
+  font-size: 15.5px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
   color: var(--text-primary);
 }
 
 .em-card-sub {
   margin: 3px 0 0;
-  font-size: 12px;
+  font-size: 11.5px;
+  letter-spacing: 0.02em;
   color: var(--text-muted);
 }
 
@@ -1396,4 +1405,114 @@
   .theme-style-grid {
     grid-template-columns: 1fr;
   }
+}
+
+/* =========================================================================
+   CYBERPUNK PRECISION CONTROLS (Switches, Wizard Steps, Notification Rows)
+   ========================================================================= */
+.cyber-stack {
+  display: grid;
+  gap: 12px;
+}
+
+.cyber-card-gap {
+  margin-bottom: 16px;
+}
+
+.cyber-row-between {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.cyber-switch {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.cyber-switch.disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.cyber-switch input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.cyber-switch-track {
+  width: 42px;
+  height: 24px;
+  border-radius: 999px;
+  background: var(--bg-inset);
+  border: 1px solid var(--border-strong);
+  position: relative;
+  transition: background var(--transition-fast), border-color var(--transition-fast);
+  flex-shrink: 0;
+}
+
+.cyber-switch-thumb {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  background: var(--text-muted);
+  transition: transform var(--transition-fast), background var(--transition-fast);
+}
+
+.cyber-switch input:checked + .cyber-switch-track {
+  background: var(--accent-teal-soft);
+  border-color: var(--accent-teal);
+}
+
+.cyber-switch input:checked + .cyber-switch-track .cyber-switch-thumb {
+  transform: translateX(18px);
+  background: var(--accent-teal);
+}
+
+.cyber-switch input:focus-visible + .cyber-switch-track {
+  outline: 2px solid var(--accent-teal);
+  outline-offset: 2px;
+}
+
+.cyber-notif-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  padding: 13px 16px;
+  border-radius: 10px;
+  background: var(--bg-inset);
+  border: 1px solid var(--border-subtle);
+  cursor: pointer;
+  transition: border-color var(--transition-fast), background var(--transition-fast);
+}
+
+.cyber-notif-row:hover {
+  border-color: var(--border-strong);
+  background: var(--bg-surface-2);
+}
+
+.cyber-banner-feedback {
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-strong);
+  font-size: 13px;
+  margin-bottom: 14px;
+}
+
+.cyber-wizard-steps {
+  display: flex;
+  gap: 8px;
 }

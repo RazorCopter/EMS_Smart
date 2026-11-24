@@ -220,7 +220,7 @@ export function EmeraldEnergyMonitor({
         >
           <defs>
             <radialGradient id="em-center-glow" cx="50%" cy="50%" r="50%">
-              <stop offset="0%" stopColor="var(--accent-teal)" stopOpacity="0.18" />
+              <stop offset="0%" stopColor="var(--accent-teal)" stopOpacity="0.07" />
               <stop offset="100%" stopColor="var(--accent-teal)" stopOpacity="0" />
             </radialGradient>
           </defs>

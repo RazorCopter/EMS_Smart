@@ -1,5 +1,6 @@
 import { useEffect, type ReactNode } from "react";
 import { AlertTriangle, CheckCircle2, Info, X, XCircle } from "lucide-react";
+import { AnimatePresence, motion } from "motion/react";
 
 export function EmeraldStatusPill({
   tone = "neutral",
@@ -175,29 +176,43 @@ export function EmeraldDetailDrawer({
     return () => window.removeEventListener("keydown", onKey);
   }, [open, onClose]);
 
-  if (!open) return null;
-
   return (
-    <div className="em-drawer-backdrop" onClick={onClose}>
-      <aside
-        className="em-drawer-panel"
-        role="dialog"
-        aria-modal="true"
-        aria-label={title}
-        onClick={(e) => e.stopPropagation()}
-        style={accentColor ? { borderTopColor: accentColor } : undefined}
-      >
-        <div className="em-drawer-head">
-          <div>
-            <h3 className="em-drawer-title">{title}</h3>
-            {subtitle && <p className="em-drawer-sub">{subtitle}</p>}
-          </div>
-          <button type="button" className="btn em-drawer-close" onClick={onClose} aria-label={`Chiudi ${title}`}>
-            <X size={18} />
-          </button>
-        </div>
-        <div className="em-drawer-body">{children}</div>
-      </aside>
-    </div>
+    <AnimatePresence>
+      {open && (
+        <motion.div
+          key="em-drawer-backdrop"
+          className="em-drawer-backdrop"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.16, ease: "easeOut" }}
+          onClick={onClose}
+        >
+          <motion.aside
+            className="em-drawer-panel"
+            role="dialog"
+            aria-modal="true"
+            aria-label={title}
+            initial={{ x: 24, opacity: 0 }}
+            animate={{ x: 0, opacity: 1 }}
+            exit={{ x: 24, opacity: 0 }}
+            transition={{ duration: 0.2, ease: "easeOut" }}
+            onClick={(e) => e.stopPropagation()}
+            style={accentColor ? { borderTopColor: accentColor } : undefined}
+          >
+            <div className="em-drawer-head">
+              <div>
+                <h3 className="em-drawer-title">{title}</h3>
+                {subtitle && <p className="em-drawer-sub">{subtitle}</p>}
+              </div>
+              <button type="button" className="btn em-drawer-close" onClick={onClose} aria-label={`Chiudi ${title}`}>
+                <X size={18} />
+              </button>
+            </div>
+            <div className="em-drawer-body">{children}</div>
+          </motion.aside>
+        </motion.div>
+      )}
+    </AnimatePresence>
   );
 }

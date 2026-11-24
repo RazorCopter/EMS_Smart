@@ -1,6 +1,7 @@
 import { lazy, Suspense, useEffect } from "react";
 import { BrowserRouter, Route, Routes } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { MotionConfig } from "motion/react";
 import { apiFetch, type AuthUser } from "./lib/api";
 import { ThemeProvider } from "./theme/ThemeProvider";
 import { useTheme } from "./theme/useTheme";
@@ -43,11 +44,12 @@ function ThemedShell({
   const pageFallback = <div className="card">Caricamento sezione...</div>;
 
   return (
-    <ThemeErrorBoundary
-      styleName={effectiveStyle}
-      onFallbackToClassic={activateTemporaryClassicFallback}
-      onResetDefault={resetToDefault}
-    >
+    <MotionConfig reducedMotion="user">
+      <ThemeErrorBoundary
+        styleName={effectiveStyle}
+        onFallbackToClassic={activateTemporaryClassicFallback}
+        onResetDefault={resetToDefault}
+      >
       <BrowserRouter>
         <Routes>
           <Route
@@ -128,6 +130,7 @@ function ThemedShell({
         </Routes>
       </BrowserRouter>
     </ThemeErrorBoundary>
+    </MotionConfig>
   );
 }
 

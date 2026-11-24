@@ -174,14 +174,14 @@ export function NotificationsPage({ user }: Props) {
       />
 
       {feedback && (
-        <div className="card" style={{ marginBottom: 16, borderColor: "var(--battery-color)" }}>
+        <div className="cyber-banner-feedback" style={{ borderColor: "var(--battery-color)" }}>
           {feedback}
         </div>
       )}
 
       {/* STATO CANALE TELEGRAM */}
-      <section className="card" style={{ marginBottom: 16 }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 16, flexWrap: "wrap" }}>
+      <section className="card cyber-card-gap">
+        <div className="cyber-row-between">
           <div>
             <h3 className="card-title" style={{ display: "flex", alignItems: "center", gap: 8 }}>
               <Bell size={18} />
@@ -193,7 +193,7 @@ export function NotificationsPage({ user }: Props) {
                 : "Completa la wizard in 3 passaggi per collegare il tuo bot Telegram."}
             </p>
           </div>
-          <label style={{ display: "flex", alignItems: "center", gap: 10, cursor: isAdmin ? "pointer" : "not-allowed" }}>
+          <label className={`cyber-switch ${!isAdmin || saveMutation.isPending ? "disabled" : ""}`}>
             <input
               type="checkbox"
               checked={enabled}
@@ -204,6 +204,9 @@ export function NotificationsPage({ user }: Props) {
                 if (configured) handleSaveAll(next);
               }}
             />
+            <span className="cyber-switch-track" aria-hidden="true">
+              <span className="cyber-switch-thumb" />
+            </span>
             <strong>{enabled ? "Notifiche attive" : "Notifiche disattivate"}</strong>
           </label>
         </div>
@@ -211,13 +214,13 @@ export function NotificationsPage({ user }: Props) {
 
       {/* WIZARD GUIDATA 3 STEP */}
       {wizardOpen && (
-        <section className="card" style={{ marginBottom: 16 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12, flexWrap: "wrap", gap: 8 }}>
+        <section className="card cyber-card-gap">
+          <div className="cyber-row-between" style={{ marginBottom: 12 }}>
             <h3 className="card-title" style={{ display: "flex", alignItems: "center", gap: 8 }}>
               <Sparkles size={17} />
               <span>Wizard configurazione Telegram</span>
             </h3>
-            <div style={{ display: "flex", gap: 8 }}>
+            <div className="cyber-wizard-steps">
               {([1, 2, 3] as const).map((s) => (
                 <button
                   key={s}
@@ -232,7 +235,7 @@ export function NotificationsPage({ user }: Props) {
           </div>
 
           {testFeedback && (
-            <div className="muted" style={{ padding: "8px 12px", borderRadius: 8, background: "var(--bg-elevated)", marginBottom: 12 }}>
+            <div className="cyber-banner-feedback">
               {testFeedback}
             </div>
           )}
@@ -367,23 +370,14 @@ export function NotificationsPage({ user }: Props) {
             <p className="muted">Scegli quali eventi generano un avviso istantaneo su Telegram.</p>
           </div>
 
-          <div style={{ display: "grid", gap: 10 }}>
+          <div className="cyber-stack">
             {catalog.map((item) => {
               const sev = SEVERITY_BADGE[item.severity] ?? SEVERITY_BADGE.info;
               const checked = Boolean(events[item.key]);
               return (
                 <label
                   key={item.key}
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                    gap: 16,
-                    padding: "12px 14px",
-                    borderRadius: 12,
-                    border: "1px solid var(--border-strong)",
-                    cursor: isAdmin ? "pointer" : "not-allowed",
-                  }}
+                  className="cyber-notif-row"
                 >
                   <div style={{ display: "grid", gap: 4 }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
@@ -394,14 +388,19 @@ export function NotificationsPage({ user }: Props) {
                     </div>
                     <span className="muted" style={{ fontSize: 13 }}>{item.description}</span>
                   </div>
-                  <input
-                    type="checkbox"
-                    checked={checked}
-                    disabled={!isAdmin}
-                    onChange={(e) =>
-                      setEvents((prev) => ({ ...prev, [item.key]: e.target.checked }))
-                    }
-                  />
+                  <span className={`cyber-switch ${!isAdmin ? "disabled" : ""}`}>
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      disabled={!isAdmin}
+                      onChange={(e) =>
+                        setEvents((prev) => ({ ...prev, [item.key]: e.target.checked }))
+                      }
+                    />
+                    <span className="cyber-switch-track" aria-hidden="true">
+                      <span className="cyber-switch-thumb" />
+                    </span>
+                  </span>
                 </label>
               );
             })}

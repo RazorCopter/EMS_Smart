@@ -183,7 +183,13 @@ export function buildLiveChartOption(
       confine: true,
       backgroundColor: chartPalette.tooltipBg,
       borderColor: chartPalette.tooltipBorder,
+      borderWidth: 1,
+      padding: [8, 12],
       textStyle: { color: chartPalette.textPrimary, fontSize: 12 },
+      axisPointer: {
+        type: "line",
+        lineStyle: { color: "rgba(0, 240, 255, 0.35)", width: 1, type: "dashed" },
+      },
     },
     legend: {
       top: 0,
@@ -211,7 +217,7 @@ export function buildLiveChartOption(
           fontSize: 10.5,
           formatter: (v: number) => (Math.abs(v) >= 1000 ? `${(v / 1000).toFixed(1)}k` : `${Math.round(v)} W`),
         },
-        splitLine: { lineStyle: { color: chartPalette.splitLine } },
+        splitLine: { lineStyle: { color: chartPalette.splitLine, type: "dashed" } },
       },
       {
         type: "value",

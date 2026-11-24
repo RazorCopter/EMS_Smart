@@ -44,12 +44,14 @@ export function EmeraldSystemPanel({ system, variant = "panel" }: Props) {
   const ntpMeta = statusMeta(comps.ntp?.status);
   const espStatus = espControlStatus(comps.aux1);
 
-  const syncErrors = (comps.esp32_sync as { details?: { errors?: Record<string, string> } } | undefined)?.details?.errors;
+  const syncErrors = (comps.esp32_sync as { detail?: { errors?: Record<string, string> } } | undefined)?.detail?.errors;
   const syncErrorText =
     syncErrors && Object.keys(syncErrors).length > 0
       ? Object.entries(syncErrors)
           .map(([k, v]) => `${k}: ${v}`)
           .join(" | ")
+      : comps.esp32_sync?.status === "degraded"
+      ? "Uno o più endpoint REST dell'ESP32 non hanno risposto nell'ultimo ciclo di sync."
       : null;
 
   const items = [

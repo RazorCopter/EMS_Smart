@@ -227,32 +227,6 @@ export function EmeraldDashboardLayout({ vm, chartRange, onChangeChartRange }: P
         </div>
       </section>
 
-      {/* SLIM COMPACT RECENT EVENTS STRIP */}
-      {vm.eventsTop3.length > 0 && (
-        <section className="em-card em-events-strip" aria-label="Ultimi eventi significativi">
-          <div className="em-card-head">
-            <div>
-              <h3 className="em-card-title">Ultimi eventi significativi</h3>
-              <p className="em-card-sub">Riepilogo automatico delle ultime variazioni EMS</p>
-            </div>
-            <Link to="/decisioni" className="inline-action-link">
-              Apri Decisioni →
-            </Link>
-          </div>
-          <div className="em-events-grid">
-            {vm.eventsTop3.map((ev) => (
-              <div key={ev.key ?? ev.id} className="em-event-item">
-                <div className="em-event-top">
-                  <strong>{ev.title}</strong>
-                  <span className="em-event-time mono">{fmtShortTime(ev.occurred_at, vm.timezone)}</span>
-                </div>
-                {ev.detail && <div className="em-event-detail">{ev.detail}</div>}
-              </div>
-            ))}
-          </div>
-        </section>
-      )}
-
       {/* Mobile Drawer for Stato Impianto when launched from dashboard button */}
       <EmeraldDetailDrawer
         open={sysDrawerOpen}

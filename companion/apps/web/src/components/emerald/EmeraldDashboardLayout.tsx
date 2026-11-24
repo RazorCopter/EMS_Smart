@@ -99,42 +99,51 @@ export function EmeraldDashboardLayout({ vm, chartRange, onChangeChartRange }: P
         <EmeraldDecisionCard decision={vm.decision} batteryW={tel?.stale ? null : tel?.battery_w} gridW={tel?.stale ? null : tel?.grid_w} />
       </section>
 
-      {/* ROW 4: 75% WIDE LIVE CHART + 25% AUTONOMOUS STATO IMPIANTO PANEL */}
+      {/* ROW 4: 75% WIDE LIVE CHART + 3 HERO KPIs | 25% AUTONOMOUS STATO IMPIANTO PANEL */}
       <section className="em-row-bottom">
-        <article className="em-card em-chart-panel">
-          <div className="em-card-head em-chart-head">
-            <div>
-              <h3 className="em-card-title">{CHART_RANGE_TITLES[chartRange]}</h3>
-              <p className="em-card-sub">FV, Casa, Batteria, Rete (W) e SOC (%) · Gap espliciti</p>
-            </div>
-            <div className="chart-controls-wrap">
-              <div className="seg-group" role="group" aria-label="Seleziona finestra grafico live">
-                {(
-                  [
-                    ["1h", "1h"],
-                    ["3h", "3h"],
-                    ["6h", "6h"],
-                    ["12h", "12h"],
-                    ["today", "Oggi"],
-                  ] as Array<[LiveChartRange, string]>
-                ).map(([key, label]) => (
-                  <button
-                    key={key}
-                    type="button"
-                    className={`seg-btn ${chartRange === key ? "active" : ""}`}
-                    onClick={() => onChangeChartRange(key)}
-                  >
-                    {label}
-                  </button>
-                ))}
+        <div className="em-bottom-left-col">
+          <article className="em-card em-chart-panel">
+            <div className="em-card-head em-chart-head">
+              <div>
+                <h3 className="em-card-title">{CHART_RANGE_TITLES[chartRange]}</h3>
+                <p className="em-card-sub">FV, Casa, Batteria, Rete (W) e SOC (%) · Gap espliciti</p>
               </div>
-              <Link to="/storico" className="inline-action-link">
-                Apri Storico →
-              </Link>
+              <div className="chart-controls-wrap">
+                <div className="seg-group" role="group" aria-label="Seleziona finestra grafico live">
+                  {(
+                    [
+                      ["1h", "1h"],
+                      ["3h", "3h"],
+                      ["6h", "6h"],
+                      ["12h", "12h"],
+                      ["today", "Oggi"],
+                    ] as Array<[LiveChartRange, string]>
+                  ).map(([key, label]) => (
+                    <button
+                      key={key}
+                      type="button"
+                      className={`seg-btn ${chartRange === key ? "active" : ""}`}
+                      onClick={() => onChangeChartRange(key)}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+                <Link to="/storico" className="inline-action-link">
+                  Apri Storico →
+                </Link>
+              </div>
             </div>
-          </div>
-          <EChart option={vm.liveChart.option} height={280} ariaLabel="Grafico andamento ultime ore FV, Casa, Batteria, Rete e SOC" />
-        </article>
+            <EChart option={vm.liveChart.option} height={270} ariaLabel="Grafico andamento ultime ore FV, Casa, Batteria, Rete e SOC" />
+          </article>
+
+          <EmeraldKpiSection
+            kpis={vm.kpis}
+            battPowerW={tel?.battery_w}
+            formulas={vm.raw.kpi_today?.formulas}
+            section="hero"
+          />
+        </div>
 
         <div className="em-system-desktop-slot">
           <EmeraldSystemPanel system={vm.system} variant="panel" />
@@ -142,11 +151,11 @@ export function EmeraldDashboardLayout({ vm, chartRange, onChangeChartRange }: P
       </section>
 
       <h2 className="em-card-title">Energia di oggi</h2>
-      {/* ROW 2 (3 HERO PANELS) & ROW 3 (4 CONTINUOUS SPARKLINE CARDS) */}
       <EmeraldKpiSection
         kpis={vm.kpis}
         battPowerW={tel?.battery_w}
         formulas={vm.raw.kpi_today?.formulas}
+        section="daily"
       />
 
       {/* SLEEK COVERAGE & DATA QUALITY RIBBON */}

@@ -11,6 +11,7 @@ interface Props {
   kpis: DailyKpiViewModel;
   battPowerW: number | null | undefined;
   formulas?: Record<string, string>;
+  section?: "all" | "hero" | "daily";
 }
 
 function ContinuousSparkline({
@@ -110,7 +111,7 @@ function kwhYesterdayCopy(today: number | null, yesterday: number | null, availa
   return `${sign}${pct.toFixed(0)}% rispetto a ieri`;
 }
 
-export function EmeraldKpiSection({ kpis, battPowerW, formulas }: Props) {
+export function EmeraldKpiSection({ kpis, battPowerW, formulas, section = "all" }: Props) {
   const scClamped = kpis.selfConsumptionPct != null && !kpis.pvNotCalculable ? Math.max(0, Math.min(100, kpis.selfConsumptionPct)) : 0;
   const ssClamped = kpis.selfSufficiencyPct != null && !kpis.loadNotCalculable ? Math.max(0, Math.min(100, kpis.selfSufficiencyPct)) : 0;
   const battState =
@@ -127,9 +128,13 @@ export function EmeraldKpiSection({ kpis, battPowerW, formulas }: Props) {
       ? Math.max(0, kpis.loadKwh - kpis.gridImportKwh)
       : null;
 
+  const showHero = section === "all" || section === "hero";
+  const showDaily = section === "all" || section === "daily";
+
   return (
     <div className="em-kpi-stack">
       {/* ROW 2: 3 HIGH-IMPACT HERO PANELS (Autoconsumo, Autosufficienza, Accumulo) */}
+      {showHero && (
       <section className="em-kpi-row-hero" aria-label="Indicatori chiave ad alto impatto">
         {/* Autoconsumo */}
         <article className="em-card em-kpi-panel">
@@ -237,8 +242,10 @@ export function EmeraldKpiSection({ kpis, battPowerW, formulas }: Props) {
           </div>
         </article>
       </section>
+      )}
 
       {/* ROW 3: 4 SECONDARY DAILY TOTALS WITH AUTHENTIC CONTINUOUS SPARKLINES */}
+      {showDaily && (
       <section className="em-kpi-row-secondary" aria-label="Totali giornalieri con andamento continuo">
         <article className="em-card em-kpi-spark-card">
           <div className="em-spark-head">
@@ -336,6 +343,7 @@ export function EmeraldKpiSection({ kpis, battPowerW, formulas }: Props) {
           </div>
         </article>
       </section>
+      )}
     </div>
   );
 }

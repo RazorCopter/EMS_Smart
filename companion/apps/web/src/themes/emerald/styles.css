@@ -1841,6 +1841,13 @@
   animation: emStreamRev 0.9s linear infinite;
 }
 
+.em-bottom-left-col {
+  display: flex;
+  flex-direction: column;
+  gap: var(--grid-gap);
+  min-width: 0;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .em-stream-fwd,
   .em-stream-rev {

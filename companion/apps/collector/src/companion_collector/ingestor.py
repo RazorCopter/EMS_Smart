@@ -780,19 +780,6 @@ class IngestionEngine:
             .on_conflict_do_nothing(index_elements=["source_timestamp", "device_id", "boot_id", "seq"])
         )
         res = await session.execute(stmt)
-
-        fault_now = bool(tel.fault)
-        if self.state.last_fault is not None and fault_now and not self.state.last_fault:
-            await self._emit_event(
-                session,
-                occurred_at=src_ts,
-                event_type="INVERTER_FAULT",
-                severity="error",
-                title="Fault telemetria / inverter rilevato",
-                detail=f"SOC {tel.soc}% · PV {tel.pv_w} W · Grid {tel.grid_w} W",
-                metadata={"provenance": provenance},
-            )
-        self.state.last_fault = fault_now
         inserted = bool(res.rowcount)
 
         if inserted:

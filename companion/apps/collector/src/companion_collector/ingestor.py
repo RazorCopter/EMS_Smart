@@ -86,6 +86,7 @@ class DeviceRuntimeState:
     last_configured_strategy: str | None = None
     last_safety_reason: str | None = None
     last_ha_online: bool | None = None
+    last_esp_online: bool | None = None
     last_config_revision: int | None = None
     last_operating_mode: str | None = None
     last_live_lock: str | None = None
@@ -552,14 +553,19 @@ class IngestionEngine:
             {"availability": status_text},
             now,
         )
-        await self._emit_event(
-            session,
-            occurred_at=now,
-            event_type="MQTT_ONLINE" if online else "MQTT_OFFLINE",
-            severity="info" if online else "warning",
-            title=f"ESP32 availability: {status_text}",
-            detail=f"LWT/availability topic reported '{status_text}'",
+        should_emit = (not online and self.state.last_esp_online is not False) or (
+            online and self.state.last_esp_online is False
         )
+        if should_emit:
+            await self._emit_event(
+                session,
+                occurred_at=now,
+                event_type="MQTT_ONLINE" if online else "MQTT_OFFLINE",
+                severity="info" if online else "warning",
+                title=f"ESP32 availability: {status_text}",
+                detail=f"LWT/availability topic reported '{status_text}'",
+            )
+        self.state.last_esp_online = online
 
     async def _handle_telemetry(
         self,

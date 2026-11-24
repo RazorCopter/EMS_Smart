@@ -576,6 +576,10 @@ private:
     int fullChargeCap = p.charge;
     if (p.chargeA)
       fullChargeCap = std::min(fullChargeCap, maxAmpW);
+    if (soc >= 98.0 || (haveVoltage && *volt >= 56.0))
+      fullChargeCap = std::min(fullChargeCap, std::max(400, fullChargeCap / 4));
+    else if (soc >= 96.0 || (haveVoltage && *volt >= 55.5))
+      fullChargeCap = std::min(fullChargeCap, std::max(800, fullChargeCap / 2));
 
     // 5. Closed-loop phase transitions
     if (!predInit_) {

@@ -67,14 +67,17 @@ public:
         return requested;
     }
 
-    Result observe(double measured, uint32_t stamp, uint32_t now) {
+    Result observe(double measured, uint32_t stamp, uint32_t now, bool physicalChargeLimited = false) {
         if (!initialized_) return Result::Waiting;
         // Use only a post-command sample and allow the inverter to settle.
         const double tolerance = std::max(double(settings_.trainerAbsW), std::abs(double(watts_)) * settings_.trainerPct / 100);
         const bool settled = stamp - changed_ >= uint32_t(settings_.trainerSettleMs) &&
                              stamp - changed_ <= now - changed_;
         const bool valid = std::isfinite(measured);
-        const bool within = valid && std::abs(measured - watts_) <= tolerance;
+        const bool bmsLimitedOk = physicalChargeLimited && watts_ > 0 && valid &&
+                                  measured >= -double(settings_.trainerAbsW) &&
+                                  measured <= double(watts_) + tolerance;
+        const bool within = valid && (std::abs(measured - watts_) <= tolerance || bmsLimitedOk);
         diagnostic_.sample = !valid ? "INVALID_SAMPLE" : !settled ? "NO_SETTLED_SAMPLE" :
                              within ? "WITHIN_TOLERANCE" : "OUTSIDE_TOLERANCE";
         diagnostic_.deadline = "NONE";

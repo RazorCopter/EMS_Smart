@@ -132,6 +132,15 @@ int main() {
     assert(failedRecovery.observe(250, 23000, 23000) == Response::Mismatch);
     assert(std::string_view(failedRecovery.diagnostic().deadline) == "RECOVERY_TIMEOUT");
 
+    // BMS CV taper near full SOC (physicalChargeLimited=true) must not trip SEVERE_RESPONSE,
+    // while opposite-direction discharge still trips Mismatch.
+    TrainerResponse bmsTaper;
+    bmsTaper.confirmed(1947, 1000);
+    assert(bmsTaper.observe(1326, 4000, 4000, true) == Response::Matched);
+    assert(bmsTaper.observe(598, 6000, 6000, true) == Response::Waiting);
+    assert(bmsTaper.observe(-300, 8000, 8000, true) == Response::Warning);
+    assert(bmsTaper.observe(-300, 10000, 10000, true) == Response::Mismatch);
+
     Bus takeover;
     takeover.mode = 1;
     heliograph::afore::ExternalEmsActuator session(takeover, 1, 1, false);

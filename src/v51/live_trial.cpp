@@ -245,7 +245,10 @@ void serviceLiveTrial(AforeReader& reader, Decision decision, uint32_t now, bool
     if (trainer && !executor->nativeDelegated() && confirmedWatts && usable) {
         const auto& sample = reader.state().battery;
         const auto measured = sample.usable(now);
-        const auto result = response.observe(measured.value_or(NAN), sample.stamp, now);
+        const auto battV = reader.state().batteryVoltage.usable(now);
+        const bool physicalChargeLimited = (*confirmedWatts > 0) &&
+            ((socNow && *socNow >= 95.0) || (battV && *battV >= 55.4));
+        const auto result = response.observe(measured.value_or(NAN), sample.stamp, now, physicalChargeLimited);
         const auto& debug = response.diagnostic();
         if (result != TrainerResponse::Result::Waiting || now - lastTrace >= sampleSeconds * 1000) {
             lastTrace = now;

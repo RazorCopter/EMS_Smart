@@ -328,7 +328,10 @@ export function buildDashboardViewModels(
     kpi.self_consumption_pct,
   );
 
-  const rawHa = dec?.ha_inputs;
+  const rawHa =
+    comps.home_assistant?.detail && Object.keys(comps.home_assistant.detail).length > 0
+      ? (comps.home_assistant.detail as any)
+      : dec?.ha_inputs;
   const fsData = rawHa?.forecast_solar?.data ?? rawHa?.forecast_solar;
   const frData = rawHa?.forecast_ratio?.data ?? rawHa?.forecast_ratio;
   const wxData = rawHa?.weather?.data ?? rawHa?.weather;

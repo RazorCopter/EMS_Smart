@@ -110,6 +110,30 @@ def mask_bot_token(token: str | None) -> str:
     return f"{t[:6]}...{t[-4:]}"
 
 
+_EVENT_ICONS: dict[str, str] = {
+    "MODE_FALLBACK_SHADOW": "🟡",
+    "MODE_LIVE_ACTIVE": "🟢",
+    "INVERTER_FAULT": "🚨",
+    "TELEMETRY_STALE": "⏱️",
+    "MAINTENANCE_FAULT_ABORT": "🛑",
+    "POWER_LIMIT": "🛡️",
+    "MQTT_OFFLINE": "📡",
+    "MQTT_ONLINE": "📶",
+    "ESP_REBOOT": "🔄",
+    "HA_OFFLINE": "🏠",
+    "HA_ONLINE": "🏡",
+    "STRATEGY_CHANGED": "⚡",
+    "TEST_NOTIFICATION": "🛰️",
+}
+
+_SEVERITY_BADGES: dict[str, str] = {
+    "critical": "🔴 CRITICO",
+    "error": "🔴 ERRORE",
+    "warning": "🟠 ATTENZIONE",
+    "info": "🔵 INFO",
+}
+
+
 def format_telegram_event_message(
     *,
     event_type: str,
@@ -119,14 +143,16 @@ def format_telegram_event_message(
     occurred_at: datetime | None = None,
     tz_name: str = "Europe/Rome",
 ) -> str:
-    icon = {
+    ev_key = event_type.upper()
+    sev_key = severity.lower()
+    icon = _EVENT_ICONS.get(ev_key) or {
         "critical": "🚨",
         "error": "❌",
         "warning": "⚠️",
         "info": "ℹ️",
-    }.get(severity.lower(), "🔔")
-    if event_type == "MODE_LIVE_ACTIVE":
-        icon = "✅"
+    }.get(sev_key, "🔔")
+    badge = "🟢 OPERATIVO" if ev_key == "MODE_LIVE_ACTIVE" else _SEVERITY_BADGES.get(sev_key, "🔔 AVVISO")
+
     ts = occurred_at or datetime.now(timezone.utc)
     if ts.tzinfo is None:
         ts = ts.replace(tzinfo=timezone.utc)
@@ -135,13 +161,24 @@ def format_telegram_event_message(
     except Exception:
         local_ts = ts
     ts_str = local_ts.strftime("%d/%m/%Y %H:%M:%S")
+
     lines = [
-        f"{icon} <b>Afore EMS · {escape(title)}</b>",
-        f"<b>Evento:</b> <code>{escape(event_type)}</code>",
+        f"{icon} <b>AFORE EMS</b> · <i>{escape(badge)}</i>",
+        "━━━━━━━━━━━━━━━━━━━━",
+        f"📌 <b>{escape(title)}</b>",
     ]
     if detail:
-        lines.append(f"<b>Dettaglio:</b> {escape(detail)}")
-    lines.append(f"<b>Ora:</b> {escape(ts_str)}")
+        parts = [p.strip() for p in detail.split("·") if p.strip()]
+        if len(parts) > 1:
+            formatted_detail = "\n".join(f"• {escape(p)}" for p in parts)
+        else:
+            formatted_detail = escape(detail.strip())
+        lines.append(f"\n<blockquote>{formatted_detail}</blockquote>")
+    lines.extend([
+        "",
+        f"🏷️ <b>Evento:</b> <code>{escape(event_type)}</code>",
+        f"🕒 <b>Ora:</b> <code>{escape(ts_str)}</code>",
+    ])
     return "\n".join(lines)
 
 

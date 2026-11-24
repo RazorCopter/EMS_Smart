@@ -409,7 +409,7 @@ class IngestionEngine:
             boot_epoch = int(ts.timestamp() - (uptime_ms / 1000.0))
             self.state.boot_id = f"boot-{boot_epoch}-{uuid.uuid4().hex[:6]}"
         elif (
-            (self.state.last_uptime_ms is not None and uptime_ms + 5000 < self.state.last_uptime_ms)
+            (self.state.last_uptime_ms is not None and uptime_ms + 5000 < self.state.last_uptime_ms and uptime_ms < 180_000)
             or (
                 self.state.last_uptime_ms is None
                 and self.state.last_seq is not None

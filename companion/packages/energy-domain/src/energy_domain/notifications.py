@@ -27,10 +27,10 @@ NOTIFICATION_CATALOG: list[dict[str, Any]] = [
     {
         "key": "esp32_error_failsafe",
         "label": "Errori ESP32, Fault inverter e Failsafe",
-        "description": "Avvisa in caso di fault inverter, telemetria scaduta (SAFE_MODE), abort manutenzione o limiti sicurezza.",
+        "description": "Avvisa in caso di fault inverter, telemetria scaduta (SAFE_MODE) o abort manutenzione.",
         "severity": "error",
         "default_enabled": True,
-        "event_types": ["INVERTER_FAULT", "TELEMETRY_STALE", "MAINTENANCE_FAULT_ABORT", "POWER_LIMIT"],
+        "event_types": ["INVERTER_FAULT", "TELEMETRY_STALE", "MAINTENANCE_FAULT_ABORT"],
     },
     {
         "key": "esp32_offline",

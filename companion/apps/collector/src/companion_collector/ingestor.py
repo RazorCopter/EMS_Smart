@@ -408,8 +408,13 @@ class IngestionEngine:
             boot_epoch = int(ts.timestamp() - (uptime_ms / 1000.0))
             self.state.boot_id = f"boot-{boot_epoch}-{uuid.uuid4().hex[:6]}"
         elif (
-            (self.state.last_seq is not None and seq < self.state.last_seq)
-            or (self.state.last_uptime_ms is not None and uptime_ms + 5000 < self.state.last_uptime_ms)
+            (self.state.last_uptime_ms is not None and uptime_ms + 5000 < self.state.last_uptime_ms)
+            or (
+                self.state.last_uptime_ms is None
+                and self.state.last_seq is not None
+                and seq < self.state.last_seq
+                and uptime_ms < 120_000
+            )
         ):
             rebooted = True
             boot_epoch = int(ts.timestamp() - (uptime_ms / 1000.0))

@@ -19,6 +19,7 @@ import pathlib
 import socketserver
 import sys
 import threading
+import time
 from http.server import SimpleHTTPRequestHandler
 
 BASE_DIR = pathlib.Path(__file__).resolve().parent
@@ -35,8 +36,8 @@ def get_active_config_path() -> pathlib.Path:
 class EmsWebHandler(SimpleHTTPRequestHandler):
     def end_headers(self):
         self.send_header("Access-Control-Allow-Origin", "*")
-        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-        self.send_header("Access-Control-Allow-Headers", "Content-Type")
+        self.send_header("Access-Control-Allow-Methods", "GET, POST, PATCH, OPTIONS")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type, Authorization")
         super().end_headers()
 
     def do_OPTIONS(self):
@@ -63,6 +64,16 @@ class EmsWebHandler(SimpleHTTPRequestHandler):
             self.serve_config()
         elif url == "/api/v1/status":
             self.serve_status()
+        elif url == "/api/v1/devices":
+            self.serve_devices()
+        elif url.startswith("/api/v1/devices/"):
+            self.serve_device_detail(url)
+        elif url == "/api/v1/diagnostics":
+            self.serve_diagnostics()
+        elif url == "/api/v1/logs":
+            self.serve_logs()
+        elif url == "/api/v1/drivers":
+            self.serve_drivers()
         elif url == "/api/v1/wifi/scan":
             self.serve_wifi_scan()
         elif url == "/api/v1/events":
@@ -73,6 +84,9 @@ class EmsWebHandler(SimpleHTTPRequestHandler):
         else:
             self.send_error(404, "Not Found")
 
+    def do_PATCH(self):
+        self._save_config(merge=True)
+
     def do_POST(self):
         url = self.path.split("?")[0]
         content_len = int(self.headers.get("Content-Length", 0))
@@ -81,21 +95,71 @@ class EmsWebHandler(SimpleHTTPRequestHandler):
         if url in ("/api/v1/config", "/api/v1/setup"):
             try:
                 data = json.loads(body)
-                cfg_path = get_active_config_path()
-                cfg_path.parent.mkdir(parents=True, exist_ok=True)
-                with open(cfg_path, "w", encoding="utf-8") as f:
-                    json.dump(data, f, indent=2)
-                self.send_response(200)
-                self.send_header("Content-Type", "application/json")
-                self.end_headers()
-                self.wfile.write(b'{"status":"saved","message":"Configuration updated successfully"}')
+                self.write_config(data)
+                self.send_json({"status": "saved", "message": "Configuration updated successfully"})
             except Exception as e:
-                self.send_response(400)
-                self.send_header("Content-Type", "application/json")
-                self.end_headers()
-                self.wfile.write(json.dumps({"status":"error", "error": str(e)}).encode())
+                self.send_json({"status": "error", "error": str(e)}, 400)
         else:
             self.send_error(404, "Not Found")
+
+    @staticmethod
+    def merge_dict(base, patch):
+        for key, value in patch.items():
+            if isinstance(value, dict) and isinstance(base.get(key), dict):
+                EmsWebHandler.merge_dict(base[key], value)
+            else:
+                base[key] = value
+        return base
+
+    def _save_config(self, merge=False):
+        if self.path.split("?")[0] != "/api/v1/config":
+            self.send_error(404, "Not Found")
+            return
+        try:
+            content_len = int(self.headers.get("Content-Length", 0))
+            patch = json.loads(self.rfile.read(content_len).decode("utf-8") or "{}")
+            data = self.load_config() if merge else patch
+            if merge:
+                self.merge_dict(data, patch)
+            self.write_config(data)
+            self.send_json({"status": "saved", "pending_restart": []})
+        except Exception as e:
+            self.send_json({"status": "error", "error": str(e)}, 400)
+
+    def send_json(self, data, status=200):
+        payload = json.dumps(data).encode("utf-8")
+        self.send_response(status)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(payload)))
+        self.end_headers()
+        self.wfile.write(payload)
+
+    def load_config(self):
+        cfg_path = get_active_config_path()
+        defaults = {
+            "version": 2, "bridge_name": "Afore EMS",
+            "wifi": {"ssid": "Ethernet", "hostname": "afore-ems", "ip": "", "password_set": False},
+            "mqtt": {"enabled": False, "host": "127.0.0.1", "port": 1883, "base_topic": "afore-ems", "discovery_prefix": "homeassistant", "discovery_enabled": True, "qos": 0, "username_set": False, "password_set": False},
+            "modbus": {"enabled": True, "port": 502, "unit_id": 1, "diagnostics_unit_id": 250, "max_clients": 4, "idle_timeout_seconds": 20, "write_enabled": False},
+            "polling": {"interval_seconds": 3}, "logging": {"level": "info"},
+            "driver": {"id": "afore_sun", "label": "Afore Inverter 1", "options": {"address": 1}},
+            "additional_devices": [], "serial": {"port": "/dev/ttyUSB0", "baud_rate": 9600, "parity": "none", "data_bits": 8, "stop_bits": 1},
+            "ntp": {"enabled": True, "use_dhcp": True, "server": "pool.ntp.org", "timezone": "CET-1CEST,M3.5.0,M10.5.0/3"},
+            "updates": {"enabled": False}, "relays": {"enabled": False, "roles": []}
+        }
+        if cfg_path.exists():
+            try:
+                with open(cfg_path, "r", encoding="utf-8") as f:
+                    return self.merge_dict(defaults, json.load(f))
+            except Exception:
+                pass
+        return defaults
+
+    def write_config(self, data):
+        cfg_path = get_active_config_path()
+        cfg_path.parent.mkdir(parents=True, exist_ok=True)
+        with open(cfg_path, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=2)
 
     def serve_asset(self, header_filename: str, content_type: str):
         # Support both repository layout (/src/web/assets) and deployment layout (/opt/afore-ems/src/web/assets)
@@ -106,11 +170,21 @@ class EmsWebHandler(SimpleHTTPRequestHandler):
             self.send_error(500, f"Asset header not found: {header_filename}")
             return
         content = path.read_text(encoding="utf-8")
-        # Extract the raw HTML literal between R"rawliteral( and )rawliteral";
-        start = content.find('R"rawliteral(')
-        end = content.rfind(')rawliteral";')
-        if start != -1 and end != -1:
-            raw_html = content[start + len('R"rawliteral('):end]
+        # Extract the raw HTML literal between R"HTML( or R"rawliteral( and )HTML"; / )rawliteral";
+        start = content.find('R"HTML(')
+        delimiter = 'R"HTML('
+        end_delimiter = ')HTML";'
+        if start == -1:
+            start = content.find('R"rawliteral(')
+            delimiter = 'R"rawliteral('
+            end_delimiter = ')rawliteral";'
+
+        if start != -1:
+            end = content.rfind(end_delimiter)
+            if end != -1:
+                raw_html = content[start + len(delimiter):end]
+            else:
+                raw_html = content
         else:
             raw_html = content
 
@@ -122,35 +196,161 @@ class EmsWebHandler(SimpleHTTPRequestHandler):
         self.wfile.write(payload)
 
     def serve_config(self):
-        cfg_path = get_active_config_path()
-        if cfg_path.exists():
-            try:
-                with open(cfg_path, "r", encoding="utf-8") as f:
-                    data = json.load(f)
-            except Exception:
-                data = {}
-        else:
-            data = {
-                "serial_port": "/dev/ttyUSB0",
-                "baud_rate": 9600,
-                "inverter_address": 1,
-                "mqtt": {"enabled": False, "host": "127.0.0.1", "port": 1883}
-            }
-        payload = json.dumps(data).encode("utf-8")
+        self.send_json(self.load_config())
+
+    def get_standard_measurements(self):
+        return {
+            "ac.power.total": {"value": 2450.0, "unit": "W", "valid": True, "stale": False},
+            "ac.phase_l1.voltage": {"value": 230.2, "unit": "V", "valid": True, "stale": False},
+            "ac.phase_l1.current": {"value": 10.6, "unit": "A", "valid": True, "stale": False},
+            "ac.phase_l1.power": {"value": 2450.0, "unit": "W", "valid": True, "stale": False},
+            "ac.frequency": {"value": 50.0, "unit": "Hz", "valid": True, "stale": False},
+            "dc.mppt_1.voltage": {"value": 340.5, "unit": "V", "valid": True, "stale": False},
+            "dc.mppt_1.current": {"value": 7.2, "unit": "A", "valid": True, "stale": False},
+            "dc.mppt_1.power": {"value": 2451.6, "unit": "W", "valid": True, "stale": False},
+            "dc.power.total": {"value": 2451.6, "unit": "W", "valid": True, "stale": False},
+            "inverter.temperature": {"value": 38.5, "unit": "°C", "valid": True, "stale": False},
+            "energy.today": {"value": 12.4, "unit": "kWh", "valid": True, "stale": False},
+            "energy.total": {"value": 4580.0, "unit": "kWh", "valid": True, "stale": False}
+        }
+
+    def serve_status(self):
+        status = {
+            "bridge": {
+                "id": "afore-m3",
+                "name": "Afore M3 Pi Gateway",
+                "firmware_version": "1.0.0",
+                "board_id": "raspberry-pi",
+                "ip_mode": "dhcp",
+                "wifi_connected": True,
+                "wifi_rssi_dbm": -42,
+                "mqtt_connected": False,
+                "modbus_listening": True,
+                "modbus_clients": 0,
+                "max_devices": 8,
+                "devices_configured": 1,
+                "devices_started": 1,
+                "device_problems": []
+            },
+            "device": {
+                "id": "inverter_1",
+                "label": "Afore Inverter 1",
+                "driver_id": "afore_sun",
+                "support_level": "production",
+                "manufacturer": "Afore",
+                "model": "HNS-3000TL",
+                "serial_number": "AFORE-20240901",
+                "online": True,
+                "data_valid": True,
+                "data_stale": False,
+                "consecutive_poll_failures": 0,
+                "last_successful_poll_seconds_ago": 2
+            },
+            "measurements": self.get_standard_measurements(),
+            "totals": {
+                "ac_power_w": 2450.0,
+                "energy_today_kwh": 12.4,
+                "devices_polled": 1,
+                "devices_answering": 1
+            },
+            "devices": [
+                {
+                    "id": "inverter_1",
+                    "label": "Afore Inverter 1",
+                    "online": True,
+                    "data_valid": True,
+                    "data_stale": False,
+                    "ac_power_w": 2450.0,
+                    "energy_today_kwh": 12.4,
+                    "last_successful_poll_seconds_ago": 2
+                }
+            ]
+        }
+        payload = json.dumps(status).encode("utf-8")
         self.send_response(200)
         self.send_header("Content-Type", "application/json")
         self.send_header("Content-Length", str(len(payload)))
         self.end_headers()
         self.wfile.write(payload)
 
-    def serve_status(self):
-        status = {
-            "version": "1.0.0",
-            "mode": "shadow_readonly",
-            "daemon_running": True,
-            "system": "Linux / Raspberry Pi"
+    def serve_devices(self):
+        payload = json.dumps({"devices": ["inverter_1"]}).encode("utf-8")
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(payload)))
+        self.end_headers()
+        self.wfile.write(payload)
+
+    def serve_device_detail(self, url):
+        if url.endswith("/measurements"):
+            meas = {"measurements": self.get_standard_measurements()}
+            payload = json.dumps(meas).encode("utf-8")
+        elif url.endswith("/capabilities"):
+            caps = {"readable": True, "writable": False, "controls": []}
+            payload = json.dumps(caps).encode("utf-8")
+        else:
+            dev = {
+                "id": "inverter_1",
+                "label": "Afore Inverter 1",
+                "driver_id": "afore_sun",
+                "support_level": "production",
+                "manufacturer": "Afore",
+                "model": "HNS-3000TL",
+                "serial_number": "AFORE-20240901",
+                "online": True,
+                "data_valid": True,
+                "data_stale": False,
+                "consecutive_poll_failures": 0,
+                "last_successful_poll_seconds_ago": 2
+            }
+            payload = json.dumps(dev).encode("utf-8")
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(payload)))
+        self.end_headers()
+        self.wfile.write(payload)
+
+    def serve_diagnostics(self):
+        diag = {
+            "uptime_seconds": int(time.monotonic()),
+            "free_heap_bytes": 104857600,
+            "minimum_free_heap_bytes": 94371840,
+            "max_alloc_heap_bytes": 52428800,
+            "poll_success_total": int(time.monotonic() / 3),
+            "poll_failure_total": 0,
+            "consecutive_poll_failures": 0,
+            "checksum_error_total": 0,
+            "rs485_timeout_total": 0,
+            "invalid_frame_total": 0,
+            "wifi_rssi_dbm": -42,
+            "mqtt_reconnect_total": 0,
+            "mqtt_publish_failure_total": 0,
+            "modbus_client_connections_total": 0,
+            "rest_requests_total": 0,
+            "reset_reason": 1,
+            "board": "raspberry-pi",
+            "last_error": ""
         }
-        payload = json.dumps(status).encode("utf-8")
+        payload = json.dumps(diag).encode("utf-8")
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(payload)))
+        self.end_headers()
+        self.wfile.write(payload)
+
+    def serve_logs(self):
+        self.send_json({"level": self.load_config().get("logging", {}).get("level", "info"),
+                        "dropped": 0, "lines": ["Afore EMS web bridge running", "RS485 polling active"]})
+
+    def serve_drivers(self):
+        drivers = {
+            "drivers": [
+                {"id": "afore_sun", "name": "Afore HNS / BNT Series", "support_level": "production"},
+                {"id": "modbus_sunspec", "name": "SunSpec Modbus Inverter", "support_level": "production"},
+                {"id": "sungrow_sh", "name": "Sungrow SH Hybrid Series", "support_level": "production"}
+            ]
+        }
+        payload = json.dumps(drivers).encode("utf-8")
         self.send_response(200)
         self.send_header("Content-Type", "application/json")
         self.send_header("Content-Length", str(len(payload)))
@@ -171,11 +371,25 @@ class EmsWebHandler(SimpleHTTPRequestHandler):
         self.send_header("Cache-Control", "no-cache")
         self.send_header("Connection", "keep-alive")
         self.end_headers()
-        self.wfile.write(b"data: {\"status\":\"connected\"}\n\n")
+        try:
+            poll_cnt = 1
+            while True:
+                msg = f"event: state\ndata: {json.dumps({'polls': poll_cnt})}\n\n"
+                self.wfile.write(msg.encode("utf-8"))
+                self.wfile.flush()
+                poll_cnt += 1
+                time.sleep(3)
+        except Exception:
+            pass
+
+
+class ThreadedHTTPServer(socketserver.ThreadingMixIn, socketserver.TCPServer):
+    allow_reuse_address = True
+    daemon_threads = True
 
 
 def run(host="0.0.0.0", port=8080):
-    server = socketserver.TCPServer((host, port), EmsWebHandler)
+    server = ThreadedHTTPServer((host, port), EmsWebHandler)
     server.allow_reuse_address = True
     print(f"===========================================================")
     print(f"  Afore Autonomous EMS - Web UI Ready                      ")

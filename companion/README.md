@@ -1,4 +1,4 @@
-# Afore EMS Companion · v1.0.0
+# Afore EMS Companion · v1.0.2
 
 Companion container premium, **strettamente in sola lettura (SHADOW)**, per monitoraggio live, storico su TimescaleDB, timeline decisioni EMS, confronto SEM/ESP32, KPI energetici, diagnostica ed esportazioni.
 

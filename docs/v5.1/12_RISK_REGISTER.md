@@ -1,0 +1,23 @@
+# Risk register
+
+Severity is impact with the current evidence. An open gate requires the listed proof before promotion.
+
+| ID | Severity and owner | Risk and trigger | Mitigation / exit evidence | Gate and status |
+|---|---|---|---|---|
+| K01 | Critical · Firmware safety | Legacy OTA, REST, MQTT, dispatcher, generic write driver or raw transport reaches TX. The legacy Shadow environment inherits the bridge. | Dedicated source allowlist, typed reader and private sink, no toggle, negative build controls, ELF/map and independent bus capture. | G2/G4/G6/G10, open |
+| K02 | Critical · Board HAL | AUX coil/contact glitches before firmware or at watchdog/power transition. | Verified LOW latch first, no ON symbol/route, isolate terminals, capture GPIO/coil/contact through each reset class, quarantine on excursions. | G3, open |
+| K03 | High · Bring-up | COM10 missing or identity differs. Unverified variant, PCB or native USB instance. | Correlate board markings, physical ports and ROM-only identification, capture manufacturer and flash geometry. | G1, USB/ROM verified; PCB and antenna correlation open |
+| K04 | High · Build/release | Wrong architecture, C3 build confusion, wrong QIO/OPI or partition layout, no safe recovery. | Pin Xtensa SDK, review app bounds and image metadata, two fresh builds, preserve protected recovery data and verify authorized restore procedure. | G2/G3, open |
+| K05 | Critical · Bus and driver | Multiple masters, inverted polarity, termination or grounding/isolation error. | Verify one master and wiring/termination, dummy responder and scope, then separately approved fixed SOC read. | G4, open |
+| K06 | High · Telemetry | FC03/source duplication, U/S mismatch, word order, transposed signs or timestamps. | Canonical FC04 reader; paired fixture/display/meter observations, null/quality checks, verify native states, resolve current sign. | G4/G5, open |
+| K07 | Critical · EMS Safety | Ramp/deadband reintroduces an unsafe setpoint after an earlier clamp. Current draft can do this. | Final feasible-band validation and hard veto before smoothing. Test reserve/ceiling with initial power on wrong side and incompatible ramp. | G6, open |
+| K08 | High · EMS Safety | Unverified BMS capabilities or missing protection metadata enables unsafe candidates. | Explicit capability confidence, safe fallback and configurable narrower approved policies, never assume absent is zero or unlimited. | G5/G6, open |
+| K09 | High · Time/advice | Retained/replayed/future MQTT advice or RTC faults revive an override or misapply tariffs. | Version/identity/sequence/UTC/TTL policy, monotonic leases, intentional invalid-clock fallback, timezone tests and ACLs. | G6/G7, open |
+| K10 | High · Runtime | PSRAM assumption, blocked network callbacks or fragmented internal memory starves watchdog/cycle. | Observe internal and PSRAM pools/stack separately, fixed buffers, audit deadlines and adverse network tests. | G3/G6/G10, open |
+| K11 | Medium · Audit | Flash wear, silent ring loss or duplicates misstate coverage. | RAM-first, gaps, overflow counters, independent capture and idempotent ingest; persistent writes limited to documented config transitions. | G7/G9/G10, open |
+| K12 | High · Validation | Simulated setpoint or derived load mistaken for measured action or evidence of target success. | Mandatory provenance and native comparison, use independent AC reference where possible, audit null applied and mark counterfactual assumptions. | G5/G9/G10, open |
+| K13 | Medium · Repository owner | Untracked work or earlier compressed artifacts accidentally become release baseline. | Record as-found fingerprints, isolated build sources, explicit merge review, match hashes and never select earlier binaries blindly. | G0 documented, ongoing at G2 |
+| K14 | Medium · Licensing | OpenEMS source/UI import or unreviewed license obligations. | Pinned behavioral references, independent code/tests, per-file provenance and review before imports. | G6/G9, controlled in design |
+| K15 | High · Configuration | Corrupt or incompatible persist/restore presets, exposed tokens or retained commands. | Strict schema and field allowlist, atomic generations, bounded role access, redaction and rollback tests. | G7/G8, open |
+| K16 | Critical · Release owner | SHADOW milestone interpreted as permission to activate control or write EEPROM. | Separate G11 authorization and image; explicit exclusions, constrained future review, no actuation in this release. | G11, deferred |
+| K17 | Medium · Qualification | Seven days pass with no relevant weather, low SOC or failure cases. | Coverage matrix, declared bench/replay scenarios, hard safety evidence and independently reviewed metrics. | G10, open |

@@ -1,0 +1,126 @@
+Processing esp32-c3-dev (platform: https://github.com/pioarduino/platform-espressif32/releases/download/55.03.312-1/platform-espressif32.zip; board: esp32-c3-devkitm-1; framework: arduino)
+--------------------------------------------------------------------------------
+Verbose mode can be enabled via `-v, --verbose` option
+build_web.py: index_html.h    192284 -> 137651 -> 41978 gzipped (-78%)
+build_web.py: setup_html.h     22665 ->  14161 ->  5345 gzipped (-76%)
+build_web.py: 214949 bytes of page served as 47323 (167626 saved)
+CONFIGURATION: https://docs.platformio.org/page/boards/espressif32/esp32-c3-devkitm-1.html
+PLATFORM: Espressif 32 (55.3.312) > Espressif ESP32-C3-DevKitM-1
+HARDWARE: ESP32C3 160MHz, 320KB RAM, 4MB Flash
+DEBUG: Current (cmsis-dap) External (cmsis-dap, esp-bridge, esp-builtin, esp-prog, esp-prog-2, iot-bus-jtag, jlink, minimodule, olimex-arm-usb-ocd, olimex-arm-usb-ocd-h, olimex-arm-usb-tiny-h, olimex-jtag-tiny, tumpa)
+PACKAGES: 
+ - contrib-piohome @ 3.4.4 
+ - framework-arduinoespressif32 @ 3.3.12 
+ - framework-arduinoespressif32-libs @ 5.5.5+sha.b774170ff46 
+ - tool-esptoolpy @ 5.4.0 
+ - tool-riscv32-esp-elf-gdb @ 17.1.0+20260402 
+ - toolchain-riscv32-esp @ 14.2.0+20260121
+LDF: Library Dependency Finder -> https://bit.ly/configure-pio-ldf
+LDF Modes: Finder ~ chain, Compatibility ~ soft
+Found 48 compatible libraries
+Scanning dependencies...
+Dependency Graph
+|-- ArduinoJson @ 7.4.3
+|-- espMqttClient @ 1.4.6+sha.6c0d4bc
+|-- Preferences @ 3.3.12
+|-- WiFi @ 3.3.12
+|-- Wire @ 3.3.12
+|-- DNSServer @ 3.3.12
+|-- ESPmDNS @ 3.3.12
+|-- Update @ 3.3.12
+Building in release mode
+Compiling .pio\build\esp32-c3-dev\src\diagnostics\coredump.cpp.o
+Compiling .pio\build\esp32-c3-dev\src\outputs\modbus_tcp\modbus_tcp_server.cpp.o
+Compiling .pio\build\esp32-c3-dev\src\outputs\rest\rest_api.cpp.o
+Compiling .pio\build\esp32-c3-dev\src\protocols\modbus\modbus_rtu.cpp.o
+Compiling .pio\build\esp32-c3-dev\src\protocols\pmu\pmu_protocol.cpp.o
+Compiling .pio\build\esp32-c3-dev\src\protocols\pmu\pmu_transaction.cpp.o
+Compiling .pio\build\esp32-c3-dev\src\relays\drm.cpp.o
+Compiling .pio\build\esp32-c3-dev\src\relays\relay_controller.cpp.o
+Compiling .pio\build\esp32-c3-dev\src\state\state_store.cpp.o
+Compiling .pio\build\esp32-c3-dev\src\status\boot_button.cpp.o
+Compiling .pio\build\esp32-c3-dev\src\status\status_led.cpp.o
+Compiling .pio\build\esp32-c3-dev\src\transport\posix_serial_transport.cpp.o
+Compiling .pio\build\esp32-c3-dev\src\transport\readonly_guard.cpp.o
+Compiling .pio\build\esp32-c3-dev\src\transport\rs485_transport.cpp.o
+Compiling .pio\build\esp32-c3-dev\src\transport\transport.cpp.o
+Building .pio\build\esp32-c3-dev\bootloader.bin
+Generating partitions .pio\build\esp32-c3-dev\partitions.bin
+esptool v5.4.0
+Creating ESP32-C3 image...
+Merged 2 ELF sections.
+Successfully created ESP32-C3 image.
+Compiling .pio\build\esp32-c3-dev\FrameworkArduino\ColorFormat.c.o
+Compiling .pio\build\esp32-c3-dev\FrameworkArduino\Esp.cpp.o
+Compiling .pio\build\esp32-c3-dev\FrameworkArduino\FirmwareMSC.cpp.o
+Compiling .pio\build\esp32-c3-dev\FrameworkArduino\FunctionalInterrupt.cpp.o
+Compiling .pio\build\esp32-c3-dev\FrameworkArduino\HEXBuilder.cpp.o
+Compiling .pio\build\esp32-c3-dev\FrameworkArduino\HWCDC.cpp.o
+Compiling .pio\build\esp32-c3-dev\FrameworkArduino\HardwareSerial.cpp.o
+Compiling .pio\build\esp32-c3-dev\FrameworkArduino\HashBuilder.cpp.o
+src/diagnostics/coredump.cpp: In function 'heliograph::diag::CoredumpSummary heliograph::diag::readCoredumpSummary()':
+src/diagnostics/coredump.cpp:98:42: error: 'struct esp_core_dump_summary_extra_info_t' has no member named 'exc_cause'
+   98 |     out.exceptionCause = summary.ex_info.exc_cause;
+      |                                          ^~~~~~~~~
+src/diagnostics/coredump.cpp:99:42: error: 'struct esp_core_dump_summary_extra_info_t' has no member named 'exc_vaddr'
+   99 |     out.faultAddress   = summary.ex_info.exc_vaddr;
+      |                                          ^~~~~~~~~
+src/diagnostics/coredump.cpp:112:38: error: 'struct esp_core_dump_summary_extra_info_t' has no member named 'exc_cause'
+  112 |     out.causeKnown = summary.ex_info.exc_cause != 0;
+      |                                      ^~~~~~~~~
+src/diagnostics/coredump.cpp:118:66: error: 'struct esp_core_dump_summary_extra_info_t' has no member named 'exc_cause'
+  118 |     out.faultAddressKnown = causeHasFaultAddress(summary.ex_info.exc_cause);
+      |                                                                  ^~~~~~~~~
+src/diagnostics/coredump.cpp:127:46: error: 'struct esp_core_dump_bt_info_t' has no member named 'bt'
+  127 |     static_assert(sizeof(summary.exc_bt_info.bt) / sizeof(summary.exc_bt_info.bt[0]) ==
+      |                                              ^~
+src/diagnostics/coredump.cpp:127:79: error: 'struct esp_core_dump_bt_info_t' has no member named 'bt'
+  127 |     static_assert(sizeof(summary.exc_bt_info.bt) / sizeof(summary.exc_bt_info.bt[0]) ==
+      |                                                                               ^~
+src/diagnostics/coredump.cpp:130:46: error: 'struct esp_core_dump_bt_info_t' has no member named 'depth'
+  130 |     const size_t depth = summary.exc_bt_info.depth < kMaxBacktrace
+      |                                              ^~~~~
+src/diagnostics/coredump.cpp:131:52: error: 'struct esp_core_dump_bt_info_t' has no member named 'depth'
+  131 |                              ? summary.exc_bt_info.depth
+      |                                                    ^~~~~
+src/diagnostics/coredump.cpp:134:48: error: 'struct esp_core_dump_bt_info_t' has no member named 'bt'
+  134 |         out.backtrace[i] = summary.exc_bt_info.bt[i];
+      |                                                ^~
+src/diagnostics/coredump.cpp:137:51: error: 'struct esp_core_dump_bt_info_t' has no member named 'corrupted'
+  137 |     out.backtraceCorrupted  = summary.exc_bt_info.corrupted;
+      |                                                   ^~~~~~~~~
+*** [.pio\build\esp32-c3-dev\src\diagnostics\coredump.cpp.o] Error 1
+src/outputs/modbus_tcp/modbus_tcp_server.cpp:125:10: fatal error: ModbusServerTCPasync.h: No such file or directory
+
+******************************************************************************
+* Looking for ModbusServerTCPasync.h dependency? Check our library registry!
+*
+* CLI  > platformio lib search "header:ModbusServerTCPasync.h"
+* Web  > https://registry.platformio.org/search?q=header:ModbusServerTCPasync.h
+*
+******************************************************************************
+
+  125 | #include <ModbusServerTCPasync.h>
+      |          ^~~~~~~~~~~~~~~~~~~~~~~~
+compilation terminated.
+*** [.pio\build\esp32-c3-dev\src\outputs\modbus_tcp\modbus_tcp_server.cpp.o] Error 1
+src/outputs/rest/rest_api.cpp:12:10: fatal error: ESPAsyncWebServer.h: No such file or directory
+
+***************************************************************************
+* Looking for ESPAsyncWebServer.h dependency? Check our library registry!
+*
+* CLI  > platformio lib search "header:ESPAsyncWebServer.h"
+* Web  > https://registry.platformio.org/search?q=header:ESPAsyncWebServer.h
+*
+***************************************************************************
+
+   12 | #include <ESPAsyncWebServer.h>
+      |          ^~~~~~~~~~~~~~~~~~~~~
+compilation terminated.
+*** [.pio\build\esp32-c3-dev\src\outputs\rest\rest_api.cpp.o] Error 1
+========================= [FAILED] Took 23.04 seconds =========================
+
+Environment    Status    Duration
+-------------  --------  ------------
+esp32-c3-dev   FAILED    00:00:23.036
+==================== 1 failed, 0 succeeded in 00:00:23.036 ====================

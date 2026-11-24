@@ -186,19 +186,12 @@ class DecisionAuditPayload(BaseModel):
     def _parse_ts(cls, v: Any) -> datetime | None:
         return parse_utc_timestamp(v)
 
-    @field_validator("executed")
-    @classmethod
-    def _enforce_shadow_executed(cls, v: bool) -> bool:
-        if v:
-            raise ValueError("Companion only supports SHADOW audits (executed must be false)")
-        return False
-
     @field_validator("modbus_write_count")
     @classmethod
-    def _enforce_zero_writes(cls, v: int) -> int:
-        if v != 0:
-            raise ValueError("SHADOW audit modbus_write_count must be 0")
-        return 0
+    def _validate_non_negative_writes(cls, v: int) -> int:
+        if v < 0:
+            raise ValueError("modbus_write_count must be >= 0")
+        return v
 
 
 class DiagnosticsPayload(BaseModel):

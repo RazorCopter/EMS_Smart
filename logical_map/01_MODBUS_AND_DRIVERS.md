@@ -20,6 +20,7 @@ Tutte le comunicazioni RS485 avvengono esclusivamente su `loopTask` (nessun acce
 - **Classe `ReadOnlyModbusTransport`**:
   - `begin(baud)`: inizializza UART RS485 (`9600 8N1`).
   - `observeBus()`: controlla che non ci sia traffico imprevisto sul bus a riposo (rileva un eventuale secondo master RS485 concorrente).
+  - `flushInput()`: svuota il buffer RX prima di un tentativo di ripristino bus.
   - `readInputRegisters(slave, addr, count, values)`: lettura **FC04**.
   - **Solo se `#ifdef V51_LIVE_TRIAL`**:
     - `readHoldingRegisters(slave, addr, count, values)`: lettura **FC03**.
@@ -35,7 +36,7 @@ Tutte le comunicazioni RS485 avvengono esclusivamente su `loopTask` (nessun acce
 - **Classe `AforeReader`** (implementa `afore::ExternalEmsBus` quando `V51_LIVE_TRIAL` è attivo):
   - `start(now)`: avvia il trasporto a `kBaud` (`9600`), attende `5 s` in ascolto passivo (`RS485_LISTEN_ONLY`).
   - `tick(now)`: verifica `observeBus()`, esegue il probe iniziale SoC (`kSocProbe` `2002`), poi polla i blocchi FC04 di `v51_profile_generated.h` con schedulazione **`Priority.HIGH / LOW`** (coppia `507` rete + `2000` batteria ravvicinata, alternando i blocchi secondari `552` PV1/PV2 e `2515` temp) per minimizzare lo sfasamento temporale `|grid.stamp - battery.stamp|`.
-  - Decodifica ogni registro in `Sample { value, stamp, Quality }`, calcola `state.load = inverter + grid` (con assorbimento piccolo skew CT fino a `-30 W`), gestisce `failures_ >= 3 → state_.readHalted = true`.
+  - Decodifica ogni registro in `Sample { value, stamp, Quality }`, calcola `state.load = inverter + grid` (con assorbimento piccolo skew CT fino a `-30 W`), resetta `phase_ = 0` se fallisce il blocco `2000` (per evitare coppie `grid`/`battery` sfasate), gestisce `failures_ >= 3 → state_.readHalted = true` con auto-recovery dopo `60 s` (`haltedAt_`, `flushInput()`, `RS485_RECOVERY_ATTEMPT`).
   - Espone `readHolding()` e `writeFrame()` (protetti da `ownsBus()`).
 
 ### `src/device/live_actuator.h` (19 righe)

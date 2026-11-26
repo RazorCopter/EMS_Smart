@@ -1,4 +1,6 @@
-# Logical Map — Firmware ESP32-S3 (`afore-ems-v51-prototype`, `v5.1-live-trial-15`)
+# Logical Map — Firmware ESP32-S3 (`afore-ems-v51-prototype`, `v5.1-live-trial-18`)
+
+> Nota Git/Deploy: il firmware ESP32 vive sul branch `v51-prototype` (`origin`: `RazorCopter/EMS_Smart`). Il Companion Docker live (Portainer GitOps) legge invece il branch `main` del repository `https://github.com/RazorCopter/dashboard_ems.git` (remote `dashboard_ems`, con `companion/` alla root).
 
 Questa cartella (`logical_map/`) fornisce una mappa file-per-file completa del firmware ESP32-S3 v5.1, pensata per dare contesto immediato a un'altra IA o sviluppatore.
 

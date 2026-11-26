@@ -560,20 +560,47 @@ int main() {
   // Surplus jumps back to 1600: damped K=0.5 rise -> 600 + (1600-600)/2 = 1100
   assert(dampCf.tick(sample(50, -1600, 3000), dampPol, 1, 3000).finalWatts == 1100);
 
-  // ChargeFirst with surplusOnly=0, gridCharge=0: uses full pv_w during day, 0 at night
+  // ChargeFirst with surplusOnly=0, gridCharge=0: prefers true AC-side net balance
+  // (battery_w + inverter_w) over inflated DC pv_w so inverter_w never goes negative
   Policy cfPvPol;
   cfPvPol.strategy = 1;
   cfPvPol.surplusOnly = 0;
   cfPvPol.gridCharge = 0;
   cfPvPol.charge = 2560;
   cfPvPol.chargeFirstW = 2560;
+  cfPvPol.ramp = 2000;
   StrategyManager cfPvMgr;
+  // Fallback when inverter sample is absent: uses pv_w during day, 0 at night
   EnergyState eDayPv = sample(50, -1400, 1000);
   eDayPv.pv = {2400.0, 1000, Quality::Valid};
   assert(cfPvMgr.tick(eDayPv, cfPvPol, 1, 1000).finalWatts == 2400);
   EnergyState eNightPv = sample(50, 400, 2000);
   eNightPv.pv = {0.0, 2000, Quality::Valid};
   assert(cfPvMgr.tick(eNightPv, cfPvPol, 1, 2000).finalWatts == 0);
+
+  // Real hardware case: pv_w=769W (MPPT DC inflated), battery_w=789W, inverter_w=-216W (pulling AC!),
+  // grid_w=735W (house=519W + 216W AC rectification). Net AC available = 789 + (-216) = 573W!
+  StrategyManager cfAcMgr;
+  EnergyState eAc1 = sample(84, 735, 1000);
+  eAc1.pv = {769.0, 1000, Quality::Valid};
+  eAc1.battery = {789.0, 1000, Quality::Valid};
+  eAc1.inverter = {-216.0, 1000, Quality::Valid};
+  auto dAc1 = cfAcMgr.tick(eAc1, cfPvPol, 1, 1000);
+  assert(dAc1.upper == 573 && dAc1.finalWatts == 573);
+  // Next tick after inverter settles near inverter_w = -4W, battery_w = 577W -> net = 573W (stable, no oscillation!)
+  EnergyState eAc2 = sample(84, 523, 2000);
+  eAc2.pv = {769.0, 2000, Quality::Valid};
+  eAc2.battery = {577.0, 2000, Quality::Valid};
+  eAc2.inverter = {-4.0, 2000, Quality::Valid};
+  auto dAc2 = cfAcMgr.tick(eAc2, cfPvPol, 1, 2000);
+  assert(dAc2.upper == 573 && dAc2.finalWatts == 573);
+  // Night with inverter tare (battery_w=0, inverter_w=-57W, grid_w=457W) -> clamps strictly to 0W!
+  EnergyState eAcNight = sample(84, 457, 3000);
+  eAcNight.pv = {0.0, 3000, Quality::Valid};
+  eAcNight.battery = {0.0, 3000, Quality::Valid};
+  eAcNight.inverter = {-57.0, 3000, Quality::Valid};
+  auto dAcNight = cfAcMgr.tick(eAcNight, cfPvPol, 1, 3000);
+  assert(dAcNight.upper == 0 && dAcNight.finalWatts == 0);
 
   // Ensure every checked Decision has an explicit non-placeholder disposition
   for (const auto *disp :

@@ -314,8 +314,16 @@ public:
     }
 
     const auto volt = essential(e.batteryVoltage, now, p.staleMs);
+    const auto invSample = essential(e.inverter, now, p.staleMs);
     const auto pvSample = essential(e.pv, now, p.staleMs);
-    const int pvAvailableW = pvSample ? std::max(0, int(std::lround(*pvSample))) : -1;
+    const bool invAligned = invSample && std::abs(*invSample) <= 30000 &&
+                            std::abs(double(int32_t(e.inverter.stamp - e.battery.stamp))) <=
+                                std::min(p.staleMs, 2000);
+    // Use true AC-side balance (*batt + *invSample) to cancel inverter self-consumption
+    // and DC MPPT sensor offsets so ChargeFirst (surplusOnly=0, gridCharge=0) keeps
+    // inverter_w >= 0 (grid_w == house_load) instead of rectifying AC from the grid.
+    const int pvAvailableW = invAligned ? std::max(0, int(std::lround(*batt + *invSample)))
+                           : (pvSample ? std::max(0, int(std::lround(*pvSample))) : -1);
     const bool haveVoltage = volt && *volt > 0 && *volt <= 1000;
     const bool voltageSafe =
         (!p.minVolt && !p.maxVolt) || (haveVoltage && *volt >= p.minVolt &&
@@ -802,7 +810,10 @@ private:
     if (priorW_ && effective_ == d.strategy) {
       if (d.strategy == Strategy::SelfUse ||
           ((d.strategy == Strategy::ChargeFirst || d.strategy == Strategy::Target) &&
-           !d.gridPermitted && selected > *priorW_ && std::string_view(state_) != "TAPER")) {
+           !d.gridPermitted &&
+           (selected > *priorW_ ||
+            (d.strategy == Strategy::ChargeFirst && !p.surplusOnly && selected > 0)) &&
+           std::string_view(state_) != "TAPER")) {
         const int delta = selected - *priorW_;
         selected =
             *priorW_ +

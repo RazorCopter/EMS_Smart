@@ -22,7 +22,7 @@
 ### `src/v51/remote.h` (80 righe) & `remote.cpp` (919 righe)
 - **Scopo**: Stack di rete Wi-Fi STA/AP, server `esp_http_server` (`httpd`, stack `10240 B`), autenticazione HTTP Basic, ring buffer log (`/api/v1/logs`), OTA firmato ECDSA P-256 (`/api/v1/ota`), e campionamento risorse FreeRTOS (`sampleSystemResources()` / `sampleSystemResourceSummary()`).
 - **Endpoint principali**:
-  - `GET /api/v1/health`, `GET /api/v1/system`, `GET /api/v1/telemetry`, `GET /api/v1/logs`
+  - `GET /api/v1/health` (con `executed` e `applied` reali), `GET /api/v1/system`, `GET /api/v1/telemetry`, `GET /api/v1/logs`
   - `POST /api/v1/ota` (verifica SHA-256 + firma DER ECDSA P-256)
   - `POST /api/v1/wifi`, `POST /api/v1/password`
   - Registra i router di `clock_service`, `ems_runtime`, `m4`, `m5`.
@@ -46,7 +46,7 @@
 - **Scopo**: Gestione input predittivi Home Assistant, comandi manuali (`operating_mode`, `live_trainer`, `live_sign`, `aux`) e controllo relè `AUX1` (mantenuto `OFF` nell'EMS).
 - **Funzioni chiave**:
   - `acceptHaInput(kind, data, size)` & `readPredictiveInputs(nowUtc, deadlineUtc)`: valida e converte i JSON MQTT (`forecast_solar`, `forecast_ratio`, `weather`, `load_profile`, `heartbeat`) in `PredictiveInputs` per `StrategyManager`.
-  - `manualCommand(action, payload, origin)`: instrada `PREFLIGHT`/`LIVE`/`SHADOW` verso `requestLiveTrial()` (solo `WEB_UI` / `REST_API`) e `live_trainer` verso `configureLiveTrainer()`.
+  - `manualCommand(action, payload, origin)`: instrada `PREFLIGHT`/`LIVE`/`SHADOW` verso `requestLiveTrial()` (per `WEB_UI`/`REST_API`, e solo `SHADOW` per `MQTT` come disarmo fail-safe) e `live_trainer` verso `configureLiveTrainer()`.
   - Espone `GET /api/v1/ha/inputs`, `GET/POST /api/v1/manual`.
 
 ---

@@ -9,7 +9,7 @@
 - **Flusso**:
   - `initVariant()` / `setup()`: forza subito `GPIO47` (`AUX1`) a `0`, avvia `Serial`, `Wire` (I2C RTC), hardware watchdog `esp_task_wdt` (`10 s`), e `v51::beginRemote()`.
   - `loop()`: attende `11 s` + `ESP_OTA_IMG_VALID` prima di avviare `reader.start()`, chiama `reader.tick()`, `serviceAux()`.
-  - Ogni `1000 ms`: emette log `SHADOW/LIVE heartbeat` ed `EnergyState`, chiama `tickEms(state, lastHeartbeat, sequence)` e (se `V51_LIVE_TRIAL`) `serviceLiveTrial(reader, decision, lastHeartbeat, healthy)`.
+  - Ogni `1000 ms`: emette log `SHADOW/LIVE heartbeat` ed `EnergyState`, chiama `tickEms(state, lastHeartbeat, sequence, false)`, esegue (se `V51_LIVE_TRIAL`) `serviceLiveTrial(reader, decision, lastHeartbeat, healthy)` (richiedendo `clock.utc` solo se `needsClock` per strategie predittive o `Target` giornaliero), e poi chiama `recordEmsDecision(...)` con `liveTrialExecuted()` e `liveTrialAppliedWatts()`.
   - Ad ogni iterazione: `tickRemote(...)`, `esp_task_wdt_reset()`, `delay(20)`.
 
 ### `src/v51/energy_state.h` (32 righe)
@@ -27,7 +27,7 @@
   - Valida freschezza e coerenza temporale di `soc`, `grid`, `battery` (`|grid.stamp - battery.stamp| <= min(staleMs, 2000)`).
   - Calcola `surplus = round(*batt - *grid)` e `balance = surplus + gridTarget`.
   - Se `predictive == 1` su `SelfUse`/`ChargeFirst`, esegue `tickPredictive()`: floor stagionale, `fogSticky_` (nebbia/radiazione), profilo carico feriale/weekend, finestra `deadlineMinute` (es. 15:30), e macchina a stati `CyclePhase { SelfUse, GentleCharge, CaptureChargeFirst, FullHold }`.
-  - In `ChargeFirst` con `surplusOnly == 0` e `gridCharge == 0`, usa `pvAvailableW` (`e.pv`) come tetto diurno (`d.upper`), azzerandosi di notte (`pv_w == 0`).
+  - In `ChargeFirst` con `surplusOnly == 0` e `gridCharge == 0`, usa il bilancio netto lato AC dell'inverter (`battery_w + inverter_w`, con fallback a `e.pv` se `e.inverter` non è disponibile) come tetto diurno (`d.upper`), mantenendo `inverter_w >= 0` (`grid_w == house_load`) senza raddrizzare AC dalla rete e azzerandosi di notte.
   - `clampAndFinalize()`: applica limiti `[lower, upper]`, smorzamento `dampingPct`/`dampingW` (bidirezionale in `SelfUse`, asimmetrico solo in risalita per `ChargeFirst`/`Target` `!gridPermitted`), `ramp` (`W/s`), `deadband`, e assegna `disposition` esplicita.
 
 ### `src/v51/ems_runtime.h` (14 righe) & `ems_runtime.cpp` (640 righe)
@@ -35,7 +35,7 @@
 - **Funzioni chiave**:
   - `loadPolicy()`: carica `ems-policy-v5` da NVS (con migrazione automatica da v2/v3/v4) e `ems-pred-st` (`PredictiveCycleState`).
   - `savedPolicy()`, `policyJson()`, `applyPolicyForm()`: lettura/aggiornamento atomico (o temporaneo con lease) della `Policy`.
-  - `tickEms(state, now, seq)`: legge `PredictiveInputs` da `m5`, chiama `StrategyManager::tick()`, salva in NVS eventuali cambi di `PredictiveCycleState`, genera riga JSON di audit su `recordDecision()`.
+  - `tickEms(state, now, seq, recordNow)` & `recordEmsDecision(...)`: legge `PredictiveInputs` da `m5`, chiama `StrategyManager::tick()`, salva in NVS eventuali cambi di `PredictiveCycleState`, e registra la riga JSON di audit con i valori reali di `executed` e `applied`.
   - `registerEms()`: registra `/api/v1/ems/config`, `/api/v1/ems/policy` (GET/POST), `/api/v1/ems/replay`, `/api/v1/ems/replay/m9b`.
 
 ---
@@ -44,7 +44,7 @@
 
 ### `src/v51/live_executor.h` (110 righe)
 - **Scopo**: Macchina a stati volatile che governa `LiveActuator`:
-  - `arm(now, leaseMs, startNative)`: arma solo in RAM (mai persistito su flash).
+  - `arm(now, leaseMs, startNative)` & `updateLease(leaseMs)`: arma solo in RAM (mai persistito su flash) e aggiorna dinamicamente la lease se cambia `trainer_s`.
   - `tick(decision, decisionAt, now, maxDecisionAgeMs)`: controlla `hasControl()`, `leaseMs_`, `kWatchdogMs` (`120 s`), validità `Decision` (`<= maxDecisionAgeMs`, non `Safe`/`Native`, entro `[lower, upper]`), rinnova `0x0A09` ogni `kHeartbeatMs` (`30 s`) se invariato.
   - Supporta `delegateNative(now)` / `resumeExternal(now)` (stato `NativeDelegated`, controllo FC03 ogni `30 s`).
   - `disarm()` / `stop()`: ripristina `nativeMode` (o verifica `verifyNativeMode()` se già delegato) e transiziona a `Shadow` (o `ReleaseFailed`).
@@ -59,9 +59,9 @@
 ### `src/v51/live_trial.h` (23 righe) & `live_trial.cpp` (313 righe)
 - **Scopo**: Orchestratore thread-safe (`trialMutex`) tra comandi HTTP (`requestLiveTrial`, `configureLiveTrainer`), `LiveExecutor`, `TrainerResponse` e `ExternalEmsActuator`.
 - **Dettagli chiave**:
-  - Definisce `V51_BUILD_ID` (`"v5.1-live-trial-15"`).
-  - Ricarica `trialPolicy = savedPolicy()` dinamicamente ad ogni tick.
-  - Gestisce la delega sicura a `Self-Use` nativo **solo** se `delegateNativeSelfUse == 1`, `gridTarget == 0`, `safetyReason == "NONE"`, `soc >= effectiveFloor + max(hysteresis, 3)` e budget EEPROM (`cooldownRemaining == 0`, `dailyModeSwitches < maxModeSwitchesPerDay`); in caso di cooldown attivo resta semplicemente in `ExtEms` senza abortire `LIVE`, e riprende `ExtEms` subito su `soc <= effectiveFloor + 1` o cambio strategia.
+  - Definisce `V51_BUILD_ID` (`"v5.1-live-trial-18"`), `liveTrialExecuted()` e `liveTrialAppliedWatts()`.
+  - Ricarica `trialPolicy = activePolicy()` (rispettando anche eventuali override) e aggiorna `executor->updateLease(...)` ad ogni tick.
+  - Gestisce la delega sicura a `Self-Use` nativo **solo** se `!trainer && delegateNativeSelfUse == 1`, `gridTarget == 0`, `safetyReason == "NONE"`, `soc >= effectiveFloor + max(hysteresis, 3)` e budget EEPROM (`cooldownRemaining == 0`, `dailyModeSwitches < maxModeSwitchesPerDay`); in caso di cooldown attivo resta semplicemente in `ExtEms` senza abortire `LIVE`, e riprende `ExtEms` subito su `soc <= effectiveFloor + 1` o cambio strategia.
 
 ---
 

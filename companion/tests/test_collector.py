@@ -129,3 +129,58 @@ async def test_collector_ingestion_dedup_out_of_order_and_reboot():
             await session.execute(delete(EmsEvent).where(EmsEvent.device_id == test_dev))
             await session.commit()
         await engine.dispose()
+
+
+@pytest.mark.asyncio
+async def test_mqtt_offline_grace_suppresses_short_blips_and_emits_after_grace():
+    import asyncio
+    from unittest.mock import AsyncMock
+
+    class DummySession:
+        def __init__(self) -> None:
+            self.added: list[object] = []
+
+        def add(self, obj: object) -> None:
+            self.added.append(obj)
+
+        async def execute(self, *_args: object, **_kwargs: object) -> None:
+            return None
+
+        async def commit(self) -> None:
+            return None
+
+        async def __aenter__(self) -> "DummySession":
+            return self
+
+        async def __aexit__(self, *_args: object) -> None:
+            return None
+
+    sessions: list[DummySession] = []
+
+    def make_session() -> DummySession:
+        s = DummySession()
+        sessions.append(s)
+        return s
+
+    ingestor = IngestionEngine(make_session, device_id="grace-dev", mqtt_offline_grace_s=0.08)  # type: ignore[arg-type]
+    ingestor._dispatch_telegram_notification = AsyncMock()  # type: ignore[method-assign]
+    t0 = datetime(2026, 11, 26, 14, 0, 0, tzinfo=timezone.utc)
+
+    # 1. Brief offline -> online blip (< grace): zero MQTT_OFFLINE / MQTT_ONLINE events
+    async with make_session() as s:
+        await ingestor._handle_availability(s, "offline", t0)
+    await asyncio.sleep(0.02)
+    async with make_session() as s:
+        await ingestor._handle_availability(s, "online", t0 + timedelta(seconds=15))
+    await asyncio.sleep(0.10)
+    emitted = [e.event_type for sess in sessions for e in sess.added if isinstance(e, EmsEvent)]
+    assert emitted == []
+
+    # 2. Sustained offline (> grace): emits MQTT_OFFLINE, then recovery emits MQTT_ONLINE
+    async with make_session() as s:
+        await ingestor._handle_availability(s, "offline", t0 + timedelta(seconds=30))
+    await asyncio.sleep(0.12)
+    async with make_session() as s:
+        await ingestor._handle_availability(s, "online", t0 + timedelta(seconds=240))
+    emitted = [e.event_type for sess in sessions for e in sess.added if isinstance(e, EmsEvent)]
+    assert emitted == ["MQTT_OFFLINE", "MQTT_ONLINE"]

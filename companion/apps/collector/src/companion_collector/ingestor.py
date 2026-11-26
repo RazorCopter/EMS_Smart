@@ -87,6 +87,8 @@ class DeviceRuntimeState:
     last_safety_reason: str | None = None
     last_ha_online: bool | None = None
     last_esp_online: bool | None = None
+    pending_offline_since: datetime | None = None
+    mqtt_offline_notified: bool = False
     last_config_revision: int | None = None
     last_operating_mode: str | None = None
     last_live_lock: str | None = None
@@ -111,6 +113,7 @@ class IngestionEngine:
         base_topic: str = "afore/afore-ems/v1",
         sem_prefix: str = "afore/afore-ems/v1/sem",
         max_energy_gap_s: float = 60.0,
+        mqtt_offline_grace_s: float = 180.0,
         sem_thresholds: SemComparisonThresholds | None = None,
     ) -> None:
         self.session_factory = session_factory
@@ -118,6 +121,8 @@ class IngestionEngine:
         self.base_topic = base_topic.rstrip("/")
         self.sem_prefix = sem_prefix.rstrip("/")
         self.max_energy_gap_s = max_energy_gap_s
+        self.mqtt_offline_grace_s = max(0.0, mqtt_offline_grace_s)
+        self._pending_offline_task: asyncio.Task[None] | None = None
         self.sem_thresholds = sem_thresholds or SemComparisonThresholds()
         self.state = DeviceRuntimeState()
         self.resource_sampler = ProcessResourceSampler("/")
@@ -544,6 +549,27 @@ class IngestionEngine:
             except RuntimeError:
                 pass
 
+    async def _emit_deferred_mqtt_offline(self, offline_since: datetime) -> None:
+        try:
+            await asyncio.sleep(self.mqtt_offline_grace_s)
+        except asyncio.CancelledError:
+            return
+        if self.state.last_esp_online is not False or self.state.mqtt_offline_notified:
+            return
+        self.state.mqtt_offline_notified = True
+        self.state.pending_offline_since = None
+        grace_min = max(1, round(self.mqtt_offline_grace_s / 60))
+        async with self.session_factory() as session:
+            await self._emit_event(
+                session,
+                occurred_at=datetime.now(timezone.utc),
+                event_type="MQTT_OFFLINE",
+                severity="warning",
+                title="ESP32 availability: offline",
+                detail=f"ESP32 offline su MQTT da oltre {grace_min} min (dalle {offline_since.astimezone().strftime('%H:%M:%S')})",
+            )
+            await session.commit()
+
     async def _handle_availability(self, session: AsyncSession, status_text: str, now: datetime) -> None:
         online = status_text.lower() == "online"
         await self._upsert_health(
@@ -553,18 +579,31 @@ class IngestionEngine:
             {"availability": status_text},
             now,
         )
-        should_emit = (not online and self.state.last_esp_online is not False) or (
-            online and self.state.last_esp_online is False
-        )
-        if should_emit:
-            await self._emit_event(
-                session,
-                occurred_at=now,
-                event_type="MQTT_ONLINE" if online else "MQTT_OFFLINE",
-                severity="info" if online else "warning",
-                title=f"ESP32 availability: {status_text}",
-                detail=f"LWT/availability topic reported '{status_text}'",
-            )
+        if not online:
+            if self.state.last_esp_online is not False and not self.state.mqtt_offline_notified:
+                self.state.pending_offline_since = now
+                if self._pending_offline_task is not None and not self._pending_offline_task.done():
+                    self._pending_offline_task.cancel()
+                try:
+                    loop = asyncio.get_running_loop()
+                    self._pending_offline_task = loop.create_task(self._emit_deferred_mqtt_offline(now))
+                except RuntimeError:
+                    pass
+        else:
+            if self._pending_offline_task is not None and not self._pending_offline_task.done():
+                self._pending_offline_task.cancel()
+            self._pending_offline_task = None
+            self.state.pending_offline_since = None
+            if self.state.mqtt_offline_notified:
+                self.state.mqtt_offline_notified = False
+                await self._emit_event(
+                    session,
+                    occurred_at=now,
+                    event_type="MQTT_ONLINE",
+                    severity="info",
+                    title=f"ESP32 availability: {status_text}",
+                    detail=f"LWT/availability topic reported '{status_text}'",
+                )
         self.state.last_esp_online = online
 
     async def _handle_telemetry(

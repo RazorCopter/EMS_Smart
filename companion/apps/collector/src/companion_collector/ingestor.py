@@ -85,6 +85,7 @@ class DeviceRuntimeState:
     last_strategy: str | None = None
     last_configured_strategy: str | None = None
     last_safety_reason: str | None = None
+    last_soc_limit_emitted_at: datetime | None = None
     last_ha_online: bool | None = None
     last_esp_online: bool | None = None
     pending_offline_since: datetime | None = None
@@ -930,13 +931,28 @@ class IngestionEngine:
             )
 
         if dec.safety_reason != self.state.last_safety_reason:
-            if dec.safety_reason in {"SOC_RESERVE", "SOC_CEILING"}:
+            if dec.safety_reason == "SOC_RESERVE":
+                if (
+                    self.state.last_soc_limit_emitted_at is None
+                    or (ts - self.state.last_soc_limit_emitted_at).total_seconds() >= 900
+                ):
+                    self.state.last_soc_limit_emitted_at = ts
+                    await self._emit_event(
+                        session,
+                        occurred_at=ts,
+                        event_type="SOC_LIMIT",
+                        severity="warning",
+                        title=f"Intervento Safety: {dec.safety_reason}",
+                        detail=f"SOC {dec.soc}% · Candidato {dec.candidate_w} W -> Simulato {dec.simulated_w} W",
+                        metadata={"seq": dec.seq, "safety_reason": dec.safety_reason},
+                    )
+            elif dec.safety_reason == "SOC_CEILING":
                 await self._emit_event(
                     session,
                     occurred_at=ts,
-                    event_type="SOC_LIMIT",
-                    severity="warning",
-                    title=f"Intervento Safety: {dec.safety_reason}",
+                    event_type="SOC_CEILING",
+                    severity="info",
+                    title="Batteria piena: SOC_CEILING",
                     detail=f"SOC {dec.soc}% · Candidato {dec.candidate_w} W -> Simulato {dec.simulated_w} W",
                     metadata={"seq": dec.seq, "safety_reason": dec.safety_reason},
                 )

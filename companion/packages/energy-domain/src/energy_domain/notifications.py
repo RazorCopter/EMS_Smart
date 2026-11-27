@@ -58,8 +58,8 @@ NOTIFICATION_CATALOG: list[dict[str, Any]] = [
     },
     {
         "key": "soc_limit",
-        "label": "Interventi Safety SOC (Riserva / Ceiling)",
-        "description": "Notifica quando viene raggiunta la riserva minima o il limite superiore di carica SOC.",
+        "label": "Riserva minima SOC raggiunta",
+        "description": "Notifica quando viene raggiunta la riserva minima SOC (SOC_RESERVE, con cooldown 15 min; SOC_CEILING al 100% escluso).",
         "severity": "info",
         "default_enabled": False,
         "event_types": ["SOC_LIMIT"],

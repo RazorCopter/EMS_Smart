@@ -183,11 +183,71 @@ export interface DashboardViewModels {
   timezone: string;
 }
 
+const STRATEGY_BAND_STYLE: Record<string, { label: string; bg: string; text: string }> = {
+  CHARGE_FIRST: { label: "Charge First", bg: "rgba(168, 85, 247, 0.14)", text: "rgba(216, 180, 254, 0.85)" },
+  SELF_USE: { label: "Self Use", bg: "rgba(16, 185, 129, 0.11)", text: "rgba(110, 231, 183, 0.85)" },
+  TARGET_SOC: { label: "Target SOC", bg: "rgba(6, 182, 212, 0.12)", text: "rgba(103, 232, 249, 0.85)" },
+  MAINTENANCE: { label: "Maintenance", bg: "rgba(245, 158, 11, 0.12)", text: "rgba(252, 211, 77, 0.85)" },
+  SAFE_MODE: { label: "Safe Mode", bg: "rgba(239, 68, 68, 0.14)", text: "rgba(252, 165, 165, 0.85)" },
+  NATIVE_INVERTER: { label: "Nativo", bg: "rgba(100, 116, 139, 0.12)", text: "rgba(148, 163, 184, 0.85)" },
+};
+
+function buildStrategyMarkAreas(series: any[]): any[] {
+  if (!series.length) return [];
+  const spans: Array<{ strategy: string; start: number; end: number }> = [];
+  let cur: { strategy: string; start: number; end: number } | null = null;
+  for (let i = 0; i < series.length; i++) {
+    const strat = typeof series[i]?.strategy === "string" ? series[i].strategy : null;
+    if (!strat) {
+      if (cur) {
+        spans.push(cur);
+        cur = null;
+      }
+      continue;
+    }
+    if (cur && cur.strategy === strat) {
+      cur.end = i;
+    } else {
+      if (cur) spans.push(cur);
+      cur = { strategy: strat, start: i, end: i };
+    }
+  }
+  if (cur) spans.push(cur);
+
+  const minLabelSpan = Math.max(2, Math.floor(series.length * 0.06));
+  return spans.map((sp) => {
+    const cfg = STRATEGY_BAND_STYLE[sp.strategy] ?? {
+      label: strategyLabel(sp.strategy),
+      bg: "rgba(148, 163, 184, 0.08)",
+      text: "rgba(203, 213, 225, 0.75)",
+    };
+    const endIdx = sp.end < series.length - 1 ? sp.end + 1 : sp.end;
+    const showLabel = sp.end - sp.start + 1 >= minLabelSpan;
+    return [
+      {
+        name: showLabel ? cfg.label : "",
+        xAxis: sp.start,
+        itemStyle: { color: cfg.bg },
+        label: {
+          show: showLabel,
+          position: "insideTopLeft",
+          distance: 4,
+          color: cfg.text,
+          fontSize: 10,
+          fontWeight: 600,
+        },
+      },
+      { xAxis: endIdx },
+    ];
+  });
+}
+
 export function buildLiveChartOption(
   series: any[],
   timezone: string,
   chartPalette: ChartPalette,
 ): EChartsOption {
+  const strategyAreas = buildStrategyMarkAreas(series);
   return {
     grid: { top: 34, right: 44, bottom: 26, left: 46 },
     tooltip: {
@@ -249,6 +309,7 @@ export function buildLiveChartOption(
         lineStyle: { color: chartPalette.pv, width: 2.2 },
         itemStyle: { color: chartPalette.pv },
         areaStyle: { color: chartPalette.pvArea },
+        markArea: strategyAreas.length > 0 ? { silent: true, data: strategyAreas } : undefined,
         data: series.map((p) => p.pv_w),
       },
       {

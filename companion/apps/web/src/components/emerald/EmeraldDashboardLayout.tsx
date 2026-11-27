@@ -106,7 +106,7 @@ export function EmeraldDashboardLayout({ vm, chartRange, onChangeChartRange }: P
             <div className="em-card-head em-chart-head">
               <div>
                 <h3 className="em-card-title">{CHART_RANGE_TITLES[chartRange]}</h3>
-                <p className="em-card-sub">FV, Casa, Batteria, Rete (W) e SOC (%) · Gap espliciti</p>
+                <p className="em-card-sub">FV, Casa, Batteria, Rete (W) e SOC (%) · Sfondo: <span style={{ color: "#c084fc" }}>Charge First</span> / <span style={{ color: "#34d399" }}>Self Use</span></p>
               </div>
               <div className="chart-controls-wrap">
                 <div className="seg-group" role="group" aria-label="Seleziona finestra grafico live">

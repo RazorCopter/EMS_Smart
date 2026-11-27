@@ -117,6 +117,8 @@ void appendLiveTrialStatus(JsonObject out) {
     }
     out["live_trial_pending"] = pending != Request::None;
     out["live_delegated_native"] = executor && executor->nativeDelegated();
+    out["native_mode"] = nullptr;
+    if (nativeMode) out["native_mode"] = *nativeMode;
     out["mode_switches_today"] = dailyModeSwitches;
     out["mode_switch_cooldown_remaining_s"] = (cooldownRemaining(clockStamp().uptime) + 999) / 1000;
     out["live_trial_confirmed_count"] = confirmedCount;
@@ -155,7 +157,13 @@ void serviceLiveTrial(AforeReader& reader, Decision decision, uint32_t now, bool
         nativeMode = healthy ? afore::ExternalEmsActuator::observedNativeMode(reader, reader.unit())
                              : std::nullopt;
         status = nativeMode ? "LIVE_PREFLIGHT_OK" : "LIVE_PREFLIGHT_FAILED";
-        recordLog(status);
+        if (nativeMode) {
+            char line[64]{};
+            snprintf(line, sizeof(line), "LIVE_PREFLIGHT_OK native_mode=%u", unsigned(*nativeMode));
+            recordLog(line);
+        } else {
+            recordLog(status);
+        }
     }
     if (request == Request::Start) {
         nativeMode = healthy ? afore::ExternalEmsActuator::observedNativeMode(reader, reader.unit())
@@ -172,7 +180,7 @@ void serviceLiveTrial(AforeReader& reader, Decision decision, uint32_t now, bool
         const auto lease = trainer ? std::optional<uint32_t>{durationMs} : std::nullopt;
         const auto socNow = reader.state().soc.usable(now);
         const bool safeForNative = !trainer && trialPolicy.delegateNativeSelfUse == 1 &&
-            nativeMode == 1 && decision.strategy == Strategy::SelfUse &&
+            nativeMode == 0 && decision.strategy == Strategy::SelfUse &&
             trialPolicy.gridTarget == 0 &&
             std::string_view(decision.safetyReason) == "NONE" &&
             socNow && *socNow >= decision.effectiveFloor + std::max(trialPolicy.hysteresis, 3);
@@ -210,7 +218,7 @@ void serviceLiveTrial(AforeReader& reader, Decision decision, uint32_t now, bool
         decision.strategy != Strategy::Safe && decision.strategy != Strategy::Native;
     const auto socNow = reader.state().soc.usable(now);
     const bool canDelegateNative = !trainer && trialPolicy.delegateNativeSelfUse == 1 &&
-        nativeMode == 1 && decision.strategy == Strategy::SelfUse &&
+        nativeMode == 0 && decision.strategy == Strategy::SelfUse &&
         trialPolicy.gridTarget == 0 &&
         std::string_view(decision.safetyReason) == "NONE" &&
         socNow && *socNow >= decision.effectiveFloor + std::max(trialPolicy.hysteresis, 3);

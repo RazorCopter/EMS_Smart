@@ -1,4 +1,4 @@
-import { useRef, useState, type KeyboardEvent } from "react";
+import { useState, type KeyboardEvent } from "react";
 import { fmtAbsKw, fmtPct } from "../../lib/format";
 import { buildEnergyFlowModel, type NodeId, type QualityKind } from "../shared/energyFlowModel";
 import type { TelemetryLive } from "../PowerFlow";
@@ -235,7 +235,6 @@ export function EmeraldEnergyMonitor({
   deadbandW = 20,
 }: Props) {
   const [selectedNode, setSelectedNode] = useState<NodeId | null>(null);
-  const invLossEmaRef = useRef<number | null>(null);
 
   const flow = buildEnergyFlowModel(
     telemetry,
@@ -245,16 +244,11 @@ export function EmeraldEnergyMonitor({
     selfConsumptionPct,
   );
 
-  // Representative smoothed inverter tare/conversion loss from live balance
-  let invLossW: number | null = invLossEmaRef.current != null ? Math.round(invLossEmaRef.current) : null;
-  if (flow.pv != null && flow.load != null && flow.batt != null && flow.grid != null) {
-    const rawLoss = Math.round(flow.pv + flow.grid - flow.load - flow.batt);
-    if (rawLoss >= 0 && rawLoss <= 1500) {
-      invLossEmaRef.current =
-        invLossEmaRef.current == null ? rawLoss : invLossEmaRef.current * 0.75 + rawLoss * 0.25;
-      invLossW = Math.round(invLossEmaRef.current);
-    }
-  }
+  // Real physical heatsink temperature of the Afore inverter (never inflated by DC MPPT sensor offset)
+  const invTempLabel =
+    telemetry?.temp_c != null && Number.isFinite(telemetry.temp_c)
+      ? `${Number(telemetry.temp_c).toFixed(1).replace(".", ",")} °C`
+      : null;
 
   const onNodeKey = (node: NodeId) => (e: KeyboardEvent<SVGGElement>) => {
     if (e.key === "Enter" || e.key === " ") {
@@ -561,7 +555,7 @@ export function EmeraldEnergyMonitor({
             />
             <text
               x="330"
-              y={invLossW != null ? "230" : "235"}
+              y={invTempLabel != null ? "230" : "235"}
               textAnchor="middle"
               fill={telemetry?.fault ? "var(--fault-red)" : flow.isStale ? "var(--safety-amber)" : "var(--accent-teal)"}
               fontSize="11.5"
@@ -569,9 +563,9 @@ export function EmeraldEnergyMonitor({
             >
               {flow.invStatusLabel}
             </text>
-            {invLossW != null && (
+            {invTempLabel != null && (
               <text x="330" y="244" textAnchor="middle" fill="var(--text-muted)" fontSize="10" fontWeight="650" className="mono">
-                {`Inv ~${invLossW} W`}
+                {invTempLabel}
               </text>
             )}
           </g>
@@ -711,12 +705,12 @@ export function EmeraldEnergyMonitor({
               scale={0.76}
               statusColor={telemetry?.fault ? "var(--fault-red)" : flow.isStale ? "var(--safety-amber)" : "var(--accent-teal)"}
             />
-            <text x="180" y={invLossW != null ? "200" : "205"} textAnchor="middle" fill="var(--accent-teal)" fontSize="10.5" fontWeight="700">
+            <text x="180" y={invTempLabel != null ? "200" : "205"} textAnchor="middle" fill="var(--accent-teal)" fontSize="10.5" fontWeight="700">
               {flow.invStatusLabel}
             </text>
-            {invLossW != null && (
+            {invTempLabel != null && (
               <text x="180" y="212" textAnchor="middle" fill="var(--text-muted)" fontSize="9.5" fontWeight="650" className="mono">
-                {`Inv ~${invLossW} W`}
+                {invTempLabel}
               </text>
             )}
           </g>

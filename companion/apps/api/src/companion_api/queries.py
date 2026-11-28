@@ -39,6 +39,17 @@ from energy_domain.sem_compare import ComparisonPoint
 _API_RESOURCE_SAMPLER = ProcessResourceSampler("/")
 _DB_FOOTPRINT_CACHE: dict[str, Any] = {"ts": 0.0, "data": None}
 
+# Empirical DC MPPT Hall-sensor over-read correction for Afore AF5K-SL (-9% in 700-2500 W band).
+# Raw Modbus readings remain untouched in TimescaleDB and diagnostic power-balance CSV exports.
+MPPT_PV_CALIBRATION_FACTOR = 0.91
+
+
+def _calibrate_pv(value: float | None, decimals: int = 1) -> float | None:
+    if value is None:
+        return None
+    scaled = float(value) * MPPT_PV_CALIBRATION_FACTOR
+    return round(scaled, decimals) if decimals >= 0 else scaled
+
 
 async def query_database_footprint(session: AsyncSession) -> dict[str, Any]:
     """Queries live TimescaleDB size, compressed chunks, and retention jobs (cached 30s)."""
@@ -218,13 +229,13 @@ def _telemetry_to_dict(row: TelemetrySample | None, now: datetime) -> dict[str, 
         "battery_w": row.battery_w,
         "battery_v": row.battery_v,
         "battery_a": row.battery_a,
-        "pv_w": row.pv_w,
+        "pv_w": _calibrate_pv(row.pv_w, 1),
         "pv1_v": row.pv1_v,
         "pv1_a": row.pv1_a,
-        "pv1_w": row.pv1_w,
+        "pv1_w": _calibrate_pv(row.pv1_w, 1),
         "pv2_v": row.pv2_v,
         "pv2_a": row.pv2_a,
-        "pv2_w": row.pv2_w,
+        "pv2_w": _calibrate_pv(row.pv2_w, 1),
         "grid_w": row.grid_w,
         "grid_v": row.grid_v,
         "hz": row.hz,
@@ -266,7 +277,7 @@ def _decision_to_dict(row: EmsDecision | None) -> dict[str, Any] | None:
         "grid_w": row.grid_w,
         "battery_w": row.battery_w,
         "load_w": row.load_w,
-        "pv_w": row.pv_w,
+        "pv_w": _calibrate_pv(row.pv_w, 1),
         "candidate_w": row.candidate_w,
         "limited_w": row.limited_w,
         "simulated_w": row.simulated_w,
@@ -358,13 +369,14 @@ async def query_energy_kpi(
 
     valid_s = float(row.valid_seconds or 0.0)
     gap_s = float(row.gap_seconds or 0.0)
-    pv_wh = float(row.pv_wh) if row.pv_wh is not None else None
+    pv_wh = float(row.pv_wh) * MPPT_PV_CALIBRATION_FACTOR if row.pv_wh is not None else None
     load_wh = float(row.load_wh) if row.load_wh is not None else None
     imp_wh = float(row.grid_import_wh) if row.grid_import_wh is not None else None
     exp_wh = float(row.grid_export_wh) if row.grid_export_wh is not None else None
     chg_wh = float(row.battery_charge_wh) if row.battery_charge_wh is not None else None
     dis_wh = float(row.battery_discharge_wh) if row.battery_discharge_wh is not None else None
-    sc_wh = float(row.self_consumed_pv_wh) if row.self_consumed_pv_wh is not None else None
+    raw_sc_wh = float(row.self_consumed_pv_wh) * MPPT_PV_CALIBRATION_FACTOR if row.self_consumed_pv_wh is not None else None
+    sc_wh = min(raw_sc_wh, pv_wh) if (raw_sc_wh is not None and pv_wh is not None) else raw_sc_wh
 
     losses_wh: float | None = None
     if all(v is not None for v in (pv_wh, load_wh, imp_wh, exp_wh, chg_wh, dis_wh)):
@@ -435,7 +447,7 @@ async def query_hourly_sparklines(
     return [
         {
             "hour": r.hr.strftime("%H:%M") if r.hr else "",
-            "pv_kwh": round(float(r.pv_kwh), 3) if r.pv_kwh is not None else None,
+            "pv_kwh": _calibrate_pv(float(r.pv_kwh), 3) if r.pv_kwh is not None else None,
             "load_kwh": round(float(r.load_kwh), 3) if r.load_kwh is not None else None,
             "chg_kwh": round(float(r.chg_kwh), 3) if r.chg_kwh is not None else None,
             "imp_kwh": round(float(r.imp_kwh), 3) if r.imp_kwh is not None else None,
@@ -898,7 +910,7 @@ async def query_history(
         series.append(
             {
                 "timestamp": r.bucket.isoformat(),
-                "pv_w": round(float(r.pv_w), 1) if r.pv_w is not None else None,
+                "pv_w": _calibrate_pv(float(r.pv_w), 1) if r.pv_w is not None else None,
                 "load_w": round(float(r.load_w), 1) if r.load_w is not None else None,
                 "battery_w": round(float(r.battery_w), 1) if r.battery_w is not None else None,
                 "grid_w": round(float(r.grid_w), 1) if r.grid_w is not None else None,

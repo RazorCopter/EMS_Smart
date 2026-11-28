@@ -587,19 +587,27 @@ int main() {
   eAc1.inverter = {-216.0, 1000, Quality::Valid};
   auto dAc1 = cfAcMgr.tick(eAc1, cfPvPol, 1, 1000);
   assert(dAc1.upper == 573 && dAc1.finalWatts == 573);
-  // Next tick after inverter settles near inverter_w = -4W, battery_w = 577W -> net = 573W (stable, no oscillation!)
-  EnergyState eAc2 = sample(84, 523, 2000);
+  // Next tick: Afore overshoots commanded 573W -> actual battery_w=613W, inverter_w=-40W
+  // Feedback uses min(priorW=573, batt=613) + (-40) = 533W -> trims overshoot to drive inverter_w -> 0!
+  EnergyState eAc2 = sample(84, 559, 2000);
   eAc2.pv = {769.0, 2000, Quality::Valid};
-  eAc2.battery = {577.0, 2000, Quality::Valid};
-  eAc2.inverter = {-4.0, 2000, Quality::Valid};
+  eAc2.battery = {613.0, 2000, Quality::Valid};
+  eAc2.inverter = {-40.0, 2000, Quality::Valid};
   auto dAc2 = cfAcMgr.tick(eAc2, cfPvPol, 1, 2000);
-  assert(dAc2.upper == 573 && dAc2.finalWatts == 573);
+  assert(dAc2.upper == 533 && dAc2.finalWatts == 533);
+  // Once settled at inverter_w=0 (batt=573W, priorW=533W) -> upper=533W (exact zero-grid fixed point!)
+  EnergyState eAc3 = sample(84, 519, 3000);
+  eAc3.pv = {769.0, 3000, Quality::Valid};
+  eAc3.battery = {573.0, 3000, Quality::Valid};
+  eAc3.inverter = {0.0, 3000, Quality::Valid};
+  auto dAc3 = cfAcMgr.tick(eAc3, cfPvPol, 1, 3000);
+  assert(dAc3.upper == 533 && dAc3.finalWatts == 533);
   // Night with inverter tare (battery_w=0, inverter_w=-57W, grid_w=457W) -> clamps strictly to 0W!
-  EnergyState eAcNight = sample(84, 457, 3000);
-  eAcNight.pv = {0.0, 3000, Quality::Valid};
-  eAcNight.battery = {0.0, 3000, Quality::Valid};
-  eAcNight.inverter = {-57.0, 3000, Quality::Valid};
-  auto dAcNight = cfAcMgr.tick(eAcNight, cfPvPol, 1, 3000);
+  EnergyState eAcNight = sample(84, 457, 4000);
+  eAcNight.pv = {0.0, 4000, Quality::Valid};
+  eAcNight.battery = {0.0, 4000, Quality::Valid};
+  eAcNight.inverter = {-57.0, 4000, Quality::Valid};
+  auto dAcNight = cfAcMgr.tick(eAcNight, cfPvPol, 1, 4000);
   assert(dAcNight.upper == 0 && dAcNight.finalWatts == 0);
 
   // Ensure every checked Decision has an explicit non-placeholder disposition

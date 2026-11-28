@@ -5,7 +5,7 @@
 namespace heliograph::v51 {
 #ifdef V51_LIVE_TRIAL
 #undef V51_BUILD_ID
-#define V51_BUILD_ID "v5.2-live-ESP32"
+#define V51_BUILD_ID "v5.2.1-live-ESP32"
 bool liveTrialActive();
 bool liveTrialExecuted();
 std::optional<int> liveTrialAppliedWatts();

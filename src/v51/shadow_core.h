@@ -319,10 +319,13 @@ public:
     const bool invAligned = invSample && std::abs(*invSample) <= 30000 &&
                             std::abs(double(int32_t(e.inverter.stamp - e.battery.stamp))) <=
                                 std::min(p.staleMs, 2000);
-    // Use true AC-side balance (*batt + *invSample) to cancel inverter self-consumption
-    // and DC MPPT sensor offsets so ChargeFirst (surplusOnly=0, gridCharge=0) keeps
-    // inverter_w >= 0 (grid_w == house_load) instead of rectifying AC from the grid.
-    const int pvAvailableW = invAligned ? std::max(0, int(std::lround(*batt + *invSample)))
+    // Use true AC-side feedback (min(priorW_, batt) + inverter_w while in ChargeFirst)
+    // to cancel both DC MPPT sensor offsets and Afore's ~+6% internal charge overshoot,
+    // driving inverter_w -> 0 W (grid_w == house_load) instead of rectifying AC from grid.
+    const int baseChargeW = (priorW_ && effective_ == Strategy::ChargeFirst)
+        ? std::min(*priorW_, int(std::lround(*batt)))
+        : int(std::lround(*batt));
+    const int pvAvailableW = invAligned ? std::max(0, baseChargeW + int(std::lround(*invSample)))
                            : (pvSample ? std::max(0, int(std::lround(*pvSample))) : -1);
     const bool haveVoltage = volt && *volt > 0 && *volt <= 1000;
     const bool voltageSafe =

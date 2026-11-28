@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "afore-companion-collector"
-version = "1.0.28"
+version = "1.0.29"
 description = "Read-only MQTT & ESP32 REST telemetry/decision collector for Afore EMS Companion"
 requires-python = ">=3.12"
 dependencies = [

@@ -227,6 +227,180 @@ function AforeInverterGlyph({
   );
 }
 
+const JARVIS_PARTICLES = [
+  { r: 64, angle: 18, size: 1.9, dur: 11.3, dir: 1, delay: -2.1, kind: "cyan" as const },
+  { r: 74, angle: 112, size: 1.5, dur: 14.9, dir: -1, delay: -6.4, kind: "teal" as const },
+  { r: 82, angle: 205, size: 2.3, dur: 17.3, dir: 1, delay: -4.8, kind: "pv" as const },
+  { r: 89, angle: 302, size: 1.3, dur: 9.7, dir: -1, delay: -1.5, kind: "cyan" as const },
+  { r: 96, angle: 54, size: 2.1, dur: 19.1, dir: 1, delay: -11.2, kind: "teal" as const },
+  { r: 104, angle: 158, size: 1.6, dur: 13.1, dir: -1, delay: -8.3, kind: "pv" as const },
+  { r: 112, angle: 248, size: 2.4, dur: 23.3, dir: 1, delay: -5.9, kind: "cyan" as const },
+  { r: 118, angle: 334, size: 1.4, dur: 16.7, dir: -1, delay: -9.7, kind: "teal" as const },
+  { r: 126, angle: 82, size: 2.0, dur: 21.1, dir: 1, delay: -14.1, kind: "cyan" as const },
+  { r: 132, angle: 188, size: 1.5, dur: 15.7, dir: -1, delay: -3.2, kind: "pv" as const },
+  { r: 138, angle: 274, size: 1.8, dur: 27.1, dir: 1, delay: -18.5, kind: "teal" as const },
+  { r: 145, angle: 26, size: 2.2, dur: 29.3, dir: -1, delay: -7.4, kind: "cyan" as const },
+  { r: 150, angle: 138, size: 1.3, dur: 18.7, dir: 1, delay: -12.6, kind: "teal" as const },
+  { r: 70, angle: 256, size: 1.4, dur: 10.7, dir: 1, delay: -4.1, kind: "pv" as const },
+  { r: 108, angle: 12, size: 1.7, dur: 24.7, dir: -1, delay: -16.2, kind: "cyan" as const },
+  { r: 142, angle: 318, size: 1.5, dur: 20.3, dir: 1, delay: -2.8, kind: "pv" as const },
+];
+
+const JARVIS_TRAILS = [
+  { r: 78, dash: "36 454", dur: 7.9, dir: 1, delay: -1.2, width: 1.5, opacity: 0.52, color: "var(--accent-cyan, #00f0ff)" },
+  { r: 106, dash: "58 608", dur: 11.7, dir: -1, delay: -5.4, width: 1.4, opacity: 0.44, color: "var(--accent-teal)" },
+  { r: 132, dash: "74 756", dur: 15.3, dir: 1, delay: -8.8, width: 1.2, opacity: 0.36, color: "var(--accent-cyan, #00f0ff)" },
+  { r: 148, dash: "44 886", dur: 19.7, dir: -1, delay: -3.6, width: 1.1, opacity: 0.3, color: "var(--accent-teal)" },
+];
+
+function JarvisCoreBackdrop({
+  cx,
+  cy,
+  scale = 1,
+  intensity = 0.7,
+  pvActive = false,
+  glowFilterId,
+  auraGradId,
+}: {
+  cx: number;
+  cy: number;
+  scale?: number;
+  intensity?: number;
+  pvActive?: boolean;
+  glowFilterId: string;
+  auraGradId: string;
+}) {
+  const clamped = Math.max(0.35, Math.min(1, intensity));
+  return (
+    <g
+      transform={`translate(${cx}, ${cy}) scale(${scale})`}
+      pointerEvents="none"
+      className="em-jarvis-field"
+      style={{ opacity: clamped }}
+    >
+      {/* Breathing core energy aura */}
+      <circle cx="0" cy="0" r="118" fill={`url(#${auraGradId})`} className="em-jarvis-pulse" />
+
+      {/* Outer Arc-Reactor segmented ring (counter-clockwise) */}
+      <g className="em-jarvis-ring-ccw-slow">
+        <circle
+          cx="0"
+          cy="0"
+          r="128"
+          fill="none"
+          stroke="var(--accent-cyan, #00f0ff)"
+          strokeWidth="1.2"
+          strokeDasharray="46 220 34 220 52 232"
+          strokeLinecap="round"
+          opacity="0.34"
+          filter={`url(#${glowFilterId})`}
+        />
+        <circle
+          cx="0"
+          cy="0"
+          r="122"
+          fill="none"
+          stroke="var(--accent-teal)"
+          strokeWidth="0.9"
+          strokeDasharray="2 11"
+          opacity="0.28"
+        />
+      </g>
+
+      {/* Mid holographic telemetry ring (clockwise) */}
+      <g className="em-jarvis-ring-cw-med">
+        <circle
+          cx="0"
+          cy="0"
+          r="94"
+          fill="none"
+          stroke="var(--accent-teal)"
+          strokeWidth="1.35"
+          strokeDasharray="68 128 24 128 54 188"
+          strokeLinecap="round"
+          opacity="0.38"
+          filter={`url(#${glowFilterId})`}
+        />
+        <circle
+          cx="0"
+          cy="0"
+          r="88"
+          fill="none"
+          stroke="var(--accent-cyan, #00f0ff)"
+          strokeWidth="0.8"
+          strokeDasharray="1.5 9"
+          opacity="0.26"
+        />
+      </g>
+
+      {/* Inner fast scanner ring around Afore hub */}
+      <g className="em-jarvis-ring-ccw-fast">
+        <circle
+          cx="0"
+          cy="0"
+          r="64"
+          fill="none"
+          stroke="var(--accent-cyan, #00f0ff)"
+          strokeWidth="1.4"
+          strokeDasharray="26 74 18 74 26 74 18 92"
+          strokeLinecap="round"
+          opacity="0.46"
+          filter={`url(#${glowFilterId})`}
+        />
+      </g>
+
+      {/* Sweeping plasma energy trails on staggered orbits */}
+      {JARVIS_TRAILS.map((tr, idx) => (
+        <circle
+          key={idx}
+          cx="0"
+          cy="0"
+          r={tr.r}
+          fill="none"
+          stroke={tr.color}
+          strokeWidth={tr.width}
+          strokeDasharray={tr.dash}
+          strokeLinecap="round"
+          opacity={tr.opacity}
+          filter={`url(#${glowFilterId})`}
+          className={tr.dir > 0 ? "em-jarvis-spin-cw" : "em-jarvis-spin-ccw"}
+          style={{ animationDuration: `${tr.dur}s`, animationDelay: `${tr.delay}s` }}
+        />
+      ))}
+
+      {/* Pseudo-random orbital particle field */}
+      {JARVIS_PARTICLES.map((p, idx) => {
+        const rad = (p.angle * Math.PI) / 180;
+        const px = +(Math.cos(rad) * p.r).toFixed(1);
+        const py = +(Math.sin(rad) * p.r).toFixed(1);
+        const fill =
+          p.kind === "pv" && pvActive
+            ? "var(--pv-amber, #f59e0b)"
+            : p.kind === "teal"
+              ? "var(--accent-teal)"
+              : "var(--accent-cyan, #00f0ff)";
+        return (
+          <g
+            key={idx}
+            className={p.dir > 0 ? "em-jarvis-spin-cw" : "em-jarvis-spin-ccw"}
+            style={{ animationDuration: `${p.dur}s`, animationDelay: `${p.delay}s` }}
+          >
+            <circle
+              cx={px}
+              cy={py}
+              r={p.size}
+              fill={fill}
+              filter={`url(#${glowFilterId})`}
+              className="em-jarvis-twinkle"
+              style={{ animationDelay: `${(idx * -0.73).toFixed(2)}s` }}
+            />
+          </g>
+        );
+      })}
+    </g>
+  );
+}
+
 export function EmeraldEnergyMonitor({
   telemetry,
   safetyMinW,
@@ -249,6 +423,10 @@ export function EmeraldEnergyMonitor({
     telemetry?.temp_c != null && Number.isFinite(telemetry.temp_c)
       ? `${Number(telemetry.temp_c).toFixed(1).replace(".", ",")} °C`
       : null;
+
+  const totalFlowW =
+    Math.abs(flow.pv ?? 0) + Math.abs(flow.load ?? 0) + Math.abs(flow.batt ?? 0) + Math.abs(flow.grid ?? 0);
+  const jarvisIntensity = Math.min(1, 0.48 + (totalFlowW / 4500) * 0.52);
 
   const onNodeKey = (node: NodeId) => (e: KeyboardEvent<SVGGElement>) => {
     if (e.key === "Enter" || e.key === " ") {
@@ -305,7 +483,8 @@ export function EmeraldEnergyMonitor({
         >
           <defs>
             <radialGradient id="em-center-glow" cx="50%" cy="50%" r="50%">
-              <stop offset="0%" stopColor="var(--accent-teal)" stopOpacity="0.07" />
+              <stop offset="0%" stopColor="var(--accent-cyan, #00f0ff)" stopOpacity="0.16" />
+              <stop offset="52%" stopColor="var(--accent-teal)" stopOpacity="0.06" />
               <stop offset="100%" stopColor="var(--accent-teal)" stopOpacity="0" />
             </radialGradient>
             <filter id="em-particle-glow" x="-80%" y="-80%" width="260%" height="260%">
@@ -339,7 +518,17 @@ export function EmeraldEnergyMonitor({
             strokeDasharray="6 7"
             opacity="0.75"
           />
-          <circle cx="330" cy="205" r="96" fill="url(#em-center-glow)" />
+
+          {/* J.A.R.V.I.S. holographic rings, sweeping energy trails & orbital particles */}
+          <JarvisCoreBackdrop
+            cx={330}
+            cy={205}
+            scale={1}
+            intensity={jarvisIntensity}
+            pvActive={flow.pvActive}
+            glowFilterId="em-particle-glow"
+            auraGradId="em-center-glow"
+          />
 
           {/* Four clean radial arcs from iconic circular nodes toward center hub */}
           <RadialFlowTrack
@@ -580,6 +769,31 @@ export function EmeraldEnergyMonitor({
           role="group"
           aria-label="Diagramma flussi energetici mobile Emerald"
         >
+          <defs>
+            <radialGradient id="em-m-center-glow" cx="50%" cy="50%" r="50%">
+              <stop offset="0%" stopColor="var(--accent-cyan, #00f0ff)" stopOpacity="0.16" />
+              <stop offset="55%" stopColor="var(--accent-teal)" stopOpacity="0.06" />
+              <stop offset="100%" stopColor="var(--accent-teal)" stopOpacity="0" />
+            </radialGradient>
+            <filter id="em-m-particle-glow" x="-80%" y="-80%" width="260%" height="260%">
+              <feGaussianBlur stdDeviation="2.2" result="blur" />
+              <feMerge>
+                <feMergeNode in="blur" />
+                <feMergeNode in="SourceGraphic" />
+              </feMerge>
+            </filter>
+          </defs>
+
+          <JarvisCoreBackdrop
+            cx={180}
+            cy={180}
+            scale={0.68}
+            intensity={jarvisIntensity}
+            pvActive={flow.pvActive}
+            glowFilterId="em-m-particle-glow"
+            auraGradId="em-m-center-glow"
+          />
+
           <RadialFlowTrack
             id="em-m-pv"
             path="M 60 100 C 60 152 108 180 140 180"

@@ -1600,8 +1600,70 @@
   animation: emHudOrbitSpin 60s linear infinite;
 }
 
+@keyframes emJarvisSpinCw {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes emJarvisSpinCcw {
+  from { transform: rotate(360deg); }
+  to { transform: rotate(0deg); }
+}
+
+@keyframes emJarvisPulse {
+  0%, 100% { transform: scale(0.95); opacity: 0.65; }
+  50% { transform: scale(1.06); opacity: 1; }
+}
+
+@keyframes emJarvisTwinkle {
+  0%, 100% { opacity: 0.25; }
+  45% { opacity: 0.95; }
+  70% { opacity: 0.5; }
+}
+
+.em-jarvis-ring-ccw-slow {
+  transform-origin: 0px 0px;
+  animation: emJarvisSpinCcw 26s linear infinite;
+}
+
+.em-jarvis-ring-cw-med {
+  transform-origin: 0px 0px;
+  animation: emJarvisSpinCw 17s linear infinite;
+}
+
+.em-jarvis-ring-ccw-fast {
+  transform-origin: 0px 0px;
+  animation: emJarvisSpinCcw 10s linear infinite;
+}
+
+.em-jarvis-spin-cw {
+  transform-origin: 0px 0px;
+  animation: emJarvisSpinCw 14s linear infinite;
+}
+
+.em-jarvis-spin-ccw {
+  transform-origin: 0px 0px;
+  animation: emJarvisSpinCcw 14s linear infinite;
+}
+
+.em-jarvis-pulse {
+  transform-origin: 0px 0px;
+  animation: emJarvisPulse 4.6s ease-in-out infinite;
+}
+
+.em-jarvis-twinkle {
+  animation: emJarvisTwinkle 3.8s ease-in-out infinite;
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .em-hud-orbit {
+  .em-hud-orbit,
+  .em-jarvis-ring-ccw-slow,
+  .em-jarvis-ring-cw-med,
+  .em-jarvis-ring-ccw-fast,
+  .em-jarvis-spin-cw,
+  .em-jarvis-spin-ccw,
+  .em-jarvis-pulse,
+  .em-jarvis-twinkle {
     animation: none;
   }
 }

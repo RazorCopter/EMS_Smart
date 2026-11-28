@@ -56,6 +56,13 @@ export function EmeraldDashboardLayout({ vm, chartRange, onChangeChartRange }: P
     month: "short",
   });
 
+  const espStatus = espControlStatus(vm.system.components.aux1);
+  const auxDetail = vm.system.components.aux1?.detail;
+  const headerStrategyLabel =
+    auxDetail?.operating_mode === "SHADOW" || auxDetail?.live_delegated_native === true
+      ? "Self-Use nativo"
+      : vm.decision.effectiveStrategyLabel;
+
   return (
     <div className="em-dashboard" data-ui-template="emerald">
       {/* TALL CONTEXTUAL EMERALD HEADER */}
@@ -71,8 +78,8 @@ export function EmeraldDashboardLayout({ vm, chartRange, onChangeChartRange }: P
               <strong>{fmtTime(vm.generatedAt, vm.timezone)}</strong>
             </span>
             <EmeraldStatusPill tone={vm.telStateClass} label={telStateLabel} />
-            <EmeraldStatusPill tone="info" label={vm.decision.effectiveStrategyLabel} />
-            <EmeraldStatusPill tone={espControlStatus(vm.system.components.aux1).pillTone} label={espControlStatus(vm.system.components.aux1).modeLabel} />
+            <EmeraldStatusPill tone="info" label={headerStrategyLabel} />
+            <EmeraldStatusPill tone={espStatus.pillTone} label={espStatus.modeLabel} />
           </>
         }
         actions={
